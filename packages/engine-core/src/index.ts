@@ -4,4 +4,5 @@ export * from './recruiting';
 export * from './result';
 export * from './schedule';
 export * from './season-advancement';
+export * from './signing-class';
 export * from './team-validation';
