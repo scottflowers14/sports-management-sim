@@ -2,7 +2,7 @@ export type Result<T, E = string> =
   | { ok: true; value: T }
   | { ok: false; error: E };
 
-export function success<T>(value: T): Result<T> {
+export function success<T, E = string>(value: T): Result<T, E> {
   return { ok: true, value };
 }
 
