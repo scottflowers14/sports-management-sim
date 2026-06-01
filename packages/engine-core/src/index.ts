@@ -1,4 +1,5 @@
 export * from './models';
+export * from './recruit-commitment';
 export * from './recruiting';
 export * from './result';
 export * from './schedule';
