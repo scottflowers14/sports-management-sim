@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/engine-core" },
-    { "path": "packages/sport-lacrosse" }
+    { "path": "packages/sport-lacrosse" },
+    { "path": "apps/desktop" }
   ]
 }

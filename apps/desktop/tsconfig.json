@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sports-management-sim/engine-core": ["../../packages/engine-core/dist/index.d.ts"],
+      "@sports-management-sim/sport-lacrosse": ["../../packages/sport-lacrosse/dist/index.d.ts"]
+    }
+  },
+  "references": [
+    { "path": "../../packages/engine-core" },
+    { "path": "../../packages/sport-lacrosse" }
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}
