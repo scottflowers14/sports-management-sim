@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { advanceLacrosseDynastyWeek, createNewLacrosseDynasty } from './dynasty';
+import {
+  advanceLacrosseDynastyWeek,
+  createNewLacrosseDynasty,
+  getLacrosseRecruitingSummary,
+  offerLacrosseRecruitScholarship,
+} from './dynasty';
 import { validateLacrosseRoster } from './roster-validation';
 
 describe('createNewLacrosseDynasty', () => {
@@ -35,6 +40,43 @@ describe('createNewLacrosseDynasty', () => {
   });
 });
 
+describe('offerLacrosseRecruitScholarship', () => {
+  it('adds a scholarship offer, boosts interest, and keeps the original dynasty immutable', () => {
+    const dynasty = createNewLacrosseDynasty({ seed: 2028, userTeamId: 'maryland-state', seasonYear: 2028 });
+    const recruitId = dynasty.recruitBoard[0]?.recruit.id;
+
+    expect(recruitId).toBeDefined();
+
+    const offered = offerLacrosseRecruitScholarship(dynasty, recruitId as string);
+    const originalRecruit = dynasty.recruits.find((recruit) => recruit.id === recruitId);
+    const offeredRecruit = offered.recruits.find((recruit) => recruit.id === recruitId);
+
+    expect(offered).not.toBe(dynasty);
+    expect(originalRecruit?.scholarshipOffers).toEqual([]);
+    expect(originalRecruit?.interestByTeamId['maryland-state']).toBeUndefined();
+    expect(offeredRecruit?.scholarshipOffers).toEqual([{ teamId: 'maryland-state', scholarshipPercent: 100 }]);
+    expect(offeredRecruit?.interestByTeamId['maryland-state']).toBeGreaterThan(0);
+    expect(getLacrosseRecruitingSummary(offered)).toMatchObject({ offersUsed: 1, commitments: 0 });
+  });
+
+  it('resolves offered recruits into the user recruiting class as weeks advance', () => {
+    const dynasty = createNewLacrosseDynasty({ seed: 2028, userTeamId: 'maryland-state', seasonYear: 2028 });
+    const recruitId = dynasty.recruitBoard[0]?.recruit.id as string;
+    const offered = offerLacrosseRecruitScholarship(dynasty, recruitId);
+
+    const advanced = advanceLacrosseDynastyWeek(
+      advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(offered))),
+    );
+    const committedRecruit = advanced.recruits.find((recruit) => recruit.id === recruitId);
+
+    expect(committedRecruit?.status).toBe('committed');
+    expect(committedRecruit?.committedTeamId).toBe('maryland-state');
+    expect(advanced.recruitingClass.map((recruit) => recruit.id)).toContain(recruitId);
+    expect(advanced.recruitBoard.map((entry) => entry.recruit.id)).not.toContain(recruitId);
+    expect(getLacrosseRecruitingSummary(advanced).commitments).toBe(1);
+  });
+});
+
 describe('advanceLacrosseDynastyWeek', () => {
   it('simulates the current week and returns a new dynasty state', () => {
     const dynasty = createNewLacrosseDynasty({ seed: 2028, userTeamId: 'maryland-state', seasonYear: 2028 });
@@ -44,23 +86,24 @@ describe('advanceLacrosseDynastyWeek', () => {
     expect(advanced).not.toBe(dynasty);
     expect(advanced.season).not.toBe(dynasty.season);
     expect(advanced.season.currentWeek).toBe(2);
-    expect(advanced.season.schedule.filter((game) => game.week === 1)).toHaveLength(1);
-    expect(advanced.season.schedule.filter((game) => game.week === 1 && game.status === 'final')).toHaveLength(1);
-    expect(dynasty.season.schedule.filter((game) => game.week === 1 && game.status === 'scheduled')).toHaveLength(1);
-    expect(advanced.season.standings).toHaveLength(4);
+    expect(advanced.season.schedule.filter((game) => game.week === 1)).toHaveLength(2);
+    expect(advanced.season.schedule.filter((game) => game.week === 1 && game.status === 'final')).toHaveLength(2);
+    expect(dynasty.season.schedule.filter((game) => game.week === 1 && game.status === 'scheduled')).toHaveLength(2);
+    expect(advanced.season.standings).toHaveLength(8);
 
     const totalWins = advanced.season.teams.reduce((sum, team) => sum + team.record.wins, 0);
     const totalLosses = advanced.season.teams.reduce((sum, team) => sum + team.record.losses, 0);
-    expect(totalWins).toBe(1);
-    expect(totalLosses).toBe(1);
+    expect(totalWins).toBe(2);
+    expect(totalLosses).toBe(2);
   });
 
   it('marks the season complete after the final scheduled week is simulated', () => {
     const dynasty = createNewLacrosseDynasty({ seed: 2028, userTeamId: 'maryland-state', seasonYear: 2028 });
 
-    const completed = advanceLacrosseDynastyWeek(
-      advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(dynasty))))),
-    );
+    let completed = dynasty;
+    for (let week = 1; week <= 14; week += 1) {
+      completed = advanceLacrosseDynastyWeek(completed);
+    }
 
     expect(completed.season.schedule.every((game) => game.status === 'final')).toBe(true);
     expect(completed.season.phase).toBe('complete');
