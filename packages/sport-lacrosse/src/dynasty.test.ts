@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createNewLacrosseDynasty } from './dynasty';
+import { advanceLacrosseDynastyWeek, createNewLacrosseDynasty } from './dynasty';
 import { validateLacrosseRoster } from './roster-validation';
 
 describe('createNewLacrosseDynasty', () => {
@@ -32,5 +32,37 @@ describe('createNewLacrosseDynasty', () => {
     expect(() =>
       createNewLacrosseDynasty({ seed: 2028, userTeamId: 'not-real', seasonYear: 2028 }),
     ).toThrow('Unknown lacrosse dynasty userTeamId: not-real');
+  });
+});
+
+describe('advanceLacrosseDynastyWeek', () => {
+  it('simulates the current week and returns a new dynasty state', () => {
+    const dynasty = createNewLacrosseDynasty({ seed: 2028, userTeamId: 'maryland-state', seasonYear: 2028 });
+
+    const advanced = advanceLacrosseDynastyWeek(dynasty);
+
+    expect(advanced).not.toBe(dynasty);
+    expect(advanced.season).not.toBe(dynasty.season);
+    expect(advanced.season.currentWeek).toBe(2);
+    expect(advanced.season.schedule.filter((game) => game.week === 1)).toHaveLength(1);
+    expect(advanced.season.schedule.filter((game) => game.week === 1 && game.status === 'final')).toHaveLength(1);
+    expect(dynasty.season.schedule.filter((game) => game.week === 1 && game.status === 'scheduled')).toHaveLength(1);
+    expect(advanced.season.standings).toHaveLength(4);
+
+    const totalWins = advanced.season.teams.reduce((sum, team) => sum + team.record.wins, 0);
+    const totalLosses = advanced.season.teams.reduce((sum, team) => sum + team.record.losses, 0);
+    expect(totalWins).toBe(1);
+    expect(totalLosses).toBe(1);
+  });
+
+  it('marks the season complete after the final scheduled week is simulated', () => {
+    const dynasty = createNewLacrosseDynasty({ seed: 2028, userTeamId: 'maryland-state', seasonYear: 2028 });
+
+    const completed = advanceLacrosseDynastyWeek(
+      advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(advanceLacrosseDynastyWeek(dynasty))))),
+    );
+
+    expect(completed.season.schedule.every((game) => game.status === 'final')).toBe(true);
+    expect(completed.season.phase).toBe('complete');
   });
 });

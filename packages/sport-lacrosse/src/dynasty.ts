@@ -1,4 +1,5 @@
 import {
+  advanceSeasonWeek,
   createRoundRobinSchedule,
   sortRecruitBoardForTeam,
   type Conference,
@@ -9,6 +10,7 @@ import {
 import type { LacrossePlayerTraits, LacrossePosition, LacrosseSeason, LacrosseTeam } from './models';
 import { generateLacrosseRecruitingClass, type LacrosseRecruit } from './recruit-generation';
 import { makeLacrosseTeam } from './test-fixtures';
+import { simulateLacrosseGame } from './simulate-game';
 
 export interface LacrosseDynastyState {
   id: string;
@@ -211,6 +213,33 @@ export function createNewLacrosseDynasty({
   };
 }
 
+export function advanceLacrosseDynastyWeek(state: LacrosseDynastyState): LacrosseDynastyState {
+  if (state.season.phase === 'complete') {
+    return state;
+  }
+
+  const random = createSeededRandom(state.seed + state.season.year * 100 + state.season.currentWeek);
+  const advancedSeason = advanceSeasonWeek(state.season, (_game, homeTeam, awayTeam) =>
+    simulateLacrosseGame({ homeTeam, awayTeam, random }),
+  );
+  const hasRemainingScheduledGames = advancedSeason.schedule.some((game) => game.status === 'scheduled');
+  const season = {
+    ...advancedSeason,
+    phase: hasRemainingScheduledGames ? advancedSeason.phase : ('complete' as const),
+  };
+  const userTeam = season.teams.find((team) => team.id === state.userTeamId);
+
+  if (userTeam === undefined) {
+    throw new Error(`Unknown lacrosse dynasty userTeamId: ${state.userTeamId}`);
+  }
+
+  return {
+    ...state,
+    season,
+    recruitBoard: sortRecruitBoardForTeam(userTeam, state.recruits, state.rosterTargets),
+  };
+}
+
 function createInitialTeams(): LacrosseTeam[] {
   return [
     makeTeamWithOverride('maryland-state'),
@@ -266,6 +295,14 @@ function createConferences(accIds: string[], necIds: string[]): Conference[] {
       regionIds: ['new-england', 'colorado', 'upstate-ny', 'mid-atlantic'],
     },
   ];
+}
+
+function createSeededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
 }
 
 function createRegions(): Region[] {
