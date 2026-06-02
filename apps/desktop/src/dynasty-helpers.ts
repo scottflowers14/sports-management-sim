@@ -2,19 +2,20 @@ import {
   addSignedRecruitsToTeam,
   applyScholarshipOffer,
   commitRecruit,
-  createRoundRobinSchedule,
   runTeamOffseason,
   signCommittedRecruit,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
-import { generateLacrosseRecruitingClass } from '@sports-management-sim/sport-lacrosse';
+import { createLacrosseSeasonSchedule, generateLacrosseRecruitingClass } from '@sports-management-sim/sport-lacrosse';
 import type {
   LacrosseDynastyState,
   LacrosseRecruit,
   LacrosseSeason,
   LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
+import { computeSeasonAwards } from './awards';
+import type { SeasonAwards } from './awards';
 
 export interface OffseasonSummary {
   seasonYear: number;
@@ -23,6 +24,7 @@ export interface OffseasonSummary {
   userRecord: { wins: number; losses: number };
   graduates: { name: string; position: string; overall: number }[];
   signingClass: { name: string; position: string; starRating: number; overall: number }[];
+  awards: SeasonAwards | null;
 }
 
 export function autoCommitWeekly(
@@ -90,6 +92,9 @@ export function runOffseason(
       overall: r.ratings.overall,
     }));
 
+  // Compute season awards
+  const awards = computeSeasonAwards(season, userTeamId);
+
   // Generate new recruiting class and board
   const newSeed = seed + newYear;
   const newRecruits = generateLacrosseRecruitingClass({ count: 80, seed: newSeed });
@@ -100,10 +105,7 @@ export function runOffseason(
     ...season,
     year: newYear,
     teams: teamsAfterOffseason,
-    schedule: createRoundRobinSchedule(
-      teamsAfterOffseason.map((t) => t.id),
-      newYear,
-    ),
+    schedule: createLacrosseSeasonSchedule(newYear),
     standings: [],
     currentWeek: 1,
     phase: 'regular_season',
@@ -116,6 +118,7 @@ export function runOffseason(
     userRecord: { wins: userTeam.record.wins, losses: userTeam.record.losses },
     graduates,
     signingClass,
+    awards,
   };
 
   return {

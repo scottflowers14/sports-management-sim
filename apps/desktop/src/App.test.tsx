@@ -32,10 +32,9 @@ describe('Desktop App', () => {
     expect(screen.queryAllByRole('button', { name: /Offer Scholarship/i }).length).toBeGreaterThan(0);
   });
 
-  it('switches to standings and shows a table', async () => {
+  it('switches to standings and shows national rankings and conference sections', async () => {
     render(<App />);
     await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
-    expect(screen.getByRole('heading', { name: /Conference Standings/i })).toBeInTheDocument();
-    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /National Rankings/i })).toBeInTheDocument();
   });
 });

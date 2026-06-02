@@ -95,6 +95,13 @@ h2 {
   color: #72f2c6;
 }
 
+.national-rank {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f2c472;
+  letter-spacing: 0.04em;
+}
+
 .metric {
   margin-bottom: 4px;
   font-size: 2rem;
@@ -130,6 +137,8 @@ h2 {
   font-weight: 600;
   letter-spacing: 0.03em;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
 }
 
 .tab:hover {
@@ -505,4 +514,306 @@ li span {
 .user-row td {
   color: #72f2c6;
   font-weight: 600;
+}
+
+/* ── Two-column season layout ─────────────────────────────── */
+
+.season-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.season-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.season-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── News styles ──────────────────────────────────────────── */
+
+.news-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.news-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.news-item:last-child {
+  border-bottom: none;
+}
+
+.news-chip {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chip-game {
+  background: rgba(71, 120, 255, 0.18);
+  color: #7ba8ff;
+}
+
+.chip-recruiting {
+  background: rgba(114, 242, 198, 0.15);
+  color: #72f2c6;
+}
+
+.chip-rankings {
+  background: rgba(242, 196, 114, 0.15);
+  color: #f2c472;
+}
+
+.chip-award {
+  background: rgba(200, 130, 255, 0.15);
+  color: #c882ff;
+}
+
+.news-headline {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #e6edf3;
+}
+
+.news-week {
+  font-size: 0.75rem;
+  color: #aab8ca;
+  margin-top: 2px;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 99px;
+  background: rgba(114, 242, 198, 0.2);
+  color: #72f2c6;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+/* ── Rankings styles ──────────────────────────────────────── */
+
+.standings-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.rank-change {
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: 28px;
+  text-align: center;
+}
+
+.rank-up {
+  color: #72f2c6;
+}
+
+.rank-down {
+  color: #f27272;
+}
+
+.rank-same {
+  color: #aab8ca;
+}
+
+.conf-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Player panel ─────────────────────────────────────────── */
+
+.player-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.player-panel {
+  width: 360px;
+  height: 100vh;
+  overflow-y: auto;
+  border-radius: 0;
+  border-right: none;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  color: #aab8ca;
+  font-size: 1.4rem;
+  cursor: pointer;
+  align-self: flex-end;
+  padding: 0;
+  line-height: 1;
+}
+
+.panel-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.panel-meta {
+  color: #aab8ca;
+  font-size: 0.9rem;
+}
+
+.ovr-block {
+  display: flex;
+  gap: 24px;
+}
+
+.ovr-stat {
+  text-align: center;
+}
+
+.ovr-num {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #72f2c6;
+}
+
+.ovr-label {
+  font-size: 0.72rem;
+  color: #aab8ca;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rating-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 32px;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.rating-bar-wrap {
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.rating-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #3d7fff, #72f2c6);
+}
+
+.rating-val {
+  color: #aab8ca;
+  text-align: right;
+}
+
+.player-roster-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.player-roster-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.12s;
+}
+
+.player-roster-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-row-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.player-row-meta {
+  font-size: 0.8rem;
+  color: #aab8ca;
+}
+
+.player-row-ovr {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #72f2c6;
+}
+
+/* ── Awards styles ────────────────────────────────────────── */
+
+.awards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.award-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.award-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #c882ff;
+  margin-bottom: 6px;
+}
+
+.award-player {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.award-detail {
+  font-size: 0.8rem;
+  color: #aab8ca;
+  margin-top: 2px;
 }
