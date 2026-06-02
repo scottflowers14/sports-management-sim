@@ -817,3 +817,500 @@ li span {
   color: #aab8ca;
   margin-top: 2px;
 }
+
+/* ── Tournament view ──────────────────────────────────────── */
+
+.tournament-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(200, 130, 255, 0.4);
+  background: rgba(200, 130, 255, 0.1);
+  color: #c882ff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.tournament-btn:hover {
+  background: rgba(200, 130, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.tournament-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.tournament-conferences {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.bracket {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.bracket-semis {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.bracket-connector {
+  font-size: 1.5rem;
+  color: #aab8ca;
+  flex-shrink: 0;
+}
+
+.bracket-final-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bracket-matchup {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.12s;
+}
+
+.bracket-matchup.played:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.bracket-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  transition: opacity 0.15s;
+}
+
+.bracket-team.winner {
+  background: rgba(114, 242, 198, 0.08);
+}
+
+.bracket-team.loser {
+  opacity: 0.5;
+}
+
+.bracket-seed {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #aab8ca;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.bracket-team-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.bracket-team-name.user {
+  color: #72f2c6;
+}
+
+.bracket-score {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #aab8ca;
+  min-width: 24px;
+  text-align: right;
+}
+
+.bracket-score.score-win {
+  color: #72f2c6;
+}
+
+.bracket-vs {
+  font-size: 0.72rem;
+  color: #aab8ca;
+  padding: 0 4px;
+  align-self: center;
+}
+
+.bracket-tbd {
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tbd-team {
+  color: #aab8ca;
+  font-size: 0.85rem;
+  padding: 6px 4px;
+}
+
+.champion-display {
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(114, 242, 198, 0.08);
+  border: 1px solid rgba(114, 242, 198, 0.2);
+}
+
+.champion-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #72f2c6;
+  margin-bottom: 2px;
+}
+
+.champion-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.national-champ-card {
+  max-width: 600px;
+}
+
+.national-champ-card h2 {
+  color: #f2c472;
+  margin-bottom: 16px;
+}
+
+.national-champion-banner {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(242, 196, 114, 0.12), rgba(200, 130, 255, 0.12));
+  border: 1px solid rgba(242, 196, 114, 0.3);
+}
+
+.champion-name-lg {
+  font-size: 1.2rem;
+  display: block;
+  margin-top: 2px;
+}
+
+.tournament-controls {
+  display: flex;
+  gap: 16px;
+  max-width: 480px;
+}
+
+.tournament-controls .sim-btn,
+.tournament-controls .offseason-btn {
+  flex: 1;
+  margin: 0;
+}
+
+/* ── Box score panel ──────────────────────────────────────── */
+
+.box-score-panel {
+  width: 480px;
+}
+
+.panel-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #72f2c6;
+  margin-bottom: 4px;
+}
+
+.box-score-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+}
+
+.box-score-side {
+  flex: 1;
+  text-align: center;
+}
+
+.box-score-home {
+  text-align: right;
+}
+
+.box-score-side.winner-side .box-score-final {
+  color: #72f2c6;
+}
+
+.box-score-team-name {
+  font-size: 0.82rem;
+  color: #aab8ca;
+  margin-bottom: 4px;
+}
+
+.box-score-final {
+  font-size: 2.4rem;
+  font-weight: 800;
+}
+
+.box-score-sep {
+  font-size: 1rem;
+  color: #aab8ca;
+  flex-shrink: 0;
+}
+
+.box-score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.box-score-table th {
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stat-away {
+  text-align: left;
+}
+
+.stat-home {
+  text-align: right;
+}
+
+.stat-name {
+  text-align: center;
+}
+
+.box-score-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.box-score-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.stat-val {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.box-score-table tr td:first-child {
+  text-align: left;
+}
+
+.box-score-table tr td:last-child {
+  text-align: right;
+}
+
+.stat-label {
+  text-align: center;
+  color: #aab8ca;
+  font-size: 0.82rem;
+}
+
+/* ── Injury indicators ────────────────────────────────────── */
+
+.inj-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(242, 114, 114, 0.2);
+  color: #f27272;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+.inj-badge-lg {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
+.player-injured .player-row-name {
+  color: #f27272;
+}
+
+.injury-count {
+  font-size: 0.8rem;
+  color: #f27272;
+  font-weight: 600;
+}
+
+.sidebar-inj {
+  color: #f27272;
+}
+
+.injury-status {
+  font-size: 0.82rem;
+  color: #f27272;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.chip-injury {
+  background: rgba(242, 114, 114, 0.15);
+  color: #f27272;
+}
+
+/* ── Clickable result rows ────────────────────────────────── */
+
+.result-row.clickable {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.result-row.clickable:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.result-row.win.clickable:hover {
+  background: rgba(114, 242, 198, 0.12);
+}
+
+.result-row.loss.clickable:hover {
+  background: rgba(242, 114, 114, 0.12);
+}
+
+.box-score-hint {
+  display: block;
+  font-size: 0.72rem;
+  color: #aab8ca;
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Dynasty history ──────────────────────────────────────── */
+
+.history-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.history-summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.history-stat-card {
+  text-align: center;
+  padding: 20px;
+}
+
+.history-stat-num {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #72f2c6;
+  margin-bottom: 4px;
+}
+
+.history-stat-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+}
+
+.history-table th {
+  white-space: nowrap;
+}
+
+.record-cell {
+  font-weight: 700;
+}
+
+.champ-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.conf-champ {
+  background: rgba(114, 242, 198, 0.15);
+  color: #72f2c6;
+}
+
+.natl-champ {
+  background: rgba(242, 196, 114, 0.15);
+  color: #f2c472;
+}
+
+/* ── Prestige bars in offseason ───────────────────────────── */
+
+.prestige-card h2 {
+  margin-bottom: 16px;
+}
+
+.prestige-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Player traits ────────────────────────────────────────── */
+
+.trait-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trait-chip {
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: capitalize;
+  background: rgba(71, 120, 255, 0.12);
+  color: #7ba8ff;
+  border: 1px solid rgba(71, 120, 255, 0.25);
+}
+
+/* ── Prestige dots in standings ───────────────────────────── */
+
+.prestige-dots {
+  font-size: 0.55rem;
+  color: #f2c472;
+  letter-spacing: -0.02em;
+}
+
+/* ── Prestige card in offseason ───────────────────────────── */
+
+.prestige-card {
+  border-color: rgba(114, 242, 198, 0.2);
+}

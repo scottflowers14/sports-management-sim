@@ -27,6 +27,70 @@ export interface OffseasonSummary {
   awards: SeasonAwards | null;
 }
 
+export interface InjuredPlayer {
+  playerId: string;
+  teamId: string;
+  weeksRemaining: number;
+}
+
+export function processInjuries(
+  currentInjuries: InjuredPlayer[],
+  teams: LacrosseTeam[],
+  random: () => number,
+  injuryChance = 0.03,
+): {
+  injuries: InjuredPlayer[];
+  newlyInjured: { playerId: string; teamId: string; playerName: string; weeksRemaining: number }[];
+  recovered: { playerId: string; teamId: string; playerName: string }[];
+} {
+  const decremented = currentInjuries.map((inj) => ({
+    ...inj,
+    weeksRemaining: inj.weeksRemaining - 1,
+  }));
+
+  const recovered: { playerId: string; teamId: string; playerName: string }[] = [];
+  const stillActive: InjuredPlayer[] = [];
+
+  for (const inj of decremented) {
+    if (inj.weeksRemaining <= 0) {
+      const player = teams.find((t) => t.id === inj.teamId)?.roster.find((p) => p.id === inj.playerId);
+      recovered.push({
+        playerId: inj.playerId,
+        teamId: inj.teamId,
+        playerName: player ? `${player.name.first} ${player.name.last}` : 'Unknown Player',
+      });
+    } else {
+      stillActive.push(inj);
+    }
+  }
+
+  const injuredIds = new Set(stillActive.map((inj) => inj.playerId));
+  const newlyInjured: { playerId: string; teamId: string; playerName: string; weeksRemaining: number }[] = [];
+  const newEntries: InjuredPlayer[] = [];
+
+  for (const team of teams) {
+    for (const player of team.roster) {
+      if (injuredIds.has(player.id)) continue;
+      if (random() < injuryChance) {
+        const weeksRemaining = 1 + Math.floor(random() * 4);
+        newlyInjured.push({
+          playerId: player.id,
+          teamId: team.id,
+          playerName: `${player.name.first} ${player.name.last}`,
+          weeksRemaining,
+        });
+        newEntries.push({ playerId: player.id, teamId: team.id, weeksRemaining });
+      }
+    }
+  }
+
+  return {
+    injuries: [...stillActive, ...newEntries],
+    newlyInjured,
+    recovered,
+  };
+}
+
 export function autoCommitWeekly(
   recruits: LacrosseRecruit[],
   teams: LacrosseTeam[],
@@ -43,6 +107,7 @@ export function autoCommitWeekly(
 
 export function runOffseason(
   dynasty: LacrosseDynastyState,
+  nationalChampionId?: string,
 ): { newDynasty: LacrosseDynastyState; summary: OffseasonSummary } {
   const { season, recruits, userTeamId, seed, rosterTargets } = dynasty;
   const newYear = season.year + 1;
@@ -76,8 +141,11 @@ export function runOffseason(
     r.status === 'committed' ? signCommittedRecruit(r) : r,
   );
 
+  // Evolve program prestige based on season performance
+  const teamsWithPrestige = evolvePrestige(season.teams, sortedStandings, nationalChampionId);
+
   // Intake signing class and run offseason for every team
-  const teamsAfterOffseason = season.teams.map((team) => {
+  const teamsAfterOffseason = teamsWithPrestige.map((team) => {
     const withClass = addSignedRecruitsToTeam(team, signed, season.year);
     return runTeamOffseason(withClass);
   });
@@ -131,6 +199,43 @@ export function runOffseason(
     },
     summary,
   };
+}
+
+function evolvePrestige(
+  teams: LacrosseTeam[],
+  standings: StandingsEntry[],
+  nationalChampionId?: string,
+): LacrosseTeam[] {
+  return teams.map((team) => {
+    const standing = standings.find((s) => s.teamId === team.id);
+    const wins = standing?.record.wins ?? 0;
+    const losses = standing?.record.losses ?? 0;
+    const total = wins + losses;
+    const winPct = total > 0 ? wins / total : 0.5;
+    const perfBase = Math.round(winPct * 100);
+
+    // Drift recentSuccess toward season performance
+    const gap = perfBase - team.reputation.recentSuccess;
+    const drift = Math.round(gap * 0.3);
+    let recentSuccess = Math.min(99, Math.max(40, team.reputation.recentSuccess + drift));
+    let nationalPrestige = team.reputation.nationalPrestige;
+
+    if (team.id === nationalChampionId) {
+      recentSuccess = Math.min(99, recentSuccess + 8);
+      nationalPrestige = Math.min(99, nationalPrestige + 5);
+    } else if (winPct > 0.75) {
+      nationalPrestige = Math.min(99, nationalPrestige + 2);
+    } else if (winPct > 0.6) {
+      nationalPrestige = Math.min(99, nationalPrestige + 1);
+    } else if (winPct < 0.35) {
+      nationalPrestige = Math.max(40, nationalPrestige - 1);
+    }
+
+    return {
+      ...team,
+      reputation: { ...team.reputation, recentSuccess, nationalPrestige },
+    };
+  });
 }
 
 // Each CPU team extends offers to their top 15 open recruits at 50% scholarship
