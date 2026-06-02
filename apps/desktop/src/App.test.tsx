@@ -26,10 +26,11 @@ describe('Desktop App', () => {
     expect(screen.getByText(/Results/i)).toBeInTheDocument();
   });
 
-  it('switches to the recruiting tab and shows offer buttons', async () => {
+  it('switches to the recruiting tab and shows scouting controls', async () => {
     render(<App />);
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
-    expect(screen.queryAllByRole('button', { name: /Offer Scholarship/i }).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Scouting Points/i)).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: /Scout/i }).length).toBeGreaterThan(0);
   });
 
   it('switches to standings and shows national rankings and conference sections', async () => {

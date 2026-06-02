@@ -22,6 +22,17 @@ import {
 } from './tournament';
 import type { TournamentState, TournamentGame, ConferenceBracket } from './tournament';
 import type { DynastySeasonRecord } from './history';
+import {
+  createScoutingState,
+  advanceScoutingWeek,
+  scoutRecruit as scoutRecruitFn,
+  resetScoutingForNewClass,
+  getDisplayOvr,
+  getScoutTier,
+} from './scouting';
+import type { ScoutingState } from './scouting';
+import { emptySeasonStats, updateSeasonStats } from './stats';
+import type { SeasonStatsMap, PlayerSeasonStats } from './stats';
 import './App.css';
 
 const initialDynasty = createNewLacrosseDynasty({
@@ -30,7 +41,7 @@ const initialDynasty = createNewLacrosseDynasty({
   seasonYear: 2028,
 });
 
-type View = 'season' | 'recruiting' | 'standings' | 'offseason' | 'news' | 'tournament' | 'history';
+type View = 'season' | 'recruiting' | 'standings' | 'offseason' | 'news' | 'tournament' | 'history' | 'stats';
 
 interface BoxScoreData {
   title: string;
@@ -55,6 +66,8 @@ export function App() {
   const [dynastyHistory, setDynastyHistory] = useState<DynastySeasonRecord[]>([]);
   const [injuries, setInjuries] = useState<InjuredPlayer[]>([]);
   const [selectedBoxScore, setSelectedBoxScore] = useState<BoxScoreData | null>(null);
+  const [scouting, setScouting] = useState<ScoutingState>(() => createScoutingState(3));
+  const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => emptySeasonStats());
 
   const rankingsRef = useRef<RankingEntry[]>(rankings);
   rankingsRef.current = rankings;
@@ -106,7 +119,6 @@ export function App() {
         userTeamId: prev.userTeamId,
         teamMap: tMap,
       });
-
       const injuryNews: NewsItem[] = [
         ...newlyInjured
           .filter((inj) => inj.teamId === prev.userTeamId)
@@ -126,9 +138,14 @@ export function App() {
           })),
       ];
 
+      // Capture for async updates
+      const newSeasonSnap = newSeason;
+
       setTimeout(() => {
         setRankings(newRanks);
         setInjuries(newInjuries);
+        setScouting((s) => advanceScoutingWeek(s));
+        setSeasonStats((prev) => updateSeasonStats(prev, newSeasonSnap.schedule, newSeasonSnap.teams, weekToSim));
         setNewsItems((prevNews) => [...weekNews, ...recruitNews, ...injuryNews, ...prevNews].slice(0, 60));
         setLastSimWeek(weekToSim);
       }, 0);
@@ -149,9 +166,12 @@ export function App() {
     });
   }, []);
 
+  const doScoutRecruit = useCallback((recruitId: string, trueOvr: number) => {
+    setScouting((s) => scoutRecruitFn(s, recruitId, trueOvr, Math.random));
+  }, []);
+
   const enterTournament = useCallback(() => {
-    const state = initTournament(dynasty.season.standings);
-    setTournament(state);
+    setTournament(initTournament(dynasty.season.standings));
     setView('tournament');
   }, [dynasty.season.standings]);
 
@@ -217,6 +237,8 @@ export function App() {
     setInjuries([]);
     setSelectedPlayerId(null);
     setSelectedBoxScore(null);
+    setSeasonStats(emptySeasonStats());
+    setScouting((s) => resetScoutingForNewClass(s));
     setView('season');
   }, []);
 
@@ -245,12 +267,13 @@ export function App() {
 
   const userRankEntry = rankings.find((r) => r.teamId === dynasty.userTeamId);
   const unreadNewsCount = newsItems.length;
-
   const userInjuries = new Set(
     injuries.filter((inj) => inj.teamId === dynasty.userTeamId).map((inj) => inj.playerId),
   );
-
   const injuredCount = injuries.filter((inj) => inj.teamId === dynasty.userTeamId).length;
+
+  // Player lookup map for stat views
+  const playerLookup = buildPlayerLookup(dynasty.season.teams);
 
   return (
     <main className="app-shell">
@@ -304,19 +327,21 @@ export function App() {
             onClick={() => setView('tournament')}
           >
             Tournament
-            {tournament?.nationalChampion && (
-              <span className="tab-badge">✓</span>
-            )}
+            {tournament?.nationalChampion && <span className="tab-badge">✓</span>}
           </button>
         )}
+        <button
+          className={view === 'stats' ? 'tab active' : 'tab'}
+          onClick={() => setView('stats')}
+        >
+          Stats
+        </button>
         <button
           className={view === 'news' ? 'tab active' : 'tab'}
           onClick={() => setView('news')}
         >
           News
-          {unreadNewsCount > 0 && (
-            <span className="tab-badge">{unreadNewsCount}</span>
-          )}
+          {unreadNewsCount > 0 && <span className="tab-badge">{unreadNewsCount}</span>}
         </button>
         <button
           className={view === 'history' ? 'tab active' : 'tab'}
@@ -324,9 +349,7 @@ export function App() {
         >
           History
         </button>
-        {view === 'offseason' && (
-          <button className="tab active">Offseason</button>
-        )}
+        {view === 'offseason' && <button className="tab active">Offseason</button>}
       </nav>
 
       {view === 'season' && (
@@ -375,9 +398,7 @@ export function App() {
                 <ul className="news-list">
                   {newsItems.slice(0, 6).map((item) => (
                     <li key={item.id} className="news-item">
-                      <span className={`news-chip chip-${item.category}`}>
-                        {item.category}
-                      </span>
+                      <span className={`news-chip chip-${item.category}`}>{item.category}</span>
                       <div>
                         <p className="news-headline">{item.headline}</p>
                         <p className="news-week">Wk {item.week}</p>
@@ -396,22 +417,9 @@ export function App() {
               <p className="sub-metric">
                 {userTeam.resources.scholarshipUsed.toFixed(1)} /{' '}
                 {userTeam.resources.scholarshipLimit.toFixed(1)} scholarships
-                {injuredCount > 0 && (
-                  <span className="sidebar-inj"> · {injuredCount} inj</span>
-                )}
+                {injuredCount > 0 && <span className="sidebar-inj"> · {injuredCount} inj</span>}
               </p>
-              <ul className="position-grid">
-                {Object.entries(dynasty.rosterTargets).map(([pos, target]) => {
-                  const current = userTeam.roster.filter((p) => p.position === pos).length;
-                  const ok = current >= (target ?? 0);
-                  return (
-                    <li key={pos} className={ok ? 'pos-ok' : 'pos-need'}>
-                      <span className="pos-label">{pos}</span>
-                      <span>{current}/{target}</span>
-                    </li>
-                  );
-                })}
-              </ul>
+              <DepthChart team={userTeam} injuries={userInjuries} />
               <ul className="player-roster-list">
                 {userTeam.roster.map((p) => {
                   const isInjured = userInjuries.has(p.id);
@@ -425,9 +433,7 @@ export function App() {
                         {p.name.first} {p.name.last}
                         {isInjured && <span className="inj-badge">INJ</span>}
                       </span>
-                      <span className="player-row-meta">
-                        {p.position} · {p.classYear}
-                      </span>
+                      <span className="player-row-meta">{p.position} · {p.classYear}</span>
                       <span className="player-row-ovr">{p.ratings.overall}</span>
                     </li>
                   );
@@ -458,64 +464,116 @@ export function App() {
       )}
 
       {view === 'recruiting' && (
-        <div className="recruit-grid">
-          {dynasty.recruitBoard.slice(0, 24).map((entry) => {
-            const { recruit } = entry;
-            const interest = recruit.interestByTeamId[dynasty.userTeamId] ?? 0;
-            const hasOffer = recruit.scholarshipOffers.some((o) => o.teamId === dynasty.userTeamId);
-            const isCommittedToUs =
-              recruit.committedTeamId === dynasty.userTeamId ||
-              recruit.signedTeamId === dynasty.userTeamId;
-            const isCommittedElsewhere = recruit.status !== 'open' && !isCommittedToUs;
+        <div className="recruit-layout">
+          <div className="scout-header card">
+            <div className="scout-pts">
+              <span className="scout-pts-num">{scouting.pointsAvailable}</span>
+              <span className="scout-pts-label">Scouting Points</span>
+            </div>
+            <p className="scout-hint">
+              Scout recruits to reveal their ratings. +{scouting.pointsPerWeek} pts/week, max {scouting.pointsPerWeek * 4}.
+            </p>
+          </div>
+          <div className="recruit-grid">
+            {dynasty.recruitBoard.slice(0, 30).map((entry) => {
+              const { recruit } = entry;
+              const tier = getScoutTier(recruit.id, scouting);
+              const displayOvr = getDisplayOvr(recruit.id, recruit.ratings.overall, scouting);
+              const interest = recruit.interestByTeamId[dynasty.userTeamId] ?? 0;
+              const hasOffer = recruit.scholarshipOffers.some((o) => o.teamId === dynasty.userTeamId);
+              const isCommittedToUs =
+                recruit.committedTeamId === dynasty.userTeamId ||
+                recruit.signedTeamId === dynasty.userTeamId;
+              const isCommittedElsewhere = recruit.status !== 'open' && !isCommittedToUs;
 
-            return (
-              <article
-                key={recruit.id}
-                className={`card recruit-card${isCommittedToUs ? ' committed-to-us' : ''}`}
-              >
-                <div className="recruit-header">
-                  <div>
-                    <strong>
-                      {recruit.name.first} {recruit.name.last}
-                    </strong>
-                    <p className="recruit-sub">
-                      {recruit.position} · {'★'.repeat(recruit.starRating)}
-                      {'☆'.repeat(5 - recruit.starRating)}
-                    </p>
-                  </div>
-                  <span className="board-score">{entry.score}</span>
-                </div>
-
-                <div className="interest-bar-wrap">
-                  <div className="interest-bar" style={{ width: `${interest}%` }} />
-                </div>
-                <p className="interest-label">Interest {interest}/100</p>
-
-                <div className="recruit-footer">
-                  {isCommittedToUs ? (
-                    <span className={`badge badge-${recruit.status}`}>
-                      {recruit.status === 'committed' ? 'Committed' : 'Signed'}
-                    </span>
-                  ) : isCommittedElsewhere ? (
-                    <span className="badge badge-elsewhere">
-                      →{' '}
-                      {formatTeamName(
-                        teamMap.get(
-                          recruit.committedTeamId ?? recruit.signedTeamId ?? '',
-                        ) ?? 'Other',
+              return (
+                <article
+                  key={recruit.id}
+                  className={`card recruit-card${isCommittedToUs ? ' committed-to-us' : ''}${tier === 'none' ? ' unscouted' : ''}`}
+                >
+                  <div className="recruit-header">
+                    <div>
+                      <strong>
+                        {recruit.name.first} {recruit.name.last}
+                      </strong>
+                      <p className="recruit-sub">
+                        {recruit.position} ·{' '}
+                        {tier !== 'none' ? (
+                          <>
+                            {'★'.repeat(recruit.starRating)}{'☆'.repeat(5 - recruit.starRating)}
+                          </>
+                        ) : (
+                          <span className="hidden-stat">? stars</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="recruit-ovr-block">
+                      {displayOvr !== null ? (
+                        <span className={`board-score${tier === 'partial' ? ' fuzzy-ovr' : ''}`}>
+                          {displayOvr}
+                          {tier === 'partial' && <span className="fuzzy-tilde">~</span>}
+                        </span>
+                      ) : (
+                        <span className="board-score hidden-stat">??</span>
                       )}
-                    </span>
-                  ) : hasOffer ? (
-                    <span className="badge badge-offered">Offered</span>
-                  ) : (
-                    <button className="offer-btn" onClick={() => offerScholarship(recruit.id)}>
-                      Offer Scholarship
-                    </button>
+                      <span className="recruit-score-label">OVR</span>
+                    </div>
+                  </div>
+
+                  {tier !== 'none' && (
+                    <>
+                      <div className="interest-bar-wrap">
+                        <div className="interest-bar" style={{ width: `${interest}%` }} />
+                      </div>
+                      <p className="interest-label">Interest {interest}/100</p>
+                    </>
                   )}
-                </div>
-              </article>
-            );
-          })}
+
+                  <div className="recruit-footer">
+                    {isCommittedToUs ? (
+                      <span className={`badge badge-${recruit.status}`}>
+                        {recruit.status === 'committed' ? 'Committed' : 'Signed'}
+                      </span>
+                    ) : isCommittedElsewhere ? (
+                      <span className="badge badge-elsewhere">
+                        → {formatTeamName(teamMap.get(recruit.committedTeamId ?? recruit.signedTeamId ?? '') ?? 'Other')}
+                      </span>
+                    ) : tier === 'none' ? (
+                      <button
+                        className="scout-btn"
+                        onClick={() => doScoutRecruit(recruit.id, recruit.ratings.overall)}
+                        disabled={scouting.pointsAvailable <= 0}
+                      >
+                        Scout (1 pt)
+                      </button>
+                    ) : tier === 'partial' ? (
+                      <div className="recruit-footer-row">
+                        <button
+                          className="scout-btn scout-btn-sm"
+                          onClick={() => doScoutRecruit(recruit.id, recruit.ratings.overall)}
+                          disabled={scouting.pointsAvailable <= 0}
+                        >
+                          Full Scout (1 pt)
+                        </button>
+                        {!hasOffer && (
+                          <button className="offer-btn" onClick={() => offerScholarship(recruit.id)}>
+                            Offer
+                          </button>
+                        )}
+                        {hasOffer && <span className="badge badge-offered">Offered</span>}
+                      </div>
+                    ) : hasOffer ? (
+                      <span className="badge badge-offered">Offered</span>
+                    ) : (
+                      <button className="offer-btn" onClick={() => offerScholarship(recruit.id)}>
+                        Offer Scholarship
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -607,14 +665,10 @@ export function App() {
                           className={entry.teamId === dynasty.userTeamId ? 'user-row' : ''}
                         >
                           <td className="rank">#{i + 1}</td>
-                          <td>
-                            {formatTeamName(teamMap.get(entry.teamId) ?? entry.teamId)}
-                          </td>
+                          <td>{formatTeamName(teamMap.get(entry.teamId) ?? entry.teamId)}</td>
                           <td>{entry.record.wins}</td>
                           <td>{entry.record.losses}</td>
-                          <td>
-                            {entry.record.conferenceWins}–{entry.record.conferenceLosses}
-                          </td>
+                          <td>{entry.record.conferenceWins}–{entry.record.conferenceLosses}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -638,6 +692,14 @@ export function App() {
           onInitTournament={enterTournament}
           seasonComplete={seasonComplete}
           onBoxScore={setSelectedBoxScore}
+        />
+      )}
+
+      {view === 'stats' && (
+        <StatsView
+          seasonStats={seasonStats}
+          playerLookup={playerLookup}
+          userTeamId={dynasty.userTeamId}
         />
       )}
 
@@ -720,9 +782,7 @@ export function App() {
                   {offseasonSummary.graduates.map((p, i) => (
                     <li key={i}>
                       <strong>{p.name}</strong>
-                      <span>
-                        {p.position} · {p.overall} OVR
-                      </span>
+                      <span>{p.position} · {p.overall} OVR</span>
                     </li>
                   ))}
                 </ul>
@@ -738,9 +798,7 @@ export function App() {
                   {offseasonSummary.signingClass.map((p, i) => (
                     <li key={i}>
                       <strong>{p.name}</strong>
-                      <span>
-                        {p.position} · {'★'.repeat(p.starRating)} · {p.overall} OVR
-                      </span>
+                      <span>{p.position} · {'★'.repeat(p.starRating)} · {p.overall} OVR</span>
                     </li>
                   ))}
                 </ul>
@@ -756,87 +814,78 @@ export function App() {
         </div>
       )}
 
-      {selectedPlayerId &&
-        (() => {
-          const player = userTeam.roster.find((p) => p.id === selectedPlayerId);
-          if (!player) return null;
-          const isInjured = userInjuries.has(player.id);
-          const injuryData = injuries.find(
-            (inj) => inj.playerId === player.id && inj.teamId === dynasty.userTeamId,
-          );
-          return (
-            <div
-              className="player-panel-backdrop"
-              onClick={() => setSelectedPlayerId(null)}
-            >
-              <aside className="player-panel card" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className="panel-close"
-                  onClick={() => setSelectedPlayerId(null)}
-                  aria-label="Close player panel"
-                >
-                  ×
-                </button>
-                <div>
-                  <p className="panel-name">
-                    {player.name.first} {player.name.last}
-                    {isInjured && <span className="inj-badge inj-badge-lg">INJ</span>}
+      {selectedPlayerId && (() => {
+        const player = userTeam.roster.find((p) => p.id === selectedPlayerId);
+        if (!player) return null;
+        const isInjured = userInjuries.has(player.id);
+        const injuryData = injuries.find(
+          (inj) => inj.playerId === player.id && inj.teamId === dynasty.userTeamId,
+        );
+        const playerStats = seasonStats[player.id];
+        return (
+          <div className="player-panel-backdrop" onClick={() => setSelectedPlayerId(null)}>
+            <aside className="player-panel card" onClick={(e) => e.stopPropagation()}>
+              <button
+                className="panel-close"
+                onClick={() => setSelectedPlayerId(null)}
+                aria-label="Close player panel"
+              >×</button>
+              <div>
+                <p className="panel-name">
+                  {player.name.first} {player.name.last}
+                  {isInjured && <span className="inj-badge inj-badge-lg">INJ</span>}
+                </p>
+                <p className="panel-meta">{player.position} · {player.classYear} · {player.hometown}</p>
+                {isInjured && injuryData && (
+                  <p className="injury-status">
+                    Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}
                   </p>
-                  <p className="panel-meta">
-                    {player.position} · {player.classYear} · {player.hometown}
-                  </p>
-                  {isInjured && injuryData && (
-                    <p className="injury-status">
-                      Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}
-                    </p>
-                  )}
+                )}
+              </div>
+              <div className="ovr-block">
+                <div className="ovr-stat">
+                  <div className="ovr-num">{player.ratings.overall}</div>
+                  <div className="ovr-label">Overall</div>
                 </div>
-                <div className="ovr-block">
-                  <div className="ovr-stat">
-                    <div className="ovr-num">{player.ratings.overall}</div>
-                    <div className="ovr-label">Overall</div>
-                  </div>
-                  <div className="ovr-stat">
-                    <div className="ovr-num">{player.ratings.potential}</div>
-                    <div className="ovr-label">Potential</div>
-                  </div>
+                <div className="ovr-stat">
+                  <div className="ovr-num">{player.ratings.potential}</div>
+                  <div className="ovr-label">Potential</div>
                 </div>
-                <div>
-                  {(
-                    [
-                      ['Athleticism', player.ratings.athleticism],
-                      ['Speed', player.ratings.speed],
-                      ['Strength', player.ratings.strength],
-                      ['Skill', player.ratings.skill],
-                      ['IQ', player.ratings.iq],
-                      ['Work Ethic', player.ratings.workEthic],
-                    ] as [string, number][]
-                  ).map(([label, value]) => (
-                    <div key={label} className="rating-row">
-                      <span>{label}</span>
-                      <div className="rating-bar-wrap">
-                        <div
-                          className="rating-bar-fill"
-                          style={{ width: `${value}%` }}
-                        />
-                      </div>
-                      <span className="rating-val">{value}</span>
+              </div>
+              <div>
+                {(
+                  [
+                    ['Athleticism', player.ratings.athleticism],
+                    ['Speed', player.ratings.speed],
+                    ['Strength', player.ratings.strength],
+                    ['Skill', player.ratings.skill],
+                    ['IQ', player.ratings.iq],
+                    ['Work Ethic', player.ratings.workEthic],
+                  ] as [string, number][]
+                ).map(([label, value]) => (
+                  <div key={label} className="rating-row">
+                    <span>{label}</span>
+                    <div className="rating-bar-wrap">
+                      <div className="rating-bar-fill" style={{ width: `${value}%` }} />
                     </div>
+                    <span className="rating-val">{value}</span>
+                  </div>
+                ))}
+              </div>
+              {player.traits.length > 0 && (
+                <div className="trait-list">
+                  {player.traits.map((trait) => (
+                    <span key={trait} className="trait-chip">{trait.replace(/_/g, ' ')}</span>
                   ))}
                 </div>
-                {player.traits.length > 0 && (
-                  <div className="trait-list">
-                    {player.traits.map((trait) => (
-                      <span key={trait} className="trait-chip">
-                        {trait.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </aside>
-            </div>
-          );
-        })()}
+              )}
+              {playerStats && playerStats.gamesPlayed > 0 && (
+                <PlayerStatsSection stats={playerStats} position={player.position} />
+              )}
+            </aside>
+          </div>
+        );
+      })()}
 
       {selectedBoxScore && (
         <BoxScorePanel data={selectedBoxScore} onClose={() => setSelectedBoxScore(null)} />
@@ -844,6 +893,309 @@ export function App() {
     </main>
   );
 }
+
+// ── Depth Chart ────────────────────────────────────────────────────────────────
+
+function DepthChart({
+  team,
+  injuries,
+}: {
+  team: { roster: Array<{ id: string; position: string; name: { first: string; last: string }; ratings: { overall: number }; classYear: string }> };
+  injuries: Set<string>;
+}) {
+  const positions = ['ATT', 'MID', 'DEF', 'GK', 'FOGO', 'LSM'] as const;
+
+  return (
+    <table className="depth-chart-table">
+      <thead>
+        <tr>
+          <th>Pos</th>
+          <th>Starter</th>
+          <th>Backup</th>
+        </tr>
+      </thead>
+      <tbody>
+        {positions.map((pos) => {
+          const byPos = [...team.roster]
+            .filter((p) => p.position === pos)
+            .sort((a, b) => b.ratings.overall - a.ratings.overall);
+          const starter = byPos[0];
+          const backup = byPos[1];
+
+          return (
+            <tr key={pos}>
+              <td className="depth-pos">{pos}</td>
+              <td className={injuries.has(starter?.id ?? '') ? 'depth-injured' : ''}>
+                {starter ? (
+                  <>
+                    <span className="depth-name">{starter.name.first[0]}. {starter.name.last}</span>
+                    <span className="depth-ovr">{starter.ratings.overall}</span>
+                    {injuries.has(starter.id) && <span className="inj-badge">INJ</span>}
+                  </>
+                ) : <span className="depth-empty">—</span>}
+              </td>
+              <td className={injuries.has(backup?.id ?? '') ? 'depth-injured' : ''}>
+                {backup ? (
+                  <>
+                    <span className="depth-name">{backup.name.first[0]}. {backup.name.last}</span>
+                    <span className="depth-ovr">{backup.ratings.overall}</span>
+                    {injuries.has(backup.id) && <span className="inj-badge">INJ</span>}
+                  </>
+                ) : <span className="depth-empty">—</span>}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// ── Stats View ─────────────────────────────────────────────────────────────────
+
+type StatCategory = 'scoring' | 'goalkeeping' | 'faceoffs' | 'defense';
+
+function StatsView({
+  seasonStats,
+  playerLookup,
+  userTeamId,
+}: {
+  seasonStats: SeasonStatsMap;
+  playerLookup: Map<string, { name: string; teamName: string; position: string; teamId: string }>;
+  userTeamId: string;
+}) {
+  const [category, setCategory] = useState<StatCategory>('scoring');
+
+  const allStats = Object.values(seasonStats).filter((s) => s.gamesPlayed > 0);
+
+  if (allStats.length === 0) {
+    return (
+      <article className="card">
+        <h2>Season Stats</h2>
+        <p className="dim">Sim some games to populate stat leaders.</p>
+      </article>
+    );
+  }
+
+  const categories: StatCategory[] = ['scoring', 'goalkeeping', 'faceoffs', 'defense'];
+
+  return (
+    <div className="stats-layout">
+      <div className="stats-cat-bar">
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            className={category === cat ? 'stat-cat-btn active' : 'stat-cat-btn'}
+            onClick={() => setCategory(cat)}
+          >
+            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {category === 'scoring' && (
+        <StatTable
+          title="Scoring Leaders"
+          rows={allStats
+            .filter((s) => {
+              const info = playerLookup.get(s.playerId);
+              return info?.position === 'ATT' || info?.position === 'MID';
+            })
+            .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists))
+            .slice(0, 15)}
+          columns={[
+            { label: 'G', key: 'goals' },
+            { label: 'A', key: 'assists' },
+            { label: 'PTS', compute: (s) => s.goals + s.assists },
+            { label: 'SH', key: 'shots' },
+            { label: 'GP', key: 'gamesPlayed' },
+          ]}
+          playerLookup={playerLookup}
+          userTeamId={userTeamId}
+        />
+      )}
+
+      {category === 'goalkeeping' && (
+        <StatTable
+          title="Goalkeeping Leaders"
+          rows={allStats
+            .filter((s) => {
+              const info = playerLookup.get(s.playerId);
+              return info?.position === 'GK';
+            })
+            .sort((a, b) => b.saves - a.saves)
+            .slice(0, 10)}
+          columns={[
+            { label: 'SV', key: 'saves' },
+            { label: 'GA', key: 'goalsAllowed' },
+            { label: 'SV%', compute: (s) => s.saves + s.goalsAllowed > 0 ? Math.round(s.saves / (s.saves + s.goalsAllowed) * 100) : 0 },
+            { label: 'GP', key: 'gamesPlayed' },
+          ]}
+          playerLookup={playerLookup}
+          userTeamId={userTeamId}
+        />
+      )}
+
+      {category === 'faceoffs' && (
+        <StatTable
+          title="Faceoff Leaders"
+          rows={allStats
+            .filter((s) => s.faceoffAttempts > 0)
+            .sort((a, b) => b.faceoffWins - a.faceoffWins)
+            .slice(0, 10)}
+          columns={[
+            { label: 'FW', key: 'faceoffWins' },
+            { label: 'FA', key: 'faceoffAttempts' },
+            { label: 'FO%', compute: (s) => s.faceoffAttempts > 0 ? Math.round(s.faceoffWins / s.faceoffAttempts * 100) : 0 },
+            { label: 'GP', key: 'gamesPlayed' },
+          ]}
+          playerLookup={playerLookup}
+          userTeamId={userTeamId}
+        />
+      )}
+
+      {category === 'defense' && (
+        <StatTable
+          title="Defensive Leaders"
+          rows={allStats
+            .filter((s) => {
+              const info = playerLookup.get(s.playerId);
+              return info?.position === 'DEF' || info?.position === 'LSM';
+            })
+            .sort((a, b) => (b.causedTurnovers + b.groundBalls) - (a.causedTurnovers + a.groundBalls))
+            .slice(0, 15)}
+          columns={[
+            { label: 'CT', key: 'causedTurnovers' },
+            { label: 'GB', key: 'groundBalls' },
+            { label: 'TO', key: 'turnovers' },
+            { label: 'GP', key: 'gamesPlayed' },
+          ]}
+          playerLookup={playerLookup}
+          userTeamId={userTeamId}
+        />
+      )}
+    </div>
+  );
+}
+
+type StatColumn =
+  | { label: string; key: keyof PlayerSeasonStats }
+  | { label: string; compute: (s: PlayerSeasonStats) => number };
+
+function StatTable({
+  title,
+  rows,
+  columns,
+  playerLookup,
+  userTeamId,
+}: {
+  title: string;
+  rows: PlayerSeasonStats[];
+  columns: StatColumn[];
+  playerLookup: Map<string, { name: string; teamName: string; position: string; teamId: string }>;
+  userTeamId: string;
+}) {
+  if (rows.length === 0) {
+    return (
+      <article className="card">
+        <h2>{title}</h2>
+        <p className="dim">No data yet</p>
+      </article>
+    );
+  }
+
+  return (
+    <article className="card">
+      <h2>{title}</h2>
+      <table className="standings-table stats-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Player</th>
+            <th>Team</th>
+            {columns.map((col) => <th key={col.label}>{col.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const info = playerLookup.get(row.playerId);
+            const isUser = info?.teamId === userTeamId;
+            return (
+              <tr key={row.playerId} className={isUser ? 'user-row' : ''}>
+                <td className="rank">#{i + 1}</td>
+                <td>{info?.name ?? '—'}</td>
+                <td className="stats-team">{info ? formatTeamShort(info.teamName) : '—'}</td>
+                {columns.map((col) => (
+                  <td key={col.label} className="stat-val">
+                    {'key' in col
+                      ? String(row[col.key])
+                      : String(col.compute(row))}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </article>
+  );
+}
+
+// ── Player stats in panel ──────────────────────────────────────────────────────
+
+function PlayerStatsSection({ stats, position }: { stats: PlayerSeasonStats; position: string }) {
+  const isGk = position === 'GK';
+  const isFogo = position === 'FOGO';
+  const isOff = position === 'ATT' || position === 'MID';
+  const isDef = position === 'DEF' || position === 'LSM';
+
+  return (
+    <div className="player-stats-section">
+      <p className="section-label">{new Date().getFullYear()} Season · {stats.gamesPlayed} GP</p>
+      <div className="player-stats-grid">
+        {isGk && (
+          <>
+            <StatChip label="SV" value={stats.saves} />
+            <StatChip label="GA" value={stats.goalsAllowed} />
+            <StatChip label="SV%" value={stats.saves + stats.goalsAllowed > 0 ? Math.round(stats.saves / (stats.saves + stats.goalsAllowed) * 100) : 0} unit="%" />
+          </>
+        )}
+        {isFogo && (
+          <>
+            <StatChip label="FW" value={stats.faceoffWins} />
+            <StatChip label="FA" value={stats.faceoffAttempts} />
+            <StatChip label="FO%" value={stats.faceoffAttempts > 0 ? Math.round(stats.faceoffWins / stats.faceoffAttempts * 100) : 0} unit="%" />
+          </>
+        )}
+        {isOff && (
+          <>
+            <StatChip label="G" value={stats.goals} />
+            <StatChip label="A" value={stats.assists} />
+            <StatChip label="PTS" value={stats.goals + stats.assists} />
+            <StatChip label="SH" value={stats.shots} />
+          </>
+        )}
+        {isDef && (
+          <StatChip label="CT" value={stats.causedTurnovers} />
+        )}
+        {!isGk && !isFogo && (
+          <StatChip label="GB" value={stats.groundBalls} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatChip({ label, value, unit = '' }: { label: string; value: number; unit?: string }) {
+  return (
+    <div className="stat-chip">
+      <div className="stat-chip-num">{value}{unit}</div>
+      <div className="stat-chip-label">{label}</div>
+    </div>
+  );
+}
+
+// ── Tournament View ────────────────────────────────────────────────────────────
 
 function TournamentView({
   tournament,
@@ -929,24 +1281,16 @@ function TournamentView({
 
       <div className="tournament-controls">
         {tournament.phase === 'semis' && (
-          <button className="sim-btn" onClick={onSimSemis}>
-            Sim Conference Semifinals
-          </button>
+          <button className="sim-btn" onClick={onSimSemis}>Sim Conference Semifinals</button>
         )}
         {tournament.phase === 'finals' && (
-          <button className="sim-btn" onClick={onSimFinals}>
-            Sim Conference Finals
-          </button>
+          <button className="sim-btn" onClick={onSimFinals}>Sim Conference Finals</button>
         )}
         {tournament.phase === 'national' && (
-          <button className="sim-btn" onClick={onSimNational}>
-            Sim National Championship
-          </button>
+          <button className="sim-btn" onClick={onSimNational}>Sim National Championship</button>
         )}
         {tournament.phase === 'complete' && (
-          <button className="offseason-btn" onClick={onEnterOffseason}>
-            Enter Offseason →
-          </button>
+          <button className="offseason-btn" onClick={onEnterOffseason}>Enter Offseason →</button>
         )}
       </div>
     </div>
@@ -1022,29 +1366,6 @@ function ConferenceBracketCard({
   );
 }
 
-function PrestigeSection({ reputation }: { reputation: { nationalPrestige: number; coachingPrestige: number; facilities: number; fanSupport: number; recentSuccess: number } }) {
-  const bars: [string, number][] = [
-    ['National Prestige', reputation.nationalPrestige],
-    ['Coaching', reputation.coachingPrestige],
-    ['Facilities', reputation.facilities],
-    ['Fan Support', reputation.fanSupport],
-    ['Recent Success', reputation.recentSuccess],
-  ];
-  return (
-    <div className="prestige-bars">
-      {bars.map(([label, val]) => (
-        <div key={label} className="rating-row">
-          <span>{label}</span>
-          <div className="rating-bar-wrap">
-            <div className="rating-bar-fill" style={{ width: `${val}%` }} />
-          </div>
-          <span className="rating-val">{val}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function BracketMatchup({
   game,
   seeds,
@@ -1062,14 +1383,10 @@ function BracketMatchup({
 }) {
   const { result } = game;
   const homeScore = result
-    ? result.winnerId === game.homeTeamId
-      ? result.winnerScore
-      : result.loserScore
+    ? result.winnerId === game.homeTeamId ? result.winnerScore : result.loserScore
     : null;
   const awayScore = result
-    ? result.winnerId === game.awayTeamId
-      ? result.winnerScore
-      : result.loserScore
+    ? result.winnerId === game.awayTeamId ? result.winnerScore : result.loserScore
     : null;
   const homeWon = result?.winnerId === game.homeTeamId;
   const awayWon = result?.winnerId === game.awayTeamId;
@@ -1119,6 +1436,8 @@ function BracketMatchup({
     </div>
   );
 }
+
+// ── Box Score Panel ────────────────────────────────────────────────────────────
 
 function BoxScorePanel({ data, onClose }: { data: BoxScoreData; onClose: () => void }) {
   const stats: Array<{ label: string; format: (s: LacrosseTeamStats) => string }> = [
@@ -1178,6 +1497,8 @@ function BoxScorePanel({ data, onClose }: { data: BoxScoreData; onClose: () => v
   );
 }
 
+// ── History View ───────────────────────────────────────────────────────────────
+
 function HistoryView({ history }: { history: DynastySeasonRecord[] }) {
   if (history.length === 0) {
     return (
@@ -1235,16 +1556,8 @@ function HistoryView({ history }: { history: DynastySeasonRecord[] }) {
                 <td className="record-cell">{record.wins}–{record.losses}</td>
                 <td>#{record.confStanding}</td>
                 <td>{record.natRankAtEnd !== null ? `#${record.natRankAtEnd}` : '—'}</td>
-                <td>
-                  {record.confChampion ? (
-                    <span className="champ-badge conf-champ">CHAMP</span>
-                  ) : '—'}
-                </td>
-                <td>
-                  {record.nationalChampion ? (
-                    <span className="champ-badge natl-champ">CHAMP</span>
-                  ) : '—'}
-                </td>
+                <td>{record.confChampion ? <span className="champ-badge conf-champ">CHAMP</span> : '—'}</td>
+                <td>{record.nationalChampion ? <span className="champ-badge natl-champ">CHAMP</span> : '—'}</td>
                 <td>{record.signingClassSize}</td>
               </tr>
             ))}
@@ -1255,44 +1568,27 @@ function HistoryView({ history }: { history: DynastySeasonRecord[] }) {
   );
 }
 
+// ── Awards Section ─────────────────────────────────────────────────────────────
+
 function AwardsSection({ awards }: { awards: SeasonAwards }) {
   return (
     <article className="card">
       <h2>Season Awards</h2>
       <div className="awards-grid">
-        <div className="award-item">
-          <div className="award-label">MVP</div>
-          <div className="award-player">{awards.mvp.playerName}</div>
-          <div className="award-detail">
-            {awards.mvp.position} · {formatTeamName(awards.mvp.teamName)} · {awards.mvp.overall} OVR
-          </div>
-        </div>
-        <div className="award-item">
-          <div className="award-label">Offensive Player</div>
-          <div className="award-player">{awards.offensivePlayer.playerName}</div>
-          <div className="award-detail">
-            {awards.offensivePlayer.position} · {formatTeamName(awards.offensivePlayer.teamName)} ·{' '}
-            {awards.offensivePlayer.overall} OVR
-          </div>
-        </div>
-        <div className="award-item">
-          <div className="award-label">Defensive Player</div>
-          <div className="award-player">{awards.defensivePlayer.playerName}</div>
-          <div className="award-detail">
-            {awards.defensivePlayer.position} · {formatTeamName(awards.defensivePlayer.teamName)} ·{' '}
-            {awards.defensivePlayer.overall} OVR
-          </div>
-        </div>
-        {awards.freshmanOfYear && (
-          <div className="award-item">
-            <div className="award-label">Freshman of Year</div>
-            <div className="award-player">{awards.freshmanOfYear.playerName}</div>
+        {[
+          { label: 'MVP', winner: awards.mvp },
+          { label: 'Offensive Player', winner: awards.offensivePlayer },
+          { label: 'Defensive Player', winner: awards.defensivePlayer },
+          ...(awards.freshmanOfYear ? [{ label: 'Freshman of Year', winner: awards.freshmanOfYear }] : []),
+        ].map(({ label, winner }) => (
+          <div key={label} className="award-item">
+            <div className="award-label">{label}</div>
+            <div className="award-player">{winner.playerName}</div>
             <div className="award-detail">
-              {awards.freshmanOfYear.position} · {formatTeamName(awards.freshmanOfYear.teamName)} ·{' '}
-              {awards.freshmanOfYear.overall} OVR
+              {winner.position} · {formatTeamName(winner.teamName)} · {winner.overall} OVR
             </div>
           </div>
-        )}
+        ))}
       </div>
       {awards.allConference.length > 0 && (
         <>
@@ -1300,10 +1596,7 @@ function AwardsSection({ awards }: { awards: SeasonAwards }) {
           <table className="standings-table">
             <thead>
               <tr>
-                <th>Player</th>
-                <th>Pos</th>
-                <th>Team</th>
-                <th>OVR</th>
+                <th>Player</th><th>Pos</th><th>Team</th><th>OVR</th>
               </tr>
             </thead>
             <tbody>
@@ -1323,6 +1616,41 @@ function AwardsSection({ awards }: { awards: SeasonAwards }) {
   );
 }
 
+// ── Prestige Section ───────────────────────────────────────────────────────────
+
+function PrestigeSection({ reputation }: {
+  reputation: {
+    nationalPrestige: number;
+    coachingPrestige: number;
+    facilities: number;
+    fanSupport: number;
+    recentSuccess: number;
+  };
+}) {
+  const bars: [string, number][] = [
+    ['National Prestige', reputation.nationalPrestige],
+    ['Coaching', reputation.coachingPrestige],
+    ['Facilities', reputation.facilities],
+    ['Fan Support', reputation.fanSupport],
+    ['Recent Success', reputation.recentSuccess],
+  ];
+  return (
+    <div className="prestige-bars">
+      {bars.map(([label, val]) => (
+        <div key={label} className="rating-row">
+          <span>{label}</span>
+          <div className="rating-bar-wrap">
+            <div className="rating-bar-fill" style={{ width: `${val}%` }} />
+          </div>
+          <span className="rating-val">{val}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Result Row ─────────────────────────────────────────────────────────────────
+
 function ResultRow({
   game,
   teamMap,
@@ -1339,11 +1667,7 @@ function ResultRow({
 
   const userInGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
   const userWon = result.winnerTeamId === userTeamId;
-  const className = userInGame
-    ? userWon
-      ? 'result-row win'
-      : 'result-row loss'
-    : 'result-row';
+  const className = userInGame ? (userWon ? 'result-row win' : 'result-row loss') : 'result-row';
 
   const handleClick = () => {
     if (!result.teamStats || !onBoxScore) return;
@@ -1366,17 +1690,32 @@ function ResultRow({
     >
       <span className="result-teams">
         {formatTeamName(teamMap.get(game.awayTeamId) ?? game.awayTeamId)}
-        <span className="result-score">
-          {result.awayScore}–{result.homeScore}
-        </span>
+        <span className="result-score">{result.awayScore}–{result.homeScore}</span>
         {formatTeamName(teamMap.get(game.homeTeamId) ?? game.homeTeamId)}
         {result.overtime && <span className="ot-badge">OT</span>}
       </span>
-      {result.teamStats && onBoxScore && (
-        <span className="box-score-hint">box score →</span>
-      )}
+      {result.teamStats && onBoxScore && <span className="box-score-hint">box score →</span>}
     </li>
   );
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function buildPlayerLookup(
+  teams: Array<{ id: string; name: string; roster: Array<{ id: string; name: { first: string; last: string }; position: string }> }>,
+): Map<string, { name: string; teamName: string; position: string; teamId: string }> {
+  const map = new Map<string, { name: string; teamName: string; position: string; teamId: string }>();
+  for (const team of teams) {
+    for (const player of team.roster) {
+      map.set(player.id, {
+        name: `${player.name.first} ${player.name.last}`,
+        teamName: team.name,
+        position: player.position,
+        teamId: team.id,
+      });
+    }
+  }
+  return map;
 }
 
 function formatTeamName(value: string): string {
@@ -1390,6 +1729,5 @@ function formatTeamName(value: string): string {
 }
 
 function formatTeamShort(value: string): string {
-  const words = formatTeamName(value).split(' ');
-  return words.slice(0, 2).join(' ');
+  return formatTeamName(value).split(' ').slice(0, 2).join(' ');
 }
