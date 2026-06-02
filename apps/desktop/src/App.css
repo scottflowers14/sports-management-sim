@@ -396,6 +396,74 @@ li span {
   background: rgba(114, 242, 198, 0.16);
 }
 
+/* ── Offseason view ───────────────────────────────────────── */
+
+.offseason-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(242, 196, 114, 0.4);
+  background: rgba(242, 196, 114, 0.1);
+  color: #f2c472;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.offseason-btn:hover {
+  background: rgba(242, 196, 114, 0.18);
+  transform: translateY(-1px);
+}
+
+.offseason-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 24px;
+  align-items: start;
+}
+
+.offseason-left,
+.offseason-right {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.season-recap-card h2 {
+  font-size: 1.6rem;
+  margin-bottom: 20px;
+}
+
+.recap-table {
+  margin-top: 8px;
+}
+
+.player-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.new-season-btn {
+  margin-top: 4px;
+  background: linear-gradient(135deg, #f2a233 0%, #d4620e 100%);
+}
+
+.badge-elsewhere {
+  background: rgba(170, 184, 202, 0.1);
+  color: #aab8ca;
+  border: 1px solid rgba(170, 184, 202, 0.2);
+}
+
+.committed-to-us {
+  border-color: rgba(114, 242, 198, 0.35);
+}
+
 /* ── Standings view ───────────────────────────────────────── */
 
 .standings-card {

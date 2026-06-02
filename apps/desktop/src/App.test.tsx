@@ -20,11 +20,16 @@ describe('Desktop App', () => {
     expect(screen.getByRole('button', { name: /Sim Week/i })).toBeInTheDocument();
   });
 
-  it('switches to the recruiting tab and shows the board', async () => {
+  it('simulates a week and shows results', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    expect(screen.getByText(/Results/i)).toBeInTheDocument();
+  });
+
+  it('switches to the recruiting tab and shows offer buttons', async () => {
     render(<App />);
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
-    const offerButtons = screen.queryAllByRole('button', { name: /Offer Scholarship/i });
-    expect(offerButtons.length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole('button', { name: /Offer Scholarship/i }).length).toBeGreaterThan(0);
   });
 
   it('switches to standings and shows a table', async () => {
@@ -32,12 +37,5 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
     expect(screen.getByRole('heading', { name: /Conference Standings/i })).toBeInTheDocument();
     expect(screen.getByRole('table')).toBeInTheDocument();
-  });
-
-  it('simulates a week and shows results', async () => {
-    render(<App />);
-    const simBtn = screen.getByRole('button', { name: /Sim Week/i });
-    await userEvent.click(simBtn);
-    expect(screen.getByText(/Results/i)).toBeInTheDocument();
   });
 });
