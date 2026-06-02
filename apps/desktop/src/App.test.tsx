@@ -1,18 +1,43 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 
+afterEach(cleanup);
+
 describe('Desktop App', () => {
-  it('renders the playable dynasty dashboard from engine state', () => {
+  it('renders the dynasty dashboard with season view by default', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: /Sports Management Sim/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Maryland State/i);
-    expect(screen.getByText(/Current Week/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week/i);
+    expect(screen.getByRole('heading', { name: /This Week/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Upcoming/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Roster/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Recruiting Board/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Schedule/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sim Week/i })).toBeInTheDocument();
+  });
+
+  it('switches to the recruiting tab and shows the board', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
+    const offerButtons = screen.queryAllByRole('button', { name: /Offer Scholarship/i });
+    expect(offerButtons.length).toBeGreaterThan(0);
+  });
+
+  it('switches to standings and shows a table', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
+    expect(screen.getByRole('heading', { name: /Conference Standings/i })).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
+  it('simulates a week and shows results', async () => {
+    render(<App />);
+    const simBtn = screen.getByRole('button', { name: /Sim Week/i });
+    await userEvent.click(simBtn);
+    expect(screen.getByText(/Results/i)).toBeInTheDocument();
   });
 });
