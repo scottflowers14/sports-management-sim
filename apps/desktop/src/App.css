@@ -25,12 +25,14 @@ select {
   padding: 48px;
 }
 
+/* ── Hero ─────────────────────────────────────────────────── */
+
 .hero {
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 24px;
   align-items: stretch;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .eyebrow,
@@ -44,6 +46,7 @@ select {
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -64,14 +67,10 @@ h2 {
   font-size: 1.2rem;
 }
 
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-}
+/* ── Cards ────────────────────────────────────────────────── */
 
 .card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 24px;
   padding: 24px;
   background: rgba(12, 24, 42, 0.78);
@@ -82,22 +81,176 @@ h2 {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .team-card strong {
   font-size: 2rem;
+  line-height: 1.1;
+}
+
+.record-big {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #72f2c6;
+}
+
+.national-rank {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f2c472;
+  letter-spacing: 0.04em;
 }
 
 .metric {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   font-size: 2rem;
   font-weight: 800;
+}
+
+.sub-metric {
+  color: #aab8ca;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.dim {
+  color: #aab8ca;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+
+.tab-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.tab {
+  padding: 10px 24px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: #aab8ca;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e6edf3;
+}
+
+.tab.active {
+  background: rgba(114, 242, 198, 0.12);
+  border-color: #72f2c6;
+  color: #72f2c6;
+}
+
+/* ── Season view ──────────────────────────────────────────── */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.sim-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #3d7fff 0%, #2256d4 100%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.sim-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.sim-btn:active {
+  transform: translateY(0);
+}
+
+.results-block {
+  margin-top: 4px;
+}
+
+.section-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #72f2c6;
+  margin-bottom: 10px;
+}
+
+.result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.result-row {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid transparent;
+}
+
+.result-row.win {
+  border-left-color: #72f2c6;
+  background: rgba(114, 242, 198, 0.07);
+}
+
+.result-row.loss {
+  border-left-color: #f27272;
+  background: rgba(242, 114, 114, 0.07);
+}
+
+.result-teams {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+.result-score {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #e6edf3;
+}
+
+.ot-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #f2c472;
+  background: rgba(242, 196, 114, 0.15);
+  border-radius: 6px;
+  padding: 2px 6px;
 }
 
 ol,
 ul {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin: 0;
   padding-left: 1.2rem;
 }
@@ -105,5 +258,1324 @@ ul {
 li span {
   display: block;
   color: #aab8ca;
+  margin-top: 3px;
+  font-size: 0.9rem;
+}
+
+.position-grid {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.position-grid li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pos-label {
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.pos-ok span {
+  color: #aab8ca;
+}
+
+.pos-need {
+  border: 1px solid rgba(242, 196, 114, 0.3);
+}
+
+.pos-need .pos-label {
+  color: #f2c472;
+}
+
+/* ── Recruiting view ──────────────────────────────────────── */
+
+.recruit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.recruit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.recruit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.recruit-header strong {
+  font-size: 1rem;
+}
+
+.recruit-sub {
+  color: #aab8ca;
+  font-size: 0.82rem;
+  margin-top: 2px;
+}
+
+.board-score {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #72f2c6;
+  white-space: nowrap;
+}
+
+.interest-bar-wrap {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.interest-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3d7fff, #72f2c6);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.interest-label {
+  font-size: 0.78rem;
+  color: #aab8ca;
+  margin-top: -4px;
+}
+
+.recruit-footer {
+  margin-top: auto;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.badge-offered {
+  background: rgba(71, 120, 255, 0.18);
+  color: #7ba8ff;
+  border: 1px solid rgba(71, 120, 255, 0.35);
+}
+
+.badge-committed {
+  background: rgba(114, 242, 198, 0.15);
+  color: #72f2c6;
+  border: 1px solid rgba(114, 242, 198, 0.35);
+}
+
+.badge-signed {
+  background: rgba(242, 196, 114, 0.15);
+  color: #f2c472;
+  border: 1px solid rgba(242, 196, 114, 0.35);
+}
+
+.offer-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(114, 242, 198, 0.35);
+  background: rgba(114, 242, 198, 0.08);
+  color: #72f2c6;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.offer-btn:hover {
+  background: rgba(114, 242, 198, 0.16);
+}
+
+/* ── Offseason view ───────────────────────────────────────── */
+
+.offseason-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(242, 196, 114, 0.4);
+  background: rgba(242, 196, 114, 0.1);
+  color: #f2c472;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.offseason-btn:hover {
+  background: rgba(242, 196, 114, 0.18);
+  transform: translateY(-1px);
+}
+
+.offseason-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 24px;
+  align-items: start;
+}
+
+.offseason-left,
+.offseason-right {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.season-recap-card h2 {
+  font-size: 1.6rem;
+  margin-bottom: 20px;
+}
+
+.recap-table {
+  margin-top: 8px;
+}
+
+.player-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.new-season-btn {
   margin-top: 4px;
+  background: linear-gradient(135deg, #f2a233 0%, #d4620e 100%);
+}
+
+.badge-elsewhere {
+  background: rgba(170, 184, 202, 0.1);
+  color: #aab8ca;
+  border: 1px solid rgba(170, 184, 202, 0.2);
+}
+
+.committed-to-us {
+  border-color: rgba(114, 242, 198, 0.35);
+}
+
+/* ── Standings view ───────────────────────────────────────── */
+
+.standings-card {
+  max-width: 640px;
+}
+
+.standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.standings-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.standings-table td {
+  padding: 12px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.standings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.standings-table .rank {
+  color: #aab8ca;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.user-row td {
+  color: #72f2c6;
+  font-weight: 600;
+}
+
+/* ── Two-column season layout ─────────────────────────────── */
+
+.season-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.season-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.season-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── News styles ──────────────────────────────────────────── */
+
+.news-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.news-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.news-item:last-child {
+  border-bottom: none;
+}
+
+.news-chip {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chip-game {
+  background: rgba(71, 120, 255, 0.18);
+  color: #7ba8ff;
+}
+
+.chip-recruiting {
+  background: rgba(114, 242, 198, 0.15);
+  color: #72f2c6;
+}
+
+.chip-rankings {
+  background: rgba(242, 196, 114, 0.15);
+  color: #f2c472;
+}
+
+.chip-award {
+  background: rgba(200, 130, 255, 0.15);
+  color: #c882ff;
+}
+
+.news-headline {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #e6edf3;
+}
+
+.news-week {
+  font-size: 0.75rem;
+  color: #aab8ca;
+  margin-top: 2px;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 99px;
+  background: rgba(114, 242, 198, 0.2);
+  color: #72f2c6;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+/* ── Rankings styles ──────────────────────────────────────── */
+
+.standings-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.rank-change {
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: 28px;
+  text-align: center;
+}
+
+.rank-up {
+  color: #72f2c6;
+}
+
+.rank-down {
+  color: #f27272;
+}
+
+.rank-same {
+  color: #aab8ca;
+}
+
+.conf-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Player panel ─────────────────────────────────────────── */
+
+.player-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.player-panel {
+  width: 360px;
+  height: 100vh;
+  overflow-y: auto;
+  border-radius: 0;
+  border-right: none;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  color: #aab8ca;
+  font-size: 1.4rem;
+  cursor: pointer;
+  align-self: flex-end;
+  padding: 0;
+  line-height: 1;
+}
+
+.panel-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.panel-meta {
+  color: #aab8ca;
+  font-size: 0.9rem;
+}
+
+.ovr-block {
+  display: flex;
+  gap: 24px;
+}
+
+.ovr-stat {
+  text-align: center;
+}
+
+.ovr-num {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #72f2c6;
+}
+
+.ovr-label {
+  font-size: 0.72rem;
+  color: #aab8ca;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rating-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 32px;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.rating-bar-wrap {
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.rating-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #3d7fff, #72f2c6);
+}
+
+.rating-val {
+  color: #aab8ca;
+  text-align: right;
+}
+
+.player-roster-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.player-roster-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.12s;
+}
+
+.player-roster-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-row-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.player-row-meta {
+  font-size: 0.8rem;
+  color: #aab8ca;
+}
+
+.player-row-ovr {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #72f2c6;
+}
+
+/* ── Awards styles ────────────────────────────────────────── */
+
+.awards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.award-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.award-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #c882ff;
+  margin-bottom: 6px;
+}
+
+.award-player {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.award-detail {
+  font-size: 0.8rem;
+  color: #aab8ca;
+  margin-top: 2px;
+}
+
+/* ── Tournament view ──────────────────────────────────────── */
+
+.tournament-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(200, 130, 255, 0.4);
+  background: rgba(200, 130, 255, 0.1);
+  color: #c882ff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.tournament-btn:hover {
+  background: rgba(200, 130, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.tournament-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.tournament-conferences {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.bracket {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.bracket-semis {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.bracket-connector {
+  font-size: 1.5rem;
+  color: #aab8ca;
+  flex-shrink: 0;
+}
+
+.bracket-final-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bracket-matchup {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.12s;
+}
+
+.bracket-matchup.played:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.bracket-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  transition: opacity 0.15s;
+}
+
+.bracket-team.winner {
+  background: rgba(114, 242, 198, 0.08);
+}
+
+.bracket-team.loser {
+  opacity: 0.5;
+}
+
+.bracket-seed {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #aab8ca;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.bracket-team-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.bracket-team-name.user {
+  color: #72f2c6;
+}
+
+.bracket-score {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #aab8ca;
+  min-width: 24px;
+  text-align: right;
+}
+
+.bracket-score.score-win {
+  color: #72f2c6;
+}
+
+.bracket-vs {
+  font-size: 0.72rem;
+  color: #aab8ca;
+  padding: 0 4px;
+  align-self: center;
+}
+
+.bracket-tbd {
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tbd-team {
+  color: #aab8ca;
+  font-size: 0.85rem;
+  padding: 6px 4px;
+}
+
+.champion-display {
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(114, 242, 198, 0.08);
+  border: 1px solid rgba(114, 242, 198, 0.2);
+}
+
+.champion-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #72f2c6;
+  margin-bottom: 2px;
+}
+
+.champion-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.national-champ-card {
+  max-width: 600px;
+}
+
+.national-champ-card h2 {
+  color: #f2c472;
+  margin-bottom: 16px;
+}
+
+.national-champion-banner {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(242, 196, 114, 0.12), rgba(200, 130, 255, 0.12));
+  border: 1px solid rgba(242, 196, 114, 0.3);
+}
+
+.champion-name-lg {
+  font-size: 1.2rem;
+  display: block;
+  margin-top: 2px;
+}
+
+.tournament-controls {
+  display: flex;
+  gap: 16px;
+  max-width: 480px;
+}
+
+.tournament-controls .sim-btn,
+.tournament-controls .offseason-btn {
+  flex: 1;
+  margin: 0;
+}
+
+/* ── Box score panel ──────────────────────────────────────── */
+
+.box-score-panel {
+  width: 480px;
+}
+
+.panel-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #72f2c6;
+  margin-bottom: 4px;
+}
+
+.box-score-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+}
+
+.box-score-side {
+  flex: 1;
+  text-align: center;
+}
+
+.box-score-home {
+  text-align: right;
+}
+
+.box-score-side.winner-side .box-score-final {
+  color: #72f2c6;
+}
+
+.box-score-team-name {
+  font-size: 0.82rem;
+  color: #aab8ca;
+  margin-bottom: 4px;
+}
+
+.box-score-final {
+  font-size: 2.4rem;
+  font-weight: 800;
+}
+
+.box-score-sep {
+  font-size: 1rem;
+  color: #aab8ca;
+  flex-shrink: 0;
+}
+
+.box-score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.box-score-table th {
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stat-away {
+  text-align: left;
+}
+
+.stat-home {
+  text-align: right;
+}
+
+.stat-name {
+  text-align: center;
+}
+
+.box-score-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.box-score-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.stat-val {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.box-score-table tr td:first-child {
+  text-align: left;
+}
+
+.box-score-table tr td:last-child {
+  text-align: right;
+}
+
+.stat-label {
+  text-align: center;
+  color: #aab8ca;
+  font-size: 0.82rem;
+}
+
+/* ── Injury indicators ────────────────────────────────────── */
+
+.inj-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(242, 114, 114, 0.2);
+  color: #f27272;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+.inj-badge-lg {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
+.player-injured .player-row-name {
+  color: #f27272;
+}
+
+.injury-count {
+  font-size: 0.8rem;
+  color: #f27272;
+  font-weight: 600;
+}
+
+.sidebar-inj {
+  color: #f27272;
+}
+
+.injury-status {
+  font-size: 0.82rem;
+  color: #f27272;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.chip-injury {
+  background: rgba(242, 114, 114, 0.15);
+  color: #f27272;
+}
+
+/* ── Clickable result rows ────────────────────────────────── */
+
+.result-row.clickable {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.result-row.clickable:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.result-row.win.clickable:hover {
+  background: rgba(114, 242, 198, 0.12);
+}
+
+.result-row.loss.clickable:hover {
+  background: rgba(242, 114, 114, 0.12);
+}
+
+.box-score-hint {
+  display: block;
+  font-size: 0.72rem;
+  color: #aab8ca;
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Dynasty history ──────────────────────────────────────── */
+
+.history-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.history-summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.history-stat-card {
+  text-align: center;
+  padding: 20px;
+}
+
+.history-stat-num {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #72f2c6;
+  margin-bottom: 4px;
+}
+
+.history-stat-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+}
+
+.history-table th {
+  white-space: nowrap;
+}
+
+.record-cell {
+  font-weight: 700;
+}
+
+.champ-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.conf-champ {
+  background: rgba(114, 242, 198, 0.15);
+  color: #72f2c6;
+}
+
+.natl-champ {
+  background: rgba(242, 196, 114, 0.15);
+  color: #f2c472;
+}
+
+/* ── Prestige bars in offseason ───────────────────────────── */
+
+.prestige-card h2 {
+  margin-bottom: 16px;
+}
+
+.prestige-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Player traits ────────────────────────────────────────── */
+
+.trait-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trait-chip {
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: capitalize;
+  background: rgba(71, 120, 255, 0.12);
+  color: #7ba8ff;
+  border: 1px solid rgba(71, 120, 255, 0.25);
+}
+
+/* ── Prestige dots in standings ───────────────────────────── */
+
+.prestige-dots {
+  font-size: 0.55rem;
+  color: #f2c472;
+  letter-spacing: -0.02em;
+}
+
+/* ── Prestige card in offseason ───────────────────────────── */
+
+.prestige-card {
+  border-color: rgba(114, 242, 198, 0.2);
+}
+
+/* ── Scouting / recruiting ────────────────────────────────── */
+
+.recruit-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.scout-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 24px;
+  border-radius: 16px;
+}
+
+.scout-pts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 56px;
+}
+
+.scout-pts-num {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #72f2c6;
+  line-height: 1;
+}
+
+.scout-pts-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.scout-hint {
+  font-size: 0.85rem;
+  color: #aab8ca;
+  margin: 0;
+}
+
+.scout-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(114, 242, 198, 0.3);
+  background: rgba(114, 242, 198, 0.06);
+  color: #72f2c6;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.scout-btn:hover:not(:disabled) {
+  background: rgba(114, 242, 198, 0.14);
+}
+
+.scout-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scout-btn-sm {
+  flex: 1;
+}
+
+.recruit-footer-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.recruit-footer-row .offer-btn {
+  flex: 1;
+}
+
+.recruit-ovr-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 48px;
+}
+
+.recruit-score-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #aab8ca;
+}
+
+.hidden-stat {
+  color: #aab8ca;
+  letter-spacing: 0.04em;
+}
+
+.fuzzy-ovr {
+  position: relative;
+  color: #f2c472;
+}
+
+.fuzzy-tilde {
+  font-size: 0.8em;
+  opacity: 0.7;
+  margin-left: 1px;
+}
+
+.unscouted {
+  opacity: 0.75;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Depth chart ──────────────────────────────────────────── */
+
+.depth-chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin-bottom: 14px;
+}
+
+.depth-chart-table th {
+  padding: 5px 8px;
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.depth-chart-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.depth-chart-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.depth-pos {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #aab8ca;
+  letter-spacing: 0.06em;
+  width: 40px;
+}
+
+.depth-name {
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.depth-ovr {
+  font-size: 0.78rem;
+  color: #72f2c6;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.depth-empty {
+  color: #4a5568;
+  font-style: italic;
+}
+
+.depth-injured .depth-name {
+  color: #f27272;
+}
+
+/* ── Stats view ───────────────────────────────────────────── */
+
+.stats-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats-cat-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.stat-cat-btn {
+  padding: 8px 20px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #aab8ca;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.stat-cat-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e6edf3;
+}
+
+.stat-cat-btn.active {
+  background: rgba(114, 242, 198, 0.12);
+  border-color: #72f2c6;
+  color: #72f2c6;
+}
+
+.stats-table {
+  max-width: 720px;
+}
+
+.stats-team {
+  color: #aab8ca;
+  font-size: 0.82rem;
+}
+
+/* ── Player stats in panel ────────────────────────────────── */
+
+.player-stats-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 16px;
+}
+
+.player-stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.stat-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stat-chip-num {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #e6edf3;
+  line-height: 1;
+}
+
+.stat-chip-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+  margin-top: 3px;
 }

@@ -13,19 +13,19 @@ describe('createNewLacrosseDynasty', () => {
     expect(dynasty.userTeamId).toBe('maryland-state');
     expect(dynasty.season.year).toBe(2028);
     expect(dynasty.season.phase).toBe('regular_season');
-    expect(dynasty.season.teams).toHaveLength(4);
+    expect(dynasty.season.teams).toHaveLength(8);
     expect(dynasty.recruits).toHaveLength(80);
     expect(dynasty.recruitBoard.length).toBeGreaterThan(0);
     expect(dynasty.recruitBoard[0]?.recruit.id).toBeDefined();
   });
 
-  it('creates valid lacrosse rosters and a complete four-team round-robin schedule', () => {
+  it('creates valid lacrosse rosters and a complete schedule with 20 games across two conferences', () => {
     const dynasty = createNewLacrosseDynasty({ seed: 99, userTeamId: 'maryland-state', seasonYear: 2028 });
 
     expect(dynasty.season.teams.every((team) => validateLacrosseRoster(team).ok)).toBe(true);
-    expect(dynasty.season.schedule).toHaveLength(6);
+    expect(dynasty.season.schedule).toHaveLength(20);
     expect(dynasty.season.schedule.every((game) => game.status === 'scheduled')).toBe(true);
-    expect(new Set(dynasty.season.schedule.map((game) => game.week)).size).toBe(6);
+    expect(dynasty.season.currentWeek).toBe(1);
   });
 
   it('throws when the requested user team is not in the generated universe', () => {

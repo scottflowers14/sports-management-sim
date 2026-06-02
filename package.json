@@ -12,6 +12,7 @@
     "typecheck": "tsc -b"
   },
   "devDependencies": {
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.17.10",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
