@@ -1839,3 +1839,213 @@ li span {
   color: #aab8ca;
   margin-top: 3px;
 }
+
+/* ── Recruiting: tabs + position filter ─────────────────────────────────────── */
+
+.recruit-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.recruit-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.recruit-tab {
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: #aab8ca;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recruit-tab.active {
+  background: rgba(114, 242, 198, 0.12);
+  color: #72f2c6;
+}
+
+.recruit-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e6edf3;
+}
+
+.portal-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #f5a623;
+  color: #0d1117;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.scout-header-inline {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.scout-pts-hint {
+  font-size: 0.78rem;
+  color: #6b7a8f;
+}
+
+.pos-filter-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pos-filter-btn {
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #aab8ca;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.pos-filter-btn.active {
+  background: rgba(114, 242, 198, 0.14);
+  border-color: rgba(114, 242, 198, 0.4);
+  color: #72f2c6;
+}
+
+.pos-filter-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6edf3;
+}
+
+/* ── Recruiting: interest + commit probability ───────────────────────────────── */
+
+.recruit-interest-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.commit-pct {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7a8f;
+}
+
+.commit-pct.warm {
+  color: #f5a623;
+}
+
+.commit-pct.hot {
+  color: #4cde9a;
+}
+
+/* ── Recruiting: competitor chips ────────────────────────────────────────────── */
+
+.competitor-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.competitor-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 183, 77, 0.1);
+  border: 1px solid rgba(255, 183, 77, 0.25);
+  color: #f5a623;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* ── Transfer portal ─────────────────────────────────────────────────────────── */
+
+.portal-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.portal-committed-card h2 {
+  color: #72f2c6;
+}
+
+.portal-entry-card {
+  border-color: rgba(245, 166, 35, 0.15);
+}
+
+.portal-entry-card.has-offer {
+  border-color: rgba(114, 242, 198, 0.25);
+}
+
+/* Offseason portal section */
+.portal-offseason-card {
+  border-color: rgba(245, 166, 35, 0.2);
+}
+
+.portal-hint {
+  font-size: 0.82rem;
+  color: #6b7a8f;
+  margin: -4px 0 12px;
+}
+
+.portal-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portal-mini-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.portal-mini-name {
+  font-weight: 600;
+  color: #e6edf3;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portal-mini-meta {
+  font-size: 0.8rem;
+  color: #aab8ca;
+  white-space: nowrap;
+}
+
+.offer-btn-sm {
+  padding: 4px 12px;
+  font-size: 0.78rem;
+}

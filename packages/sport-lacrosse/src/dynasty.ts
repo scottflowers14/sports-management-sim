@@ -1,10 +1,13 @@
 import {
   advanceSeasonWeek,
+  applyPortalOffer,
   applyScholarshipOffer,
   calculateRecruitFitScore,
   createRoundRobinSchedule,
+  resolvePortalCommitments,
   sortRecruitBoardForTeam,
   type Conference,
+  type PortalEntry,
   type RecruitBoardEntry,
   type Region,
   type ScheduledGame,
@@ -13,6 +16,8 @@ import type { LacrossePlayerTraits, LacrossePosition, LacrosseSeason, LacrosseTe
 import { generateLacrosseRecruitingClass, type LacrosseRecruit } from './recruit-generation';
 import { makeLacrosseTeam } from './test-fixtures';
 import { simulateLacrosseGame } from './simulate-game';
+
+export type LacrossePortalEntry = PortalEntry<LacrossePosition, LacrossePlayerTraits>;
 
 export interface LacrosseDynastyState {
   id: string;
@@ -23,6 +28,7 @@ export interface LacrosseDynastyState {
   recruitBoard: RecruitBoardEntry<LacrossePosition, LacrossePlayerTraits>[];
   recruitingClass: LacrosseRecruit[];
   rosterTargets: Record<LacrossePosition, number>;
+  portalEntries: LacrossePortalEntry[];
 }
 
 export interface LacrosseRecruitingSummary {
@@ -220,6 +226,7 @@ export function createNewLacrosseDynasty({
     recruitBoard,
     recruitingClass: [],
     rosterTargets: DEFAULT_LACROSSE_ROSTER_TARGETS,
+    portalEntries: [],
   };
 }
 
@@ -244,6 +251,24 @@ export function offerLacrosseRecruitScholarship(
   );
 
   return buildRecruitingState({ ...state, recruits }, userTeam);
+}
+
+export function offerLacrossePortalPlayer(
+  state: LacrosseDynastyState,
+  portalEntryId: string,
+  scholarshipPercent = 100,
+): LacrosseDynastyState {
+  const portalEntries = state.portalEntries.map((entry) =>
+    entry.id === portalEntryId
+      ? applyPortalOffer(entry, state.userTeamId, scholarshipPercent)
+      : entry,
+  );
+  return { ...state, portalEntries };
+}
+
+export function resolveLacrossePortal(state: LacrosseDynastyState): LacrosseDynastyState {
+  const resolved = resolvePortalCommitments(state.portalEntries, state.season.teams);
+  return { ...state, portalEntries: resolved };
 }
 
 export function getLacrosseRecruitingSummary(state: LacrosseDynastyState): LacrosseRecruitingSummary {
@@ -283,7 +308,12 @@ export function advanceLacrosseDynastyWeek(state: LacrosseDynastyState): Lacross
     throw new Error(`Unknown lacrosse dynasty userTeamId: ${state.userTeamId}`);
   }
 
-  const recruits = resolveWeeklyRecruiting(state.recruits, userTeam, state.season.currentWeek);
+  const recruits = resolveWeeklyRecruiting(
+    state.recruits,
+    season.teams,
+    state.userTeamId,
+    state.season.currentWeek,
+  );
 
   return buildRecruitingState(
     {
@@ -319,36 +349,96 @@ function buildRecruitingState(state: LacrosseDynastyState, userTeam: LacrosseTea
 
 function resolveWeeklyRecruiting(
   recruits: LacrosseRecruit[],
-  userTeam: LacrosseTeam,
+  allTeams: LacrosseTeam[],
+  userTeamId: string,
   currentWeek: number,
 ): LacrosseRecruit[] {
-  return recruits.map((recruit) => {
-    if (recruit.status !== 'open' || !hasUserOffer(recruit, userTeam.id)) {
-      return recruit;
+  const userTeam = allTeams.find((t) => t.id === userTeamId);
+
+  // Apply CPU weekly offers (teams gradually build their offer lists)
+  let updated = applyCpuWeeklyOffers(recruits, allTeams, userTeamId);
+
+  return updated.map((recruit) => {
+    if (recruit.status !== 'open') return recruit;
+    if (recruit.scholarshipOffers.length === 0) return recruit;
+
+    // Build interest for every team that holds an offer
+    const updatedInterest = { ...recruit.interestByTeamId };
+
+    for (const offer of recruit.scholarshipOffers) {
+      const team = allTeams.find((t) => t.id === offer.teamId);
+      if (!team) continue;
+      const current = updatedInterest[team.id] ?? 0;
+      if (team.id === userTeamId && userTeam) {
+        const fitScore = calculateRecruitFitScore(recruit, userTeam);
+        const gain = Math.round(
+          11 + recruit.starRating * 2 + fitScore * 0.05 + recruit.preferences.scholarshipImportance * 0.04,
+        );
+        updatedInterest[team.id] = clamp(current + gain, 0, 100);
+      } else {
+        // CPU teams: prestige-weighted gain, no fitScore calculation
+        const prestigeBonus = Math.round((team.reputation.nationalPrestige / 100) * 5);
+        const gain = 6 + recruit.starRating + prestigeBonus;
+        updatedInterest[team.id] = clamp(current + gain, 0, 100);
+      }
     }
 
-    const currentInterest = recruit.interestByTeamId[userTeam.id] ?? 0;
-    const fitScore = calculateRecruitFitScore(recruit, userTeam);
-    const weeklyInterestGain = Math.round(
-      13 + recruit.starRating * 2 + fitScore * 0.05 + recruit.preferences.scholarshipImportance * 0.05,
-    );
-    const interest = clamp(currentInterest + weeklyInterestGain, 0, 100);
-    const shouldCommit = interest >= commitmentThreshold(recruit, currentWeek);
+    // Check if any offering team has crossed the commitment threshold
+    const threshold = commitmentThreshold(recruit, currentWeek);
+    const aboveThreshold = recruit.scholarshipOffers
+      .map((o) => ({ teamId: o.teamId, interest: updatedInterest[o.teamId] ?? 0 }))
+      .filter((t) => t.interest >= threshold)
+      .sort((a, b) => b.interest - a.interest);
+
+    const committingTo = aboveThreshold[0];
 
     return {
       ...recruit,
-      interestByTeamId: {
-        ...recruit.interestByTeamId,
-        [userTeam.id]: interest,
-      },
-      ...(shouldCommit
-        ? {
-            status: 'committed' as const,
-            committedTeamId: userTeam.id,
-          }
+      interestByTeamId: updatedInterest,
+      ...(committingTo
+        ? { status: 'committed' as const, committedTeamId: committingTo.teamId }
         : {}),
     };
   });
+}
+
+function applyCpuWeeklyOffers(
+  recruits: LacrosseRecruit[],
+  allTeams: LacrosseTeam[],
+  userTeamId: string,
+): LacrosseRecruit[] {
+  const CPU_MAX_OFFERS = 12;
+  const CPU_WEEKLY_NEW_OFFERS = 2;
+
+  let updated = [...recruits];
+
+  for (const team of allTeams) {
+    if (team.id === userTeamId) continue;
+
+    const alreadyOfferedIds = new Set(
+      updated
+        .filter((r) => r.scholarshipOffers.some((o) => o.teamId === team.id))
+        .map((r) => r.id),
+    );
+
+    if (alreadyOfferedIds.size >= CPU_MAX_OFFERS) continue;
+
+    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - alreadyOfferedIds.size);
+    const open = updated.filter((r) => r.status === 'open' && !alreadyOfferedIds.has(r.id));
+    const board = sortRecruitBoardForTeam(team, open, DEFAULT_LACROSSE_ROSTER_TARGETS);
+
+    let count = 0;
+    for (const entry of board) {
+      if (count >= canOffer) break;
+      const idx = updated.findIndex((r) => r.id === entry.recruit.id);
+      if (idx >= 0) {
+        updated[idx] = applyScholarshipOffer(updated[idx]!, team.id, 50);
+        count++;
+      }
+    }
+  }
+
+  return updated;
 }
 
 function commitmentThreshold(recruit: LacrosseRecruit, currentWeek: number): number {

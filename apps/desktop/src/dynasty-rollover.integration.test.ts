@@ -1,8 +1,8 @@
 import { advanceSeasonWeek } from '@sports-management-sim/engine-core';
-import { createNewLacrosseDynasty, simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
+import { createNewLacrosseDynasty, offerLacrossePortalPlayer, simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
 import type { LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
 import { describe, expect, it } from 'vitest';
-import { runOffseason } from './dynasty-helpers';
+import { resolveAndApplyPortal, runOffseason } from './dynasty-helpers';
 
 function simFullSeason(dynasty: LacrosseDynastyState): LacrosseDynastyState {
   let season = dynasty.season;
@@ -209,6 +209,95 @@ describe('multi-season dynasty rollover', () => {
       for (const ids of Object.values(dc)) {
         expect(ids).not.toContain(seniorPlayer.id);
       }
+    }
+  });
+});
+
+describe('transfer portal lifecycle', () => {
+  it('generates portal entries after offseason and hydrates empty for new dynasties', () => {
+    const dynasty = createNewLacrosseDynasty({
+      seed: 99,
+      userTeamId: 'maryland-state',
+      seasonYear: 2028,
+    });
+    // Fresh dynasty has no portal entries
+    expect(dynasty.portalEntries).toEqual([]);
+
+    const afterSeason = simFullSeason(dynasty);
+    const { newDynasty } = runOffseason(afterSeason);
+    // After first offseason, portal entries are generated from AI team rosters
+    expect(newDynasty.portalEntries.length).toBeGreaterThan(0);
+    expect(newDynasty.portalEntries.every((e) => e.status === 'available')).toBe(true);
+    // Portal players all come from AI teams, never from the user team
+    expect(newDynasty.portalEntries.every((e) => e.sourceTeamId !== 'maryland-state')).toBe(true);
+  });
+
+  it('offered portal player commits to user team, leaves source team, and updates scholarship', () => {
+    const dynasty = createNewLacrosseDynasty({
+      seed: 77,
+      userTeamId: 'maryland-state',
+      seasonYear: 2028,
+    });
+
+    const afterSeason = simFullSeason(dynasty);
+    const { newDynasty } = runOffseason(afterSeason);
+
+    // Pick the first available portal entry and offer
+    const target = newDynasty.portalEntries.find((e) => e.status === 'available');
+    expect(target).toBeDefined();
+    if (!target) return;
+
+    const withOffer = offerLacrossePortalPlayer(newDynasty, target.id, 100);
+    expect(withOffer.portalEntries.find((e) => e.id === target.id)?.offersByTeamId['maryland-state']).toBe(100);
+
+    const resolved = resolveAndApplyPortal(withOffer);
+    const committedEntry = resolved.portalEntries.find((e) => e.id === target.id);
+
+    // Entry resolved one way or another
+    expect(committedEntry?.status).not.toBe('available');
+
+    if (committedEntry?.committedTeamId === 'maryland-state') {
+      // Player is on user roster
+      const userTeam = resolved.season.teams.find((t) => t.id === 'maryland-state')!;
+      const isOnRoster = userTeam.roster.some((p) => p.name.first === target.name.first && p.name.last === target.name.last);
+      expect(isOnRoster).toBe(true);
+
+      // Player is NOT on source team anymore
+      const sourceTeam = resolved.season.teams.find((t) => t.id === target.sourceTeamId)!;
+      const stillOnSource = sourceTeam.roster.some((p) => p.id === target.playerId);
+      expect(stillOnSource).toBe(false);
+
+      // Scholarship usage is within the cap and the new player has the offered percent
+      expect(userTeam.resources.scholarshipUsed).toBeLessThanOrEqual(userTeam.resources.scholarshipLimit);
+      // Portal players get a deterministic ID: portal-player-<entry.id>
+      const newPlayer = userTeam.roster.find((p) => p.id === `portal-player-${target.id}`);
+      expect(newPlayer).toBeDefined();
+      expect(newPlayer?.scholarshipPercent).toBe(100);
+    } else {
+      // Player still left source team (they went elsewhere or withdrew)
+      const sourceTeam = resolved.season.teams.find((t) => t.id === target.sourceTeamId)!;
+      const stillOnSource = sourceTeam.roster.some((p) => p.id === target.playerId);
+      expect(stillOnSource).toBe(false);
+    }
+  });
+
+  it('portal players are always removed from source teams on resolution regardless of destination', () => {
+    const dynasty = createNewLacrosseDynasty({
+      seed: 55,
+      userTeamId: 'maryland-state',
+      seasonYear: 2028,
+    });
+
+    const afterSeason = simFullSeason(dynasty);
+    const { newDynasty } = runOffseason(afterSeason);
+    // Resolve without offering — all entries should withdraw
+    const resolved = resolveAndApplyPortal(newDynasty);
+
+    for (const entry of resolved.portalEntries) {
+      const sourceTeam = resolved.season.teams.find((t) => t.id === entry.sourceTeamId);
+      if (!sourceTeam) continue;
+      const stillPresent = sourceTeam.roster.some((p) => p.id === entry.playerId);
+      expect(stillPresent).toBe(false);
     }
   });
 });
