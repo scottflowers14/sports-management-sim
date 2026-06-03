@@ -1,4 +1,4 @@
-import type { LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
@@ -21,6 +21,8 @@ export interface DynastySaveState {
   injuries: InjuredPlayer[];
   scouting: ScoutingState;
   seasonStats: SeasonStatsMap;
+  /** Keyed by game ID. Maps don't JSON-serialize so stored as a plain Record. */
+  gameLogs: Record<string, GameLog>;
 }
 
 interface PersistedDynastySave extends DynastySaveState {
@@ -50,6 +52,9 @@ export function loadDynastyState(storage: Storage = window.localStorage): Persis
     // Hydrate fields added after the initial save version so old saves don't crash
     if (!parsed.dynasty.portalEntries) {
       parsed.dynasty = { ...parsed.dynasty, portalEntries: [] };
+    }
+    if (!parsed.gameLogs) {
+      parsed.gameLogs = {};
     }
     return parsed as PersistedDynastySave;
   } catch {

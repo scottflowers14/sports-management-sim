@@ -1,5 +1,5 @@
-import { simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
-import type { LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import { simulateLacrosseGameWithLog } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
 
 export interface TournamentGameResult {
@@ -9,6 +9,7 @@ export interface TournamentGameResult {
   loserScore: number;
   overtime: boolean;
   teamStats?: { home: LacrosseTeamStats; away: LacrosseTeamStats };
+  log?: GameLog;
 }
 
 export interface TournamentGame {
@@ -126,20 +127,16 @@ function simulateFinal(bracket: ConferenceBracket, teams: LacrosseTeam[]): Confe
 function playTournamentGame(game: TournamentGame, teams: LacrosseTeam[]): TournamentGameResult {
   const homeTeam = teams.find((t) => t.id === game.homeTeamId)!;
   const awayTeam = teams.find((t) => t.id === game.awayTeamId)!;
-  const result = simulateLacrosseGame({ homeTeam, awayTeam });
+  const result = simulateLacrosseGameWithLog({ homeTeam, awayTeam });
   const homeWon = result.winnerTeamId === homeTeam.id;
-  const tournamentResult: TournamentGameResult = {
+
+  return {
     winnerId: result.winnerTeamId,
     loserId: result.loserTeamId,
     winnerScore: homeWon ? result.homeScore : result.awayScore,
     loserScore: homeWon ? result.awayScore : result.homeScore,
     overtime: result.overtime,
+    ...(result.teamStats ? { teamStats: result.teamStats } : {}),
+    log: result.log,
   };
-
-  return result.teamStats === undefined
-    ? tournamentResult
-    : {
-        ...tournamentResult,
-        teamStats: result.teamStats,
-      };
 }

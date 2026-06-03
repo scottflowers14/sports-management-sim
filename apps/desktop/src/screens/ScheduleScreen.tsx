@@ -1,5 +1,5 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
-import type { LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName } from '../ui/format';
 import type { BoxScoreData } from '../ui/types';
 import { getNextUserGamePreview } from '../schedule-preview';
@@ -10,6 +10,7 @@ export function ScheduleScreen({
   teamMap,
   userTeamId,
   currentWeek,
+  gameLogs,
   onBoxScore,
 }: {
   schedule: ScheduledGame[];
@@ -17,6 +18,7 @@ export function ScheduleScreen({
   teamMap: Map<string, string>;
   userTeamId: string;
   currentWeek: number;
+  gameLogs: Map<string, GameLog>;
   onBoxScore: (data: BoxScoreData) => void;
 }) {
   const weeks = [...new Set(schedule.map((game) => game.week))].sort((a, b) => a - b);
@@ -86,6 +88,7 @@ export function ScheduleScreen({
 
                   const openBoxScore = () => {
                     if (!result?.teamStats) return;
+                    const log = gameLogs.get(game.id);
                     onBoxScore({
                       title: `Week ${game.week}`,
                       homeTeamName: teamMap.get(game.homeTeamId) ?? game.homeTeamId,
@@ -95,6 +98,7 @@ export function ScheduleScreen({
                       overtime: result.overtime,
                       homeStats: result.teamStats.home as LacrosseTeamStats,
                       awayStats: result.teamStats.away as LacrosseTeamStats,
+                      ...(log ? { log } : {}),
                     });
                   };
 
