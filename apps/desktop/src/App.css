@@ -579,7 +579,8 @@ li span {
 }
 
 .team-roster-card,
-.schedule-header-card {
+.schedule-header-card,
+.matchup-preview-card {
   grid-column: 1 / -1;
 }
 
@@ -614,6 +615,69 @@ li span {
 
 .schedule-view-layout {
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+}
+
+.matchup-preview-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.matchup-preview-header h2 {
+  margin: 4px 0 8px;
+}
+
+.matchup-line {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  min-width: 260px;
+  padding: 12px 14px;
+}
+
+.matchup-line strong {
+  color: #72f2c6;
+  font-size: 1.45rem;
+}
+
+.matchup-edge-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-top: 18px;
+}
+
+.matchup-edge {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.matchup-edge span {
+  color: #aab8ca;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.matchup-edge.positive strong {
+  color: #72f2c6;
+}
+
+.matchup-edge.negative strong {
+  color: #f27272;
+}
+
+.matchup-edge.even strong {
+  color: #e6edf3;
 }
 
 .schedule-week-header {

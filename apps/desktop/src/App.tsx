@@ -566,8 +566,10 @@ export function App() {
       {view === 'schedule' && (
         <ScheduleScreen
           schedule={dynasty.season.schedule}
+          teams={dynasty.season.teams}
           teamMap={teamMap}
           userTeamId={dynasty.userTeamId}
+          currentWeek={dynasty.season.currentWeek}
           onBoxScore={setSelectedBoxScore}
         />
       )}

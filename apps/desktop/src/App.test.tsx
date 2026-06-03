@@ -89,6 +89,9 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Schedule/i }));
 
     expect(screen.getByRole('heading', { name: /Full Schedule/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Next game preview/i)).toHaveTextContent(/Next Game Preview/i);
+    expect(screen.getByLabelText(/Next game preview/i)).toHaveTextContent(/Overall/i);
+    expect(screen.getByLabelText(/Next game preview/i)).toHaveTextContent(/Faceoff/i);
     expect(screen.getByRole('heading', { name: /^Week 1$/i })).toBeInTheDocument();
     expect(screen.getAllByText(/Scheduled/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Your game/i).length).toBeGreaterThan(0);

@@ -1,20 +1,26 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
-import type { LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName } from '../ui/format';
 import type { BoxScoreData } from '../ui/types';
+import { getNextUserGamePreview } from '../schedule-preview';
 
 export function ScheduleScreen({
   schedule,
+  teams,
   teamMap,
   userTeamId,
+  currentWeek,
   onBoxScore,
 }: {
   schedule: ScheduledGame[];
+  teams: LacrosseTeam[];
   teamMap: Map<string, string>;
   userTeamId: string;
+  currentWeek: number;
   onBoxScore: (data: BoxScoreData) => void;
 }) {
   const weeks = [...new Set(schedule.map((game) => game.week))].sort((a, b) => a - b);
+  const nextPreview = getNextUserGamePreview({ schedule, teams, userTeamId, currentWeek });
 
   return (
     <div className="schedule-view-layout">
@@ -23,6 +29,34 @@ export function ScheduleScreen({
         <h2>Full Schedule</h2>
         <p className="dim">Review every matchup, result, and completed box score for the season.</p>
       </article>
+
+      {nextPreview && (
+        <article className="card matchup-preview-card" aria-label="Next game preview">
+          <div className="matchup-preview-header">
+            <div>
+              <p className="eyebrow">Next Game Preview</p>
+              <h2>Week {nextPreview.game.week}: {formatTeamName(nextPreview.opponent.name)}</h2>
+              <p className="dim">
+                {nextPreview.userIsHome ? 'Home' : 'Away'} game · {nextPreview.matchupNote}
+              </p>
+            </div>
+            <div className="matchup-line">
+              <span>{formatTeamName(nextPreview.userTeam.shortName)}</span>
+              <strong>{nextPreview.userRating.overall}</strong>
+              <span>vs</span>
+              <strong>{nextPreview.opponentRating.overall}</strong>
+              <span>{formatTeamName(nextPreview.opponent.shortName)}</span>
+            </div>
+          </div>
+          <div className="matchup-edge-grid">
+            <MatchupEdge label="Overall" edge={nextPreview.ratingEdge} />
+            <MatchupEdge label="Your O vs Opp D" edge={nextPreview.offenseEdge} />
+            <MatchupEdge label="Your D vs Opp O" edge={nextPreview.defenseEdge} />
+            <MatchupEdge label="Goalie" edge={nextPreview.goalieEdge} />
+            <MatchupEdge label="Faceoff" edge={nextPreview.faceoffEdge} />
+          </div>
+        </article>
+      )}
 
       {weeks.map((week) => {
         const weekGames = schedule.filter((game) => game.week === week);
@@ -93,6 +127,18 @@ export function ScheduleScreen({
           </article>
         );
       })}
+    </div>
+  );
+}
+
+function MatchupEdge({ label, edge }: { label: string; edge: number }) {
+  const signed = edge > 0 ? `+${edge}` : `${edge}`;
+  const className = edge > 0 ? 'positive' : edge < 0 ? 'negative' : 'even';
+
+  return (
+    <div className={`matchup-edge ${className}`}>
+      <span>{label}</span>
+      <strong>{signed}</strong>
     </div>
   );
 }
