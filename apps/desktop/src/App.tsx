@@ -4,9 +4,8 @@ import {
   applyScholarshipOffer,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
-import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { calculateLacrosseTeamRating, createNewLacrosseDynasty, simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
-import type { LacrosseDynastyState, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, runOffseason, processInjuries } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
 import { computeNationalRankings } from './rankings';
@@ -33,6 +32,13 @@ import {
 import type { ScoutingState } from './scouting';
 import { emptySeasonStats, updateSeasonStats } from './stats';
 import type { SeasonStatsMap, PlayerSeasonStats } from './stats';
+import { DepthChart } from './components/DepthChart';
+import { ResultRow } from './components/ResultRow';
+import { BoxScorePanel } from './components/BoxScorePanel';
+import { TeamScreen } from './screens/TeamScreen';
+import { ScheduleScreen } from './screens/ScheduleScreen';
+import { formatTeamName, formatTeamShort } from './ui/format';
+import type { BoxScoreData } from './ui/types';
 import './App.css';
 
 const initialDynasty = createNewLacrosseDynasty({
@@ -52,17 +58,6 @@ type View =
   | 'tournament'
   | 'history'
   | 'stats';
-
-interface BoxScoreData {
-  title: string;
-  homeTeamName: string;
-  awayTeamName: string;
-  homeScore: number;
-  awayScore: number;
-  overtime: boolean;
-  homeStats: LacrosseTeamStats;
-  awayStats: LacrosseTeamStats;
-}
 
 export function App() {
   const [dynasty, setDynasty] = useState<LacrosseDynastyState>(initialDynasty);
@@ -487,7 +482,7 @@ export function App() {
       )}
 
       {view === 'team' && (
-        <TeamView
+        <TeamScreen
           team={userTeam}
           injuries={userInjuries}
           injuredCount={injuredCount}
@@ -497,7 +492,7 @@ export function App() {
       )}
 
       {view === 'schedule' && (
-        <ScheduleView
+        <ScheduleScreen
           schedule={dynasty.season.schedule}
           teamMap={teamMap}
           userTeamId={dynasty.userTeamId}
@@ -933,263 +928,6 @@ export function App() {
         <BoxScorePanel data={selectedBoxScore} onClose={() => setSelectedBoxScore(null)} />
       )}
     </main>
-  );
-}
-
-// ── Team View ───────────────────────────────────────────────────────────────────
-
-function TeamView({
-  team,
-  injuries,
-  injuredCount,
-  rating,
-  onSelectPlayer,
-}: {
-  team: LacrosseTeam;
-  injuries: Set<string>;
-  injuredCount: number;
-  rating: ReturnType<typeof calculateLacrosseTeamRating>;
-  onSelectPlayer: (playerId: string) => void;
-}) {
-  const rosterByPosition = [...team.roster].sort(
-    (a, b) => a.position.localeCompare(b.position) || b.ratings.overall - a.ratings.overall,
-  );
-
-  return (
-    <div className="team-view-layout">
-      <article className="card team-overview-card">
-        <p className="eyebrow">Current Team</p>
-        <h2>{formatTeamName(team.name)}</h2>
-        <div className="team-view-metrics">
-          <div>
-            <span className="metric">{team.record.wins}–{team.record.losses}</span>
-            <span className="sub-metric">Record</span>
-          </div>
-          <div>
-            <span className="metric">{team.roster.length}</span>
-            <span className="sub-metric">Players</span>
-          </div>
-          <div>
-            <span className="metric">{team.resources.scholarshipUsed.toFixed(1)}</span>
-            <span className="sub-metric">Scholarships Used</span>
-          </div>
-          <div>
-            <span className="metric">{injuredCount}</span>
-            <span className="sub-metric">Injuries</span>
-          </div>
-        </div>
-        <div className="team-rating-summary wide" aria-label="Team rating summary">
-          <div className="team-rating-overall">
-            <span className="team-rating-number">{rating.overall}</span>
-            <span className="team-rating-label">Team OVR</span>
-          </div>
-          <div className="team-rating-breakdown wide">
-            <span>OFF {rating.offense}</span>
-            <span>DEF {rating.defense}</span>
-            <span>GK {rating.goalie}</span>
-            <span>FO {rating.faceoff}</span>
-            <span>DEPTH {rating.depth}</span>
-          </div>
-        </div>
-      </article>
-
-      <article className="card team-depth-card">
-        <h2>Depth Chart</h2>
-        <DepthChart team={team} injuries={injuries} />
-      </article>
-
-      <article className="card team-roster-card">
-        <h2>Full Roster</h2>
-        <table className="standings-table roster-table">
-          <thead>
-            <tr>
-              <th>Player</th>
-              <th>Pos</th>
-              <th>Class</th>
-              <th>OVR</th>
-              <th>Skill</th>
-              <th>IQ</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rosterByPosition.map((player) => {
-              const isInjured = injuries.has(player.id);
-              return (
-                <tr
-                  key={player.id}
-                  className={`clickable-row${isInjured ? ' player-injured' : ''}`}
-                  onClick={() => onSelectPlayer(player.id)}
-                >
-                  <td>
-                    <strong>{player.name.first} {player.name.last}</strong>
-                  </td>
-                  <td>{player.position}</td>
-                  <td>{player.classYear}</td>
-                  <td>{player.ratings.overall}</td>
-                  <td>{player.ratings.skill}</td>
-                  <td>{player.ratings.iq}</td>
-                  <td>{isInjured ? <span className="inj-badge">INJ</span> : 'Available'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </article>
-    </div>
-  );
-}
-
-// ── Schedule View ───────────────────────────────────────────────────────────────
-
-function ScheduleView({
-  schedule,
-  teamMap,
-  userTeamId,
-  onBoxScore,
-}: {
-  schedule: ScheduledGame[];
-  teamMap: Map<string, string>;
-  userTeamId: string;
-  onBoxScore: (data: BoxScoreData) => void;
-}) {
-  const weeks = [...new Set(schedule.map((game) => game.week))].sort((a, b) => a - b);
-
-  return (
-    <div className="schedule-view-layout">
-      <article className="card schedule-header-card">
-        <p className="eyebrow">Season Schedule</p>
-        <h2>Full Schedule</h2>
-        <p className="dim">Review every matchup, result, and completed box score for the season.</p>
-      </article>
-
-      {weeks.map((week) => {
-        const weekGames = schedule.filter((game) => game.week === week);
-        const userGame = weekGames.find((game) => game.homeTeamId === userTeamId || game.awayTeamId === userTeamId);
-
-        return (
-          <article key={week} className="card schedule-week-card">
-            <div className="schedule-week-header">
-              <h3>Week {week}</h3>
-              {userGame && <span className="user-game-pill">Your game</span>}
-            </div>
-            <table className="standings-table schedule-table">
-              <thead>
-                <tr>
-                  <th>Matchup</th>
-                  <th>Status</th>
-                  <th>Score</th>
-                  <th>Box</th>
-                </tr>
-              </thead>
-              <tbody>
-                {weekGames.map((game) => {
-                  const result = game.result;
-                  const userInGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
-                  const userWon = result?.winnerTeamId === userTeamId;
-                  const canOpenBox = Boolean(result?.teamStats);
-
-                  const openBoxScore = () => {
-                    if (!result?.teamStats) return;
-                    onBoxScore({
-                      title: `Week ${game.week}`,
-                      homeTeamName: teamMap.get(game.homeTeamId) ?? game.homeTeamId,
-                      awayTeamName: teamMap.get(game.awayTeamId) ?? game.awayTeamId,
-                      homeScore: result.homeScore,
-                      awayScore: result.awayScore,
-                      overtime: result.overtime,
-                      homeStats: result.teamStats.home as LacrosseTeamStats,
-                      awayStats: result.teamStats.away as LacrosseTeamStats,
-                    });
-                  };
-
-                  return (
-                    <tr
-                      key={game.id}
-                      className={userInGame ? (userWon ? 'schedule-user-game win' : result ? 'schedule-user-game loss' : 'schedule-user-game') : ''}
-                    >
-                      <td>
-                        <strong>{formatTeamName(teamMap.get(game.awayTeamId) ?? game.awayTeamId)}</strong>
-                        <span className="schedule-at"> at </span>
-                        <strong>{formatTeamName(teamMap.get(game.homeTeamId) ?? game.homeTeamId)}</strong>
-                      </td>
-                      <td>{result ? `Final${result.overtime ? ' OT' : ''}` : 'Scheduled'}</td>
-                      <td>{result ? `${result.awayScore}–${result.homeScore}` : '—'}</td>
-                      <td>
-                        {canOpenBox ? (
-                          <button className="box-score-btn" onClick={openBoxScore}>
-                            View
-                          </button>
-                        ) : (
-                          <span className="dim">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </article>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Depth Chart ────────────────────────────────────────────────────────────────
-
-function DepthChart({
-  team,
-  injuries,
-}: {
-  team: { roster: Array<{ id: string; position: string; name: { first: string; last: string }; ratings: { overall: number }; classYear: string }> };
-  injuries: Set<string>;
-}) {
-  const positions = ['ATT', 'MID', 'DEF', 'GK', 'FOGO', 'LSM'] as const;
-
-  return (
-    <table className="depth-chart-table">
-      <thead>
-        <tr>
-          <th>Pos</th>
-          <th>Starter</th>
-          <th>Backup</th>
-        </tr>
-      </thead>
-      <tbody>
-        {positions.map((pos) => {
-          const byPos = [...team.roster]
-            .filter((p) => p.position === pos)
-            .sort((a, b) => b.ratings.overall - a.ratings.overall);
-          const starter = byPos[0];
-          const backup = byPos[1];
-
-          return (
-            <tr key={pos}>
-              <td className="depth-pos">{pos}</td>
-              <td className={injuries.has(starter?.id ?? '') ? 'depth-injured' : ''}>
-                {starter ? (
-                  <>
-                    <span className="depth-name">{starter.name.first[0]}. {starter.name.last}</span>
-                    <span className="depth-ovr">{starter.ratings.overall}</span>
-                    {injuries.has(starter.id) && <span className="inj-badge">INJ</span>}
-                  </>
-                ) : <span className="depth-empty">—</span>}
-              </td>
-              <td className={injuries.has(backup?.id ?? '') ? 'depth-injured' : ''}>
-                {backup ? (
-                  <>
-                    <span className="depth-name">{backup.name.first[0]}. {backup.name.last}</span>
-                    <span className="depth-ovr">{backup.ratings.overall}</span>
-                    {injuries.has(backup.id) && <span className="inj-badge">INJ</span>}
-                  </>
-                ) : <span className="depth-empty">—</span>}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
   );
 }
 
@@ -1679,66 +1417,6 @@ function BracketMatchup({
   );
 }
 
-// ── Box Score Panel ────────────────────────────────────────────────────────────
-
-function BoxScorePanel({ data, onClose }: { data: BoxScoreData; onClose: () => void }) {
-  const stats: Array<{ label: string; format: (s: LacrosseTeamStats) => string }> = [
-    { label: 'Goals', format: (s) => String(s.goals) },
-    { label: 'Shots', format: (s) => String(s.shots) },
-    { label: 'Shots on Goal', format: (s) => String(s.shotsOnGoal) },
-    { label: 'Saves', format: (s) => String(s.saves) },
-    { label: 'Ground Balls', format: (s) => String(s.groundBalls) },
-    { label: 'Faceoffs', format: (s) => `${s.faceoffWins}/${s.faceoffAttempts}` },
-    { label: 'Assists', format: (s) => String(s.assists) },
-    { label: 'Turnovers', format: (s) => String(s.turnovers) },
-    { label: 'Caused TOs', format: (s) => String(s.causedTurnovers) },
-    { label: 'Clears', format: (s) => `${s.clears}/${s.clearAttempts}` },
-    { label: 'Penalties', format: (s) => `${s.penalties} (${s.penaltyMinutes}min)` },
-  ];
-
-  return (
-    <div className="player-panel-backdrop" onClick={onClose}>
-      <aside className="player-panel box-score-panel card" onClick={(e) => e.stopPropagation()}>
-        <button className="panel-close" onClick={onClose} aria-label="Close box score">×</button>
-        <p className="panel-eyebrow">{data.title}</p>
-
-        <div className="box-score-header">
-          <div className={`box-score-side${data.awayScore > data.homeScore ? ' winner-side' : ''}`}>
-            <p className="box-score-team-name">{formatTeamName(data.awayTeamName)}</p>
-            <p className="box-score-final">{data.awayScore}</p>
-          </div>
-          <div className="box-score-sep">
-            {data.overtime ? <span className="ot-badge">OT</span> : <span>@</span>}
-          </div>
-          <div className={`box-score-side box-score-home${data.homeScore > data.awayScore ? ' winner-side' : ''}`}>
-            <p className="box-score-team-name">{formatTeamName(data.homeTeamName)}</p>
-            <p className="box-score-final">{data.homeScore}</p>
-          </div>
-        </div>
-
-        <table className="box-score-table">
-          <thead>
-            <tr>
-              <th className="stat-away">{formatTeamShort(data.awayTeamName)}</th>
-              <th className="stat-name">Stat</th>
-              <th className="stat-home">{formatTeamShort(data.homeTeamName)}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stats.map(({ label, format }) => (
-              <tr key={label}>
-                <td className="stat-val">{format(data.awayStats)}</td>
-                <td className="stat-label">{label}</td>
-                <td className="stat-val">{format(data.homeStats)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </aside>
-    </div>
-  );
-}
-
 // ── History View ───────────────────────────────────────────────────────────────
 
 function HistoryView({ history }: { history: DynastySeasonRecord[] }) {
@@ -1891,56 +1569,6 @@ function PrestigeSection({ reputation }: {
   );
 }
 
-// ── Result Row ─────────────────────────────────────────────────────────────────
-
-function ResultRow({
-  game,
-  teamMap,
-  userTeamId,
-  onBoxScore,
-}: {
-  game: ScheduledGame;
-  teamMap: Map<string, string>;
-  userTeamId: string;
-  onBoxScore?: (data: BoxScoreData) => void;
-}) {
-  const { result } = game;
-  if (!result) return null;
-
-  const userInGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
-  const userWon = result.winnerTeamId === userTeamId;
-  const className = userInGame ? (userWon ? 'result-row win' : 'result-row loss') : 'result-row';
-
-  const handleClick = () => {
-    if (!result.teamStats || !onBoxScore) return;
-    onBoxScore({
-      title: `Week ${game.week}`,
-      homeTeamName: teamMap.get(game.homeTeamId) ?? game.homeTeamId,
-      awayTeamName: teamMap.get(game.awayTeamId) ?? game.awayTeamId,
-      homeScore: result.homeScore,
-      awayScore: result.awayScore,
-      overtime: result.overtime,
-      homeStats: result.teamStats.home as LacrosseTeamStats,
-      awayStats: result.teamStats.away as LacrosseTeamStats,
-    });
-  };
-
-  return (
-    <li
-      className={`${className}${result.teamStats && onBoxScore ? ' clickable' : ''}`}
-      onClick={result.teamStats && onBoxScore ? handleClick : undefined}
-    >
-      <span className="result-teams">
-        {formatTeamName(teamMap.get(game.awayTeamId) ?? game.awayTeamId)}
-        <span className="result-score">{result.awayScore}–{result.homeScore}</span>
-        {formatTeamName(teamMap.get(game.homeTeamId) ?? game.homeTeamId)}
-        {result.overtime && <span className="ot-badge">OT</span>}
-      </span>
-      {result.teamStats && onBoxScore && <span className="box-score-hint">box score →</span>}
-    </li>
-  );
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function buildPlayerLookup(
@@ -1958,18 +1586,4 @@ function buildPlayerLookup(
     }
   }
   return map;
-}
-
-function formatTeamName(value: string): string {
-  return value
-    .split(/[-\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-    .replace('University', '')
-    .trim();
-}
-
-function formatTeamShort(value: string): string {
-  return formatTeamName(value).split(' ').slice(0, 2).join(' ');
 }
