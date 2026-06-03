@@ -537,6 +537,102 @@ li span {
   gap: 24px;
 }
 
+.team-view-layout,
+.schedule-view-layout {
+  display: grid;
+  gap: 24px;
+}
+
+.team-view-layout {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+}
+
+.team-roster-card,
+.schedule-header-card {
+  grid-column: 1 / -1;
+}
+
+.team-view-metrics {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 18px 0;
+}
+
+.team-view-metrics .metric,
+.team-view-metrics .sub-metric {
+  display: block;
+}
+
+.team-rating-summary.wide {
+  margin-bottom: 0;
+}
+
+.team-rating-breakdown.wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.roster-table tr.clickable-row {
+  cursor: pointer;
+}
+
+.roster-table tr.clickable-row:hover,
+.schedule-table tr.schedule-user-game {
+  background: rgba(114, 242, 198, 0.06);
+}
+
+.schedule-view-layout {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+}
+
+.schedule-week-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.schedule-week-header h3 {
+  margin: 0;
+}
+
+.user-game-pill {
+  background: rgba(114, 242, 198, 0.14);
+  border: 1px solid rgba(114, 242, 198, 0.25);
+  border-radius: 999px;
+  color: #72f2c6;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+
+.schedule-table th:last-child,
+.schedule-table td:last-child {
+  text-align: right;
+}
+
+.schedule-at {
+  color: #aab8ca;
+  font-weight: 500;
+}
+
+.box-score-btn {
+  background: rgba(61, 127, 255, 0.14);
+  border: 1px solid rgba(61, 127, 255, 0.35);
+  border-radius: 10px;
+  color: #8fb2ff;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.box-score-btn:hover {
+  background: rgba(61, 127, 255, 0.24);
+}
+
 /* ── News styles ──────────────────────────────────────────── */
 
 .news-list {

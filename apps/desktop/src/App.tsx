@@ -6,7 +6,7 @@ import {
 } from '@sports-management-sim/engine-core';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { calculateLacrosseTeamRating, createNewLacrosseDynasty, simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
-import type { LacrosseDynastyState, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { LacrosseDynastyState, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, runOffseason, processInjuries } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
 import { computeNationalRankings } from './rankings';
@@ -41,7 +41,17 @@ const initialDynasty = createNewLacrosseDynasty({
   seasonYear: 2028,
 });
 
-type View = 'season' | 'recruiting' | 'standings' | 'offseason' | 'news' | 'tournament' | 'history' | 'stats';
+type View =
+  | 'season'
+  | 'team'
+  | 'schedule'
+  | 'recruiting'
+  | 'standings'
+  | 'offseason'
+  | 'news'
+  | 'tournament'
+  | 'history'
+  | 'stats';
 
 interface BoxScoreData {
   title: string;
@@ -311,7 +321,7 @@ export function App() {
       </header>
 
       <nav className="tab-bar" aria-label="Main navigation">
-        {(['season', 'recruiting', 'standings'] as const).map((v) => (
+        {(['season', 'team', 'schedule', 'recruiting', 'standings'] as const).map((v) => (
           <button
             key={v}
             className={view === v ? 'tab active' : 'tab'}
@@ -474,6 +484,25 @@ export function App() {
             </article>
           </div>
         </div>
+      )}
+
+      {view === 'team' && (
+        <TeamView
+          team={userTeam}
+          injuries={userInjuries}
+          injuredCount={injuredCount}
+          rating={userTeamRating}
+          onSelectPlayer={setSelectedPlayerId}
+        />
+      )}
+
+      {view === 'schedule' && (
+        <ScheduleView
+          schedule={dynasty.season.schedule}
+          teamMap={teamMap}
+          userTeamId={dynasty.userTeamId}
+          onBoxScore={setSelectedBoxScore}
+        />
       )}
 
       {view === 'recruiting' && (
@@ -904,6 +933,206 @@ export function App() {
         <BoxScorePanel data={selectedBoxScore} onClose={() => setSelectedBoxScore(null)} />
       )}
     </main>
+  );
+}
+
+// ── Team View ───────────────────────────────────────────────────────────────────
+
+function TeamView({
+  team,
+  injuries,
+  injuredCount,
+  rating,
+  onSelectPlayer,
+}: {
+  team: LacrosseTeam;
+  injuries: Set<string>;
+  injuredCount: number;
+  rating: ReturnType<typeof calculateLacrosseTeamRating>;
+  onSelectPlayer: (playerId: string) => void;
+}) {
+  const rosterByPosition = [...team.roster].sort(
+    (a, b) => a.position.localeCompare(b.position) || b.ratings.overall - a.ratings.overall,
+  );
+
+  return (
+    <div className="team-view-layout">
+      <article className="card team-overview-card">
+        <p className="eyebrow">Current Team</p>
+        <h2>{formatTeamName(team.name)}</h2>
+        <div className="team-view-metrics">
+          <div>
+            <span className="metric">{team.record.wins}–{team.record.losses}</span>
+            <span className="sub-metric">Record</span>
+          </div>
+          <div>
+            <span className="metric">{team.roster.length}</span>
+            <span className="sub-metric">Players</span>
+          </div>
+          <div>
+            <span className="metric">{team.resources.scholarshipUsed.toFixed(1)}</span>
+            <span className="sub-metric">Scholarships Used</span>
+          </div>
+          <div>
+            <span className="metric">{injuredCount}</span>
+            <span className="sub-metric">Injuries</span>
+          </div>
+        </div>
+        <div className="team-rating-summary wide" aria-label="Team rating summary">
+          <div className="team-rating-overall">
+            <span className="team-rating-number">{rating.overall}</span>
+            <span className="team-rating-label">Team OVR</span>
+          </div>
+          <div className="team-rating-breakdown wide">
+            <span>OFF {rating.offense}</span>
+            <span>DEF {rating.defense}</span>
+            <span>GK {rating.goalie}</span>
+            <span>FO {rating.faceoff}</span>
+            <span>DEPTH {rating.depth}</span>
+          </div>
+        </div>
+      </article>
+
+      <article className="card team-depth-card">
+        <h2>Depth Chart</h2>
+        <DepthChart team={team} injuries={injuries} />
+      </article>
+
+      <article className="card team-roster-card">
+        <h2>Full Roster</h2>
+        <table className="standings-table roster-table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Pos</th>
+              <th>Class</th>
+              <th>OVR</th>
+              <th>Skill</th>
+              <th>IQ</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rosterByPosition.map((player) => {
+              const isInjured = injuries.has(player.id);
+              return (
+                <tr
+                  key={player.id}
+                  className={`clickable-row${isInjured ? ' player-injured' : ''}`}
+                  onClick={() => onSelectPlayer(player.id)}
+                >
+                  <td>
+                    <strong>{player.name.first} {player.name.last}</strong>
+                  </td>
+                  <td>{player.position}</td>
+                  <td>{player.classYear}</td>
+                  <td>{player.ratings.overall}</td>
+                  <td>{player.ratings.skill}</td>
+                  <td>{player.ratings.iq}</td>
+                  <td>{isInjured ? <span className="inj-badge">INJ</span> : 'Available'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </article>
+    </div>
+  );
+}
+
+// ── Schedule View ───────────────────────────────────────────────────────────────
+
+function ScheduleView({
+  schedule,
+  teamMap,
+  userTeamId,
+  onBoxScore,
+}: {
+  schedule: ScheduledGame[];
+  teamMap: Map<string, string>;
+  userTeamId: string;
+  onBoxScore: (data: BoxScoreData) => void;
+}) {
+  const weeks = [...new Set(schedule.map((game) => game.week))].sort((a, b) => a - b);
+
+  return (
+    <div className="schedule-view-layout">
+      <article className="card schedule-header-card">
+        <p className="eyebrow">Season Schedule</p>
+        <h2>Full Schedule</h2>
+        <p className="dim">Review every matchup, result, and completed box score for the season.</p>
+      </article>
+
+      {weeks.map((week) => {
+        const weekGames = schedule.filter((game) => game.week === week);
+        const userGame = weekGames.find((game) => game.homeTeamId === userTeamId || game.awayTeamId === userTeamId);
+
+        return (
+          <article key={week} className="card schedule-week-card">
+            <div className="schedule-week-header">
+              <h3>Week {week}</h3>
+              {userGame && <span className="user-game-pill">Your game</span>}
+            </div>
+            <table className="standings-table schedule-table">
+              <thead>
+                <tr>
+                  <th>Matchup</th>
+                  <th>Status</th>
+                  <th>Score</th>
+                  <th>Box</th>
+                </tr>
+              </thead>
+              <tbody>
+                {weekGames.map((game) => {
+                  const result = game.result;
+                  const userInGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
+                  const userWon = result?.winnerTeamId === userTeamId;
+                  const canOpenBox = Boolean(result?.teamStats);
+
+                  const openBoxScore = () => {
+                    if (!result?.teamStats) return;
+                    onBoxScore({
+                      title: `Week ${game.week}`,
+                      homeTeamName: teamMap.get(game.homeTeamId) ?? game.homeTeamId,
+                      awayTeamName: teamMap.get(game.awayTeamId) ?? game.awayTeamId,
+                      homeScore: result.homeScore,
+                      awayScore: result.awayScore,
+                      overtime: result.overtime,
+                      homeStats: result.teamStats.home as LacrosseTeamStats,
+                      awayStats: result.teamStats.away as LacrosseTeamStats,
+                    });
+                  };
+
+                  return (
+                    <tr
+                      key={game.id}
+                      className={userInGame ? (userWon ? 'schedule-user-game win' : result ? 'schedule-user-game loss' : 'schedule-user-game') : ''}
+                    >
+                      <td>
+                        <strong>{formatTeamName(teamMap.get(game.awayTeamId) ?? game.awayTeamId)}</strong>
+                        <span className="schedule-at"> at </span>
+                        <strong>{formatTeamName(teamMap.get(game.homeTeamId) ?? game.homeTeamId)}</strong>
+                      </td>
+                      <td>{result ? `Final${result.overtime ? ' OT' : ''}` : 'Scheduled'}</td>
+                      <td>{result ? `${result.awayScore}–${result.homeScore}` : '—'}</td>
+                      <td>
+                        {canOpenBox ? (
+                          <button className="box-score-btn" onClick={openBoxScore}>
+                            View
+                          </button>
+                        ) : (
+                          <span className="dim">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </article>
+        );
+      })}
+    </div>
   );
 }
 

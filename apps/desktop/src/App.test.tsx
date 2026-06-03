@@ -28,6 +28,28 @@ describe('Desktop App', () => {
     expect(screen.getByText(/Results/i)).toBeInTheDocument();
   });
 
+  it('switches to the team tab and shows the full roster/depth chart screen', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Team/i }));
+
+    expect(screen.getByText(/Current Team/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Depth Chart/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Full Roster/i })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /OVR/i })).toBeInTheDocument();
+  });
+
+  it('switches to the schedule tab and shows the full season schedule', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Schedule/i }));
+
+    expect(screen.getByRole('heading', { name: /Full Schedule/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Week 1$/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/Scheduled/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Your game/i).length).toBeGreaterThan(0);
+  });
+
   it('switches to the recruiting tab and shows scouting controls', async () => {
     render(<App />);
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
