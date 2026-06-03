@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
 import type { RecruitBoardEntry } from '@sports-management-sim/engine-core';
 import type { ScoutingState } from '../scouting';
@@ -12,9 +11,13 @@ export function RecruitingScreen({
   userTeamId,
   teamMap,
   currentWeek,
+  recruitPosFilter,
+  recruitTab,
   onOfferScholarship,
   onScoutRecruit,
   onOfferPortalPlayer,
+  onRecruitPosFilterChange,
+  onRecruitTabChange,
 }: {
   recruitBoard: RecruitBoardEntry<LacrossePosition, LacrossePlayerTraits>[];
   portalEntries: LacrossePortalEntry[];
@@ -22,12 +25,14 @@ export function RecruitingScreen({
   userTeamId: string;
   teamMap: Map<string, string>;
   currentWeek: number;
+  recruitPosFilter: LacrossePosition | 'ALL';
+  recruitTab: 'board' | 'portal';
   onOfferScholarship: (recruitId: string) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onOfferPortalPlayer: (entryId: string) => void;
+  onRecruitPosFilterChange: (pos: LacrossePosition | 'ALL') => void;
+  onRecruitTabChange: (tab: 'board' | 'portal') => void;
 }) {
-  const [recruitPosFilter, setRecruitPosFilter] = useState<LacrossePosition | 'ALL'>('ALL');
-  const [recruitTab, setRecruitTab] = useState<'board' | 'portal'>('board');
 
   return (
     <div className="recruit-layout">
@@ -35,13 +40,13 @@ export function RecruitingScreen({
         <div className="recruit-tabs">
           <button
             className={`recruit-tab${recruitTab === 'board' ? ' active' : ''}`}
-            onClick={() => setRecruitTab('board')}
+            onClick={() => onRecruitTabChange('board')}
           >
             Recruit Board
           </button>
           <button
             className={`recruit-tab${recruitTab === 'portal' ? ' active' : ''}`}
-            onClick={() => setRecruitTab('portal')}
+            onClick={() => onRecruitTabChange('portal')}
           >
             Transfer Portal
             {portalEntries.filter((e) => e.status === 'available').length > 0 && (
@@ -68,7 +73,7 @@ export function RecruitingScreen({
               <button
                 key={pos}
                 className={`pos-filter-btn${recruitPosFilter === pos ? ' active' : ''}`}
-                onClick={() => setRecruitPosFilter(pos)}
+                onClick={() => onRecruitPosFilterChange(pos)}
               >
                 {pos}
               </button>

@@ -86,6 +86,8 @@ export function App() {
   const [scouting, setScouting] = useState<ScoutingState>(() => loadedSave?.scouting ?? createScoutingState(3));
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded local save' : 'Autosave ready'));
+  const [recruitPosFilter, setRecruitPosFilter] = useState<LacrossePosition | 'ALL'>('ALL');
+  const [recruitTab, setRecruitTab] = useState<'board' | 'portal'>('board');
 
   const rankingsRef = useRef<RankingEntry[]>(rankings);
   rankingsRef.current = rankings;
@@ -493,9 +495,13 @@ export function App() {
           userTeamId={dynasty.userTeamId}
           teamMap={teamMap}
           currentWeek={dynasty.season.currentWeek}
+          recruitPosFilter={recruitPosFilter}
+          recruitTab={recruitTab}
           onOfferScholarship={offerScholarship}
           onScoutRecruit={doScoutRecruit}
           onOfferPortalPlayer={offerPortalPlayer}
+          onRecruitPosFilterChange={setRecruitPosFilter}
+          onRecruitTabChange={setRecruitTab}
         />
       )}
 
