@@ -209,6 +209,7 @@ function BracketMatchup({
       overtime: result.overtime,
       homeStats: result.teamStats.home,
       awayStats: result.teamStats.away,
+      ...(result.log ? { log: result.log } : {}),
     });
   };
 

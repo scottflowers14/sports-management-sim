@@ -83,7 +83,9 @@ export function App() {
   const [dynastyHistory, setDynastyHistory] = useState<DynastySeasonRecord[]>(loadedSave?.dynastyHistory ?? []);
   const [injuries, setInjuries] = useState<InjuredPlayer[]>(loadedSave?.injuries ?? []);
   const [selectedBoxScore, setSelectedBoxScore] = useState<BoxScoreData | null>(null);
-  const [gameLogs, setGameLogs] = useState<Map<string, GameLog>>(() => new Map());
+  const [gameLogs, setGameLogs] = useState<Map<string, GameLog>>(() =>
+    new Map(Object.entries(loadedSave?.gameLogs ?? {})),
+  );
   const [scouting, setScouting] = useState<ScoutingState>(() => loadedSave?.scouting ?? createScoutingState(3));
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded local save' : 'Autosave ready'));
@@ -107,9 +109,10 @@ export function App() {
       injuries,
       scouting,
       seasonStats,
+      gameLogs: Object.fromEntries(gameLogs),
     });
     setSaveStatus(status);
-  }, [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats]);
+  }, [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, gameLogs]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => persistDynasty('Autosaved'), 300);
