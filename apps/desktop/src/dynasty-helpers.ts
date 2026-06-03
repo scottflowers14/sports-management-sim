@@ -291,51 +291,77 @@ export function runOffseason(
 
 export function resolveAndApplyPortal(dynasty: LacrosseDynastyState): LacrosseDynastyState {
   const resolved = resolvePortalCommitments(dynasty.portalEntries, dynasty.season.teams);
-  const userCommits = resolved.filter((e) => e.committedTeamId === dynasty.userTeamId);
 
-  if (userCommits.length === 0) {
-    return { ...dynasty, portalEntries: resolved };
+  // All portal entries represent players who have left their source program
+  const removedIdsByTeam = new Map<string, Set<string>>();
+  for (const entry of resolved) {
+    const ids = removedIdsByTeam.get(entry.sourceTeamId) ?? new Set<string>();
+    ids.add(entry.playerId);
+    removedIdsByTeam.set(entry.sourceTeamId, ids);
   }
 
-  const defaultTraits: LacrossePlayerTraits = {
-    shooting: 50,
-    passing: 50,
-    dodging: 50,
-    stickSkills: 55,
-    offBallMovement: 50,
-    defense: 50,
-    checking: 45,
-    groundBalls: 55,
-    preferredHand: 'right',
-  };
+  // Remove portal players from source rosters
+  let updatedTeams = dynasty.season.teams.map((team) => {
+    const removedIds = removedIdsByTeam.get(team.id);
+    if (!removedIds) return team;
+    return { ...team, roster: team.roster.filter((p) => !removedIds.has(p.id)) };
+  });
 
-  const newPlayers: LacrossePlayer[] = userCommits.map((entry) => ({
-    id: `portal-player-${entry.id}`,
-    name: entry.name,
-    age: 19,
-    classYear: entry.classYear,
-    hometown: entry.regionId,
-    regionId: entry.regionId,
-    position: entry.position,
-    secondaryPositions: [],
-    ratings: entry.ratings,
-    traits: [],
-    sportTraits: (entry.sportTraits ?? defaultTraits) as LacrossePlayerTraits,
-    scholarshipPercent: entry.offersByTeamId[dynasty.userTeamId] ?? 100,
-    isWalkOn: false,
-    morale: 80,
-    health: 100,
-    fatigue: 0,
-    redshirtStatus: 'none' as const,
-    eligibility: eligibilityForClass(entry.classYear),
-    createdSeason: dynasty.season.year,
-  }));
+  // Add players who committed to the user team
+  const userCommits = resolved.filter((e) => e.committedTeamId === dynasty.userTeamId);
 
-  const updatedTeams = dynasty.season.teams.map((team) =>
-    team.id === dynasty.userTeamId
-      ? { ...team, roster: [...team.roster, ...newPlayers] }
-      : team,
-  );
+  if (userCommits.length > 0) {
+    const defaultTraits: LacrossePlayerTraits = {
+      shooting: 50,
+      passing: 50,
+      dodging: 50,
+      stickSkills: 55,
+      offBallMovement: 50,
+      defense: 50,
+      checking: 45,
+      groundBalls: 55,
+      preferredHand: 'right',
+    };
+
+    const newPlayers: LacrossePlayer[] = userCommits.map((entry) => ({
+      id: `portal-player-${entry.id}`,
+      name: entry.name,
+      age: 19,
+      classYear: entry.classYear,
+      hometown: entry.regionId,
+      regionId: entry.regionId,
+      position: entry.position,
+      secondaryPositions: [],
+      ratings: entry.ratings,
+      traits: [],
+      sportTraits: (entry.sportTraits ?? defaultTraits) as LacrossePlayerTraits,
+      scholarshipPercent: entry.offersByTeamId[dynasty.userTeamId] ?? 100,
+      isWalkOn: false,
+      morale: 80,
+      health: 100,
+      fatigue: 0,
+      redshirtStatus: 'none' as const,
+      eligibility: eligibilityForClass(entry.classYear),
+      createdSeason: dynasty.season.year,
+    }));
+
+    const scholarshipDelta = newPlayers.reduce((sum, p) => sum + p.scholarshipPercent / 100, 0);
+
+    updatedTeams = updatedTeams.map((team) => {
+      if (team.id !== dynasty.userTeamId) return team;
+      return {
+        ...team,
+        roster: [...team.roster, ...newPlayers],
+        resources: {
+          ...team.resources,
+          scholarshipUsed: Math.min(
+            team.resources.scholarshipLimit,
+            team.resources.scholarshipUsed + scholarshipDelta,
+          ),
+        },
+      };
+    });
+  }
 
   return {
     ...dynasty,

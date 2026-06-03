@@ -47,6 +47,10 @@ export function loadDynastyState(storage: Storage = window.localStorage): Persis
     if (parsed.version !== DYNASTY_SAVE_VERSION || !parsed.dynasty) {
       return null;
     }
+    // Hydrate fields added after the initial save version so old saves don't crash
+    if (!parsed.dynasty.portalEntries) {
+      parsed.dynasty = { ...parsed.dynasty, portalEntries: [] };
+    }
     return parsed as PersistedDynastySave;
   } catch {
     return null;
