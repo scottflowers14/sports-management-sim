@@ -1,5 +1,6 @@
 import type { GameResult } from '@sports-management-sim/engine-core';
 import type { LacrosseTeam, LacrosseTeamStats } from './models';
+import { calculateLacrosseTeamRating, type LacrosseTeamRating } from './team-rating';
 
 export type RandomSource = () => number;
 
@@ -16,14 +17,15 @@ export function simulateLacrosseGame({
   awayTeam,
   random = Math.random,
 }: SimulateLacrosseGameInput): LacrosseGameResult {
-  const homeStrength = averageOverall(homeTeam);
-  const awayStrength = averageOverall(awayTeam);
+  const homeRating = calculateLacrosseTeamRating(homeTeam);
+  const awayRating = calculateLacrosseTeamRating(awayTeam);
+  const homePossessionEdge = (homeRating.faceoff - awayRating.faceoff) / 12;
 
-  const homePossessions = 40 + Math.floor(random() * 16);
-  const awayPossessions = 40 + Math.floor(random() * 16);
+  const homePossessions = Math.round(44 + Math.floor(random() * 12) + homePossessionEdge);
+  const awayPossessions = Math.round(44 + Math.floor(random() * 12) - homePossessionEdge);
 
-  let homeScore = simulateGoals(homePossessions, homeStrength, awayStrength, random);
-  let awayScore = simulateGoals(awayPossessions, awayStrength, homeStrength, random);
+  let homeScore = simulateGoals(homePossessions, homeRating, awayRating, random);
+  let awayScore = simulateGoals(awayPossessions, awayRating, homeRating, random);
   let overtime = false;
 
   if (homeScore === awayScore) {
@@ -44,22 +46,21 @@ export function simulateLacrosseGame({
     loserTeamId: homeWon ? awayTeam.id : homeTeam.id,
     overtime,
     teamStats: {
-      home: createTeamStats(homeScore, homePossessions, random),
-      away: createTeamStats(awayScore, awayPossessions, random),
+      home: createTeamStats(homeScore, homePossessions, homeRating, awayRating, random),
+      away: createTeamStats(awayScore, awayPossessions, awayRating, homeRating, random),
     },
   };
 }
 
-function averageOverall(team: LacrosseTeam): number {
-  if (team.roster.length === 0) {
-    return 0;
-  }
-
-  return team.roster.reduce((sum, player) => sum + player.ratings.overall, 0) / team.roster.length;
-}
-
-function simulateGoals(possessions: number, offenseStrength: number, defenseStrength: number, random: RandomSource): number {
-  const scoringChance = clamp(0.18 + offenseStrength / 500 - defenseStrength / 700, 0.12, 0.42);
+function simulateGoals(
+  possessions: number,
+  offenseRating: LacrosseTeamRating,
+  defenseRating: LacrosseTeamRating,
+  random: RandomSource,
+): number {
+  const ratingEdge = offenseRating.offense - defenseRating.defense;
+  const goalieEdge = offenseRating.offense - defenseRating.goalie;
+  const scoringChance = clamp(0.23 + ratingEdge / 320 + goalieEdge / 900, 0.1, 0.48);
   let goals = 0;
 
   for (let possession = 0; possession < possessions; possession += 1) {
@@ -71,11 +72,19 @@ function simulateGoals(possessions: number, offenseStrength: number, defenseStre
   return goals;
 }
 
-function createTeamStats(goals: number, possessions: number, random: RandomSource): LacrosseTeamStats {
-  const shots = goals + Math.floor(possessions * (0.35 + random() * 0.25));
-  const shotsOnGoal = Math.min(shots, goals + Math.floor((shots - goals) * (0.45 + random() * 0.25)));
+function createTeamStats(
+  goals: number,
+  possessions: number,
+  teamRating: LacrosseTeamRating,
+  opponentRating: LacrosseTeamRating,
+  random: RandomSource,
+): LacrosseTeamStats {
+  const shotRate = clamp(0.42 + teamRating.offense / 360 - opponentRating.defense / 520, 0.28, 0.72);
+  const shots = goals + Math.floor(possessions * (shotRate + random() * 0.12));
+  const shotsOnGoal = Math.min(shots, goals + Math.floor((shots - goals) * (0.42 + teamRating.offense / 500 + random() * 0.16)));
   const faceoffAttempts = possessions;
-  const faceoffWins = Math.floor(faceoffAttempts * (0.35 + random() * 0.3));
+  const faceoffWinRate = clamp(0.5 + (teamRating.faceoff - opponentRating.faceoff) / 180, 0.28, 0.72);
+  const faceoffWins = Math.floor(faceoffAttempts * faceoffWinRate);
 
   return {
     goals,

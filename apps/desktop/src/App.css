@@ -744,6 +744,47 @@ li span {
   text-align: right;
 }
 
+.team-rating-summary {
+  align-items: center;
+  background: rgba(114, 242, 198, 0.08);
+  border: 1px solid rgba(114, 242, 198, 0.2);
+  border-radius: 16px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+}
+
+.team-rating-overall {
+  display: grid;
+  gap: 2px;
+}
+
+.team-rating-number {
+  color: #72f2c6;
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.team-rating-label {
+  color: #aab8ca;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.team-rating-breakdown {
+  color: #d8e4f2;
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 4px 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .player-roster-list {
   list-style: none;
   padding: 0;

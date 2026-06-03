@@ -17,6 +17,8 @@ describe('Desktop App', () => {
     expect(screen.getByRole('heading', { name: /This Week/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Upcoming/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Roster/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Team rating summary/i)).toHaveTextContent(/Team OVR/i);
+    expect(screen.getByLabelText(/Team rating summary/i)).toHaveTextContent(/OFF/i);
     expect(screen.getByRole('button', { name: /Sim Week/i })).toBeInTheDocument();
   });
 

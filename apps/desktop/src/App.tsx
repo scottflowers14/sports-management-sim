@@ -5,7 +5,7 @@ import {
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
-import { createNewLacrosseDynasty, simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
+import { calculateLacrosseTeamRating, createNewLacrosseDynasty, simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
 import type { LacrosseDynastyState, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, runOffseason, processInjuries } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
@@ -271,6 +271,7 @@ export function App() {
     injuries.filter((inj) => inj.teamId === dynasty.userTeamId).map((inj) => inj.playerId),
   );
   const injuredCount = injuries.filter((inj) => inj.teamId === dynasty.userTeamId).length;
+  const userTeamRating = calculateLacrosseTeamRating(userTeam);
 
   // Player lookup map for stat views
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
@@ -419,6 +420,18 @@ export function App() {
                 {userTeam.resources.scholarshipLimit.toFixed(1)} scholarships
                 {injuredCount > 0 && <span className="sidebar-inj"> · {injuredCount} inj</span>}
               </p>
+              <div className="team-rating-summary" aria-label="Team rating summary">
+                <div className="team-rating-overall">
+                  <span className="team-rating-number">{userTeamRating.overall}</span>
+                  <span className="team-rating-label">Team OVR</span>
+                </div>
+                <div className="team-rating-breakdown">
+                  <span>OFF {userTeamRating.offense}</span>
+                  <span>DEF {userTeamRating.defense}</span>
+                  <span>GK {userTeamRating.goalie}</span>
+                  <span>FO {userTeamRating.faceoff}</span>
+                </div>
+              </div>
               <DepthChart team={userTeam} injuries={userInjuries} />
               <ul className="player-roster-list">
                 {userTeam.roster.map((p) => {
