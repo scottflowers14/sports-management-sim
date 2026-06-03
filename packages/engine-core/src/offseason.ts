@@ -99,7 +99,7 @@ function shiftRating(current: number, potential: number, delta: number): number 
   if (delta >= 0) {
     return Math.min(potential, current + Math.max(0, Math.floor(delta / 2)));
   }
-  return Math.max(1, current + Math.ceil(delta / 2));
+  return Math.max(1, current + delta);
 }
 
 function emptyRecord(): TeamRecord {

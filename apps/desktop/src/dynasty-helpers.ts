@@ -148,7 +148,7 @@ export function runOffseason(
   // then add the signing class as true freshmen for the upcoming season.
   const teamsAfterOffseason = teamsWithPrestige.map((team) => {
     const afterOffseason = runTeamOffseason(team);
-    const withClass = addSignedRecruitsToTeam(afterOffseason, signed, season.year);
+    const withClass = addSignedRecruitsToTeam(afterOffseason, signed, newYear);
     return pruneDepthChart(withClass);
   });
 

@@ -135,6 +135,9 @@ describe('offseason progression', () => {
 
     const regressed = progressPlayer(player, 0.0);
     expect(regressed.ratings.overall).toBe(79);
+    // Attributes should also drop by 1
+    expect(regressed.ratings.speed).toBe(player.ratings.speed - 1);
+    expect(regressed.ratings.skill).toBe(player.ratings.skill - 1);
   });
 
   it('does not regress a player at potential ceiling on high development roll with high work ethic', () => {

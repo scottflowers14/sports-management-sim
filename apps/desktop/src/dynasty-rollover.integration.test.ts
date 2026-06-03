@@ -124,6 +124,41 @@ describe('multi-season dynasty rollover', () => {
     }
   });
 
+  it('sets createdSeason on freshmen to the upcoming season year, not the outgoing year', () => {
+    let dynasty = createNewLacrosseDynasty({
+      seed: 88,
+      userTeamId: 'maryland-state',
+      seasonYear: 2028,
+    });
+
+    // Commit some recruits manually so they sign during offseason
+    dynasty = {
+      ...dynasty,
+      recruits: dynasty.recruits.map((r, i) =>
+        i < 4
+          ? {
+              ...r,
+              status: 'committed' as const,
+              committedTeamId: 'maryland-state',
+              scholarshipOffers: [{ teamId: 'maryland-state', scholarshipPercent: 100 }],
+            }
+          : r,
+      ),
+    };
+
+    dynasty = simFullSeason(dynasty);
+    const { newDynasty } = runOffseason(dynasty);
+
+    const freshmen = newDynasty.season.teams
+      .find((t) => t.id === 'maryland-state')!
+      .roster.filter((p) => p.classYear === 'FR');
+
+    expect(freshmen.length).toBeGreaterThan(0);
+    for (const player of freshmen) {
+      expect(player.createdSeason).toBe(newDynasty.season.year);
+    }
+  });
+
   it('generates a fresh recruit pool each season', () => {
     let dynasty = createNewLacrosseDynasty({
       seed: 55,
