@@ -1,14 +1,19 @@
 import {
   addSignedRecruitsToTeam,
   applyScholarshipOffer,
+  calculateRecruitFitScore,
   commitRecruit,
+  resolvePortalCommitments,
   runTeamOffseason,
   signCommittedRecruit,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
-import type { StandingsEntry } from '@sports-management-sim/engine-core';
+import type { EligibilityStatus, PlayerClass, StandingsEntry } from '@sports-management-sim/engine-core';
 import { createLacrosseSeasonSchedule, generateLacrosseRecruitingClass } from '@sports-management-sim/sport-lacrosse';
 import type {
+  LacrossePlayer,
+  LacrossePlayerTraits,
+  LacrossePortalEntry,
   LacrosseDynastyState,
   LacrosseRecruit,
   LacrosseSeason,
@@ -94,15 +99,95 @@ export function processInjuries(
 export function autoCommitWeekly(
   recruits: LacrosseRecruit[],
   teams: LacrosseTeam[],
+  userTeamId: string,
+  currentWeek: number,
   random: () => number,
-  commitChance = 0.22,
 ): LacrosseRecruit[] {
-  return recruits.map((recruit) => {
+  const userTeam = teams.find((t) => t.id === userTeamId);
+
+  // CPU teams gradually extend offers week by week
+  let updated = applyCpuWeeklyOffers(recruits, teams, userTeamId, random);
+
+  return updated.map((recruit) => {
     if (recruit.status !== 'open') return recruit;
     if (recruit.scholarshipOffers.length === 0) return recruit;
-    if (random() < commitChance) return commitRecruit(recruit, teams);
-    return recruit;
+
+    const updatedInterest = { ...recruit.interestByTeamId };
+
+    for (const offer of recruit.scholarshipOffers) {
+      const team = teams.find((t) => t.id === offer.teamId);
+      if (!team) continue;
+      const current = updatedInterest[team.id] ?? 0;
+      if (team.id === userTeamId && userTeam) {
+        const fitScore = calculateRecruitFitScore(recruit, userTeam);
+        const gain = Math.round(
+          11 + recruit.starRating * 2 + fitScore * 0.05 + recruit.preferences.scholarshipImportance * 0.04,
+        );
+        updatedInterest[team.id] = Math.min(100, current + gain);
+      } else {
+        const prestigeBonus = Math.round((team.reputation.nationalPrestige / 100) * 5);
+        updatedInterest[team.id] = Math.min(100, current + 6 + recruit.starRating + prestigeBonus);
+      }
+    }
+
+    // Commit to highest-interest team above the threshold
+    const threshold = clamp(84 - currentWeek * 5 + recruit.starRating, 58, 84);
+    const aboveThreshold = recruit.scholarshipOffers
+      .map((o) => ({ teamId: o.teamId, interest: updatedInterest[o.teamId] ?? 0 }))
+      .filter((t) => t.interest >= threshold)
+      .sort((a, b) => b.interest - a.interest);
+
+    const committingTo = aboveThreshold[0];
+
+    return {
+      ...recruit,
+      interestByTeamId: updatedInterest,
+      ...(committingTo ? { status: 'committed' as const, committedTeamId: committingTo.teamId } : {}),
+    };
   });
+}
+
+function applyCpuWeeklyOffers(
+  recruits: LacrosseRecruit[],
+  teams: LacrosseTeam[],
+  userTeamId: string,
+  _random: () => number,
+): LacrosseRecruit[] {
+  const CPU_MAX_OFFERS = 12;
+  const CPU_WEEKLY_NEW_OFFERS = 2;
+  const rosterTargets = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
+
+  let updated = [...recruits];
+
+  for (const team of teams) {
+    if (team.id === userTeamId) continue;
+
+    const alreadyOfferedIds = new Set(
+      updated.filter((r) => r.scholarshipOffers.some((o) => o.teamId === team.id)).map((r) => r.id),
+    );
+
+    if (alreadyOfferedIds.size >= CPU_MAX_OFFERS) continue;
+
+    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - alreadyOfferedIds.size);
+    const open = updated.filter((r) => r.status === 'open' && !alreadyOfferedIds.has(r.id));
+    const board = sortRecruitBoardForTeam(team, open, rosterTargets);
+
+    let count = 0;
+    for (const entry of board) {
+      if (count >= canOffer) break;
+      const idx = updated.findIndex((r) => r.id === entry.recruit.id);
+      if (idx >= 0) {
+        updated[idx] = applyScholarshipOffer(updated[idx]!, team.id, 50);
+        count++;
+      }
+    }
+  }
+
+  return updated;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 export function runOffseason(
@@ -198,8 +283,127 @@ export function runOffseason(
       recruits: newRecruits,
       recruitBoard: newRecruitBoard,
       seed: newSeed,
+      portalEntries: generatePortalEntries(teamsAfterOffseason, userTeamId, newSeed),
     },
     summary,
+  };
+}
+
+export function resolveAndApplyPortal(dynasty: LacrosseDynastyState): LacrosseDynastyState {
+  const resolved = resolvePortalCommitments(dynasty.portalEntries, dynasty.season.teams);
+  const userCommits = resolved.filter((e) => e.committedTeamId === dynasty.userTeamId);
+
+  if (userCommits.length === 0) {
+    return { ...dynasty, portalEntries: resolved };
+  }
+
+  const defaultTraits: LacrossePlayerTraits = {
+    shooting: 50,
+    passing: 50,
+    dodging: 50,
+    stickSkills: 55,
+    offBallMovement: 50,
+    defense: 50,
+    checking: 45,
+    groundBalls: 55,
+    preferredHand: 'right',
+  };
+
+  const newPlayers: LacrossePlayer[] = userCommits.map((entry) => ({
+    id: `portal-player-${entry.id}`,
+    name: entry.name,
+    age: 19,
+    classYear: entry.classYear,
+    hometown: entry.regionId,
+    regionId: entry.regionId,
+    position: entry.position,
+    secondaryPositions: [],
+    ratings: entry.ratings,
+    traits: [],
+    sportTraits: (entry.sportTraits ?? defaultTraits) as LacrossePlayerTraits,
+    scholarshipPercent: entry.offersByTeamId[dynasty.userTeamId] ?? 100,
+    isWalkOn: false,
+    morale: 80,
+    health: 100,
+    fatigue: 0,
+    redshirtStatus: 'none' as const,
+    eligibility: eligibilityForClass(entry.classYear),
+    createdSeason: dynasty.season.year,
+  }));
+
+  const updatedTeams = dynasty.season.teams.map((team) =>
+    team.id === dynasty.userTeamId
+      ? { ...team, roster: [...team.roster, ...newPlayers] }
+      : team,
+  );
+
+  return {
+    ...dynasty,
+    season: { ...dynasty.season, teams: updatedTeams },
+    portalEntries: resolved,
+  };
+}
+
+function eligibilityForClass(classYear: PlayerClass): EligibilityStatus {
+  const map: Record<PlayerClass, { played: number; remaining: number }> = {
+    FR: { played: 0, remaining: 4 },
+    SO: { played: 1, remaining: 3 },
+    JR: { played: 2, remaining: 2 },
+    SR: { played: 3, remaining: 1 },
+    GR: { played: 4, remaining: 1 },
+  };
+  const { played, remaining } = map[classYear];
+  return { seasonsPlayed: played, seasonsRemaining: remaining, isEligible: remaining > 0 };
+}
+
+function generatePortalEntries(
+  teams: LacrosseTeam[],
+  userTeamId: string,
+  seed: number,
+): LacrossePortalEntry[] {
+  const random = seededRandom(seed + 777);
+  const PORTAL_RATE = 0.12;
+  const entries: LacrossePortalEntry[] = [];
+
+  for (const team of teams) {
+    if (team.id === userTeamId) continue;
+    for (const player of team.roster) {
+      // Only SO and JR typically transfer; FR rarely; SR/GR graduate
+      if (player.classYear === 'FR' || player.classYear === 'SR' || player.classYear === 'GR') continue;
+      if (random() >= PORTAL_RATE) continue;
+
+      entries.push({
+        id: `portal-${seed}-${player.id}`,
+        playerId: player.id,
+        name: player.name,
+        position: player.position,
+        classYear: player.classYear,
+        ratings: player.ratings,
+        sportTraits: player.sportTraits as LacrossePlayerTraits,
+        sourceTeamId: team.id,
+        regionId: player.regionId,
+        status: 'available',
+        preferences: {
+          proximityImportance: 40 + Math.round(random() * 60),
+          prestigeImportance: 40 + Math.round(random() * 60),
+          scholarshipImportance: 55 + Math.round(random() * 45),
+          playingTimeImportance: 65 + Math.round(random() * 35),
+          academicImportance: 25 + Math.round(random() * 55),
+        },
+        interestByTeamId: {},
+        offersByTeamId: {},
+      });
+    }
+  }
+
+  return entries;
+}
+
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
   };
 }
 
