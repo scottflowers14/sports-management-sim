@@ -2,10 +2,41 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
+import { DYNASTY_SAVE_KEY } from './persistence';
 
-afterEach(cleanup);
+function installMockLocalStorage() {
+  let store: Record<string, string> = {};
+  const storage = {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
+  };
+
+  Object.defineProperty(window, 'localStorage', { value: storage, configurable: true });
+  Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
+}
+
+beforeEach(() => {
+  installMockLocalStorage();
+});
+
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 describe('Desktop App', () => {
   it('renders the dynasty dashboard with season view by default', () => {
@@ -48,6 +79,32 @@ describe('Desktop App', () => {
     expect(screen.getByRole('heading', { name: /^Week 1$/i })).toBeInTheDocument();
     expect(screen.getAllByText(/Scheduled/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Your game/i).length).toBeGreaterThan(0);
+  });
+
+  it('saves the current dynasty to local storage', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
+
+    const raw = localStorage.getItem(DYNASTY_SAVE_KEY);
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw ?? '{}')).toMatchObject({
+      version: 1,
+      dynasty: { userTeamId: 'maryland-state' },
+    });
+    expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Saved locally/i);
+  });
+
+  it('loads an existing local dynasty save on startup', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
+    cleanup();
+
+    render(<App />);
+
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 2/i);
+    expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Loaded local save/i);
   });
 
   it('switches to the recruiting tab and shows scouting controls', async () => {

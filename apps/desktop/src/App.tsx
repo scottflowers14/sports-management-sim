@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   advanceSeasonWeek,
   applyScholarshipOffer,
@@ -39,6 +39,7 @@ import { TeamScreen } from './screens/TeamScreen';
 import { ScheduleScreen } from './screens/ScheduleScreen';
 import { formatTeamName, formatTeamShort } from './ui/format';
 import type { BoxScoreData } from './ui/types';
+import { clearDynastyState, loadDynastyState, saveDynastyState } from './persistence';
 import './App.css';
 
 const initialDynasty = createNewLacrosseDynasty({
@@ -60,24 +61,65 @@ type View =
   | 'stats';
 
 export function App() {
-  const [dynasty, setDynasty] = useState<LacrosseDynastyState>(initialDynasty);
+  const [loadedSave] = useState(() => loadDynastyState());
+  const [dynasty, setDynasty] = useState<LacrosseDynastyState>(loadedSave?.dynasty ?? initialDynasty);
   const [view, setView] = useState<View>('season');
-  const [lastSimWeek, setLastSimWeek] = useState<number | null>(null);
-  const [offseasonSummary, setOffseasonSummary] = useState<OffseasonSummary | null>(null);
-  const [rankings, setRankings] = useState<RankingEntry[]>([]);
-  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [lastSimWeek, setLastSimWeek] = useState<number | null>(loadedSave?.lastSimWeek ?? null);
+  const [offseasonSummary, setOffseasonSummary] = useState<OffseasonSummary | null>(loadedSave?.offseasonSummary ?? null);
+  const [rankings, setRankings] = useState<RankingEntry[]>(loadedSave?.rankings ?? []);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>(loadedSave?.newsItems ?? []);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
-  const [tournament, setTournament] = useState<TournamentState | null>(null);
-  const [dynastyHistory, setDynastyHistory] = useState<DynastySeasonRecord[]>([]);
-  const [injuries, setInjuries] = useState<InjuredPlayer[]>([]);
+  const [tournament, setTournament] = useState<TournamentState | null>(loadedSave?.tournament ?? null);
+  const [dynastyHistory, setDynastyHistory] = useState<DynastySeasonRecord[]>(loadedSave?.dynastyHistory ?? []);
+  const [injuries, setInjuries] = useState<InjuredPlayer[]>(loadedSave?.injuries ?? []);
   const [selectedBoxScore, setSelectedBoxScore] = useState<BoxScoreData | null>(null);
-  const [scouting, setScouting] = useState<ScoutingState>(() => createScoutingState(3));
-  const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => emptySeasonStats());
+  const [scouting, setScouting] = useState<ScoutingState>(() => loadedSave?.scouting ?? createScoutingState(3));
+  const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
+  const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded local save' : 'Autosave ready'));
 
   const rankingsRef = useRef<RankingEntry[]>(rankings);
   rankingsRef.current = rankings;
   const injuriesRef = useRef<InjuredPlayer[]>(injuries);
   injuriesRef.current = injuries;
+
+  const persistDynasty = useCallback((status = 'Saved locally') => {
+    saveDynastyState({
+      dynasty,
+      lastSimWeek,
+      offseasonSummary,
+      rankings,
+      newsItems,
+      tournament,
+      dynastyHistory,
+      injuries,
+      scouting,
+      seasonStats,
+    });
+    setSaveStatus(status);
+  }, [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => persistDynasty('Autosaved'), 300);
+    return () => window.clearTimeout(timeout);
+  }, [persistDynasty]);
+
+  const resetDynasty = useCallback(() => {
+    clearDynastyState();
+    setDynasty(initialDynasty);
+    setView('season');
+    setLastSimWeek(null);
+    setOffseasonSummary(null);
+    setRankings([]);
+    setNewsItems([]);
+    setSelectedPlayerId(null);
+    setTournament(null);
+    setDynastyHistory([]);
+    setInjuries([]);
+    setSelectedBoxScore(null);
+    setScouting(createScoutingState(3));
+    setSeasonStats(emptySeasonStats());
+    setSaveStatus('New dynasty started');
+  }, []);
 
   const userTeam = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
 
@@ -312,6 +354,15 @@ export function App() {
           {injuredCount > 0 && (
             <span className="injury-count">{injuredCount} injured</span>
           )}
+          <div className="save-actions" aria-label="Save controls">
+            <button type="button" onClick={() => persistDynasty()}>
+              Save Now
+            </button>
+            <button type="button" onClick={resetDynasty}>
+              New Dynasty
+            </button>
+            <span>{saveStatus}</span>
+          </div>
         </section>
       </header>
 
