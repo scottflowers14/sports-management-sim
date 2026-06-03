@@ -46,10 +46,20 @@ import { StatsScreen } from './screens/StatsScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { OffseasonScreen } from './screens/OffseasonScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
+import { StartScreen } from './screens/StartScreen';
 import { formatTeamName } from './ui/format';
 import type { BoxScoreData } from './ui/types';
-import { clearDynastyState, loadDynastyState, saveDynastyState } from './persistence';
-import { createFreshLacrosseDynasty } from './dynasty-factory';
+import {
+  createDynastySaveId,
+  getActiveDynastySaveId,
+  listDynastySaves,
+  loadActiveDynastySave,
+  loadDynastySaveSlot,
+  saveDynastySlot,
+  type DynastySaveMetadata,
+  type DynastySaveState,
+} from './persistence';
+import { createFreshLacrosseDynasty, getLacrosseDynastyTeamChoices } from './dynasty-factory';
 import './App.css';
 
 type View =
@@ -65,7 +75,11 @@ type View =
   | 'stats';
 
 export function App() {
-  const [loadedSave] = useState(() => loadDynastyState());
+  const [loadedSave] = useState(() => loadActiveDynastySave());
+  const [activeSaveId, setActiveSaveId] = useState<string | null>(() => getActiveDynastySaveId());
+  const [saves, setSaves] = useState<DynastySaveMetadata[]>(() => listDynastySaves());
+  const teamChoices = useState(() => getLacrosseDynastyTeamChoices())[0];
+  const [selectedNewTeamId, setSelectedNewTeamId] = useState(() => teamChoices[0]?.id ?? 'maryland-state');
   const [dynasty, setDynasty] = useState<LacrosseDynastyState>(() => loadedSave?.dynasty ?? createFreshLacrosseDynasty());
   const [view, setView] = useState<View>('season');
   const [lastSimWeek, setLastSimWeek] = useState<number | null>(loadedSave?.lastSimWeek ?? null);
@@ -82,40 +96,27 @@ export function App() {
   );
   const [scouting, setScouting] = useState<ScoutingState>(() => loadedSave?.scouting ?? createScoutingState(3));
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
-  const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded local save' : 'Autosave ready'));
+  const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded dynasty save' : 'Choose or create a dynasty'));
   const [recruitPosFilter, setRecruitPosFilter] = useState<LacrossePosition | 'ALL'>('ALL');
   const [recruitTab, setRecruitTab] = useState<'board' | 'portal'>('board');
 
-  const rankingsRef = useRef<RankingEntry[]>(rankings);
-  rankingsRef.current = rankings;
-  const injuriesRef = useRef<InjuredPlayer[]>(injuries);
-  injuriesRef.current = injuries;
+  const saveState = useCallback((): DynastySaveState => ({
+    dynasty,
+    lastSimWeek,
+    offseasonSummary,
+    rankings,
+    newsItems,
+    tournament,
+    dynastyHistory,
+    injuries,
+    scouting,
+    seasonStats,
+    gameLogs: Object.fromEntries(gameLogs),
+  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, gameLogs]);
 
-  const persistDynasty = useCallback((status = 'Saved locally') => {
-    saveDynastyState({
-      dynasty,
-      lastSimWeek,
-      offseasonSummary,
-      rankings,
-      newsItems,
-      tournament,
-      dynastyHistory,
-      injuries,
-      scouting,
-      seasonStats,
-      gameLogs: Object.fromEntries(gameLogs),
-    });
-    setSaveStatus(status);
-  }, [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, gameLogs]);
+  const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => persistDynasty('Autosaved'), 300);
-    return () => window.clearTimeout(timeout);
-  }, [persistDynasty]);
-
-  const resetDynasty = useCallback(() => {
-    clearDynastyState();
-    setDynasty(createFreshLacrosseDynasty());
+  const resetUiState = useCallback(() => {
     setView('season');
     setLastSimWeek(null);
     setOffseasonSummary(null);
@@ -129,8 +130,83 @@ export function App() {
     setGameLogs(new Map());
     setScouting(createScoutingState(3));
     setSeasonStats(emptySeasonStats());
-    setSaveStatus('New dynasty started');
+    setRecruitPosFilter('ALL');
+    setRecruitTab('board');
   }, []);
+
+  const persistDynasty = useCallback((status = 'Saved locally') => {
+    const saveId = activeSaveId ?? createDynastySaveId(dynasty.seed);
+    saveDynastySlot({ saveId, state: saveState() });
+    setActiveSaveId(saveId);
+    refreshSaves();
+    setSaveStatus(status);
+  }, [activeSaveId, dynasty.seed, refreshSaves, saveState]);
+
+  const startNewDynasty = useCallback(() => {
+    const nextDynasty = createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId });
+    const saveId = createDynastySaveId(nextDynasty.seed);
+    resetUiState();
+    setDynasty(nextDynasty);
+    const state: DynastySaveState = {
+      dynasty: nextDynasty,
+      lastSimWeek: null,
+      offseasonSummary: null,
+      rankings: [],
+      newsItems: [],
+      tournament: null,
+      dynastyHistory: [],
+      injuries: [],
+      scouting: createScoutingState(3),
+      seasonStats: emptySeasonStats(),
+      gameLogs: {},
+    };
+    saveDynastySlot({ saveId, state });
+    setActiveSaveId(saveId);
+    refreshSaves();
+    setSaveStatus('New dynasty started');
+  }, [refreshSaves, resetUiState, selectedNewTeamId]);
+
+  const loadSave = useCallback((saveId: string) => {
+    const save = loadDynastySaveSlot(saveId);
+    if (!save) return;
+    setDynasty(save.dynasty);
+    setLastSimWeek(save.lastSimWeek);
+    setOffseasonSummary(save.offseasonSummary);
+    setRankings(save.rankings);
+    setNewsItems(save.newsItems);
+    setSelectedPlayerId(null);
+    setTournament(save.tournament);
+    setDynastyHistory(save.dynastyHistory);
+    setInjuries(save.injuries);
+    setSelectedBoxScore(null);
+    setGameLogs(new Map(Object.entries(save.gameLogs ?? {})));
+    setScouting(save.scouting);
+    setSeasonStats(save.seasonStats);
+    setView('season');
+    setRecruitPosFilter('ALL');
+    setRecruitTab('board');
+    saveDynastySlot({ saveId, state: save });
+    setActiveSaveId(saveId);
+    refreshSaves();
+    setSaveStatus('Loaded dynasty save');
+  }, [refreshSaves]);
+
+  const resetDynasty = useCallback(() => {
+    setActiveSaveId(null);
+    setSaveStatus('Choose or create a dynasty');
+    refreshSaves();
+  }, [refreshSaves]);
+
+  const rankingsRef = useRef<RankingEntry[]>(rankings);
+  rankingsRef.current = rankings;
+  const injuriesRef = useRef<InjuredPlayer[]>(injuries);
+  injuriesRef.current = injuries;
+
+  useEffect(() => {
+    if (!activeSaveId) return undefined;
+    const timeout = window.setTimeout(() => persistDynasty('Autosaved'), 300);
+    return () => window.clearTimeout(timeout);
+  }, [activeSaveId, persistDynasty]);
 
   const updateDepthChartSlot = useCallback((position: LacrossePosition, slotIndex: number, playerId: string) => {
     setDynasty((current) => ({
@@ -327,6 +403,19 @@ export function App() {
     setScouting((s) => resetScoutingForNewClass(s));
     setView('season');
   }, []);
+
+  if (!activeSaveId) {
+    return (
+      <StartScreen
+        saves={saves}
+        teamChoices={teamChoices}
+        selectedTeamId={selectedNewTeamId}
+        onTeamChange={setSelectedNewTeamId}
+        onCreateDynasty={startNewDynasty}
+        onLoadSave={loadSave}
+      />
+    );
+  }
 
   if (!userTeam) return <main>Unable to load dynasty team.</main>;
 

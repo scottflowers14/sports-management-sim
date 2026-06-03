@@ -2246,3 +2246,99 @@ li span {
 .dev-delta.regress {
   color: #f2726a;
 }
+
+
+/* ── Dynasty Start Screen ─────────────────────────────────── */
+
+.start-screen {
+  min-height: 100vh;
+  padding: 48px;
+}
+
+.start-hero {
+  margin: 0 auto 24px;
+  max-width: 1120px;
+}
+
+.start-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
+  margin: 0 auto;
+  max-width: 1120px;
+}
+
+.new-dynasty-card,
+.load-dynasty-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field-label {
+  color: #aab8ca;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.new-dynasty-card select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  color: #e6edf3;
+  padding: 12px 14px;
+}
+
+.primary-action {
+  background: linear-gradient(135deg, #72f2c6, #4da3ff);
+  border: 0;
+  border-radius: 14px;
+  color: #07111f;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 13px 16px;
+}
+
+.save-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.save-slot {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  color: #e6edf3;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.save-slot:hover {
+  border-color: rgba(114, 242, 198, 0.45);
+  transform: translateY(-1px);
+}
+
+.save-slot strong,
+.save-slot small {
+  display: block;
+}
+
+.save-slot small {
+  color: #aab8ca;
+  margin-top: 4px;
+}
+
+.save-slot-meta {
+  color: #72f2c6;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

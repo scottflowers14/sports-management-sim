@@ -1,0 +1,81 @@
+import type { DynastySaveMetadata } from '../persistence';
+import type { DynastyTeamChoice } from '../dynasty-factory';
+
+export function StartScreen({
+  saves,
+  teamChoices,
+  selectedTeamId,
+  onTeamChange,
+  onCreateDynasty,
+  onLoadSave,
+}: {
+  saves: DynastySaveMetadata[];
+  teamChoices: DynastyTeamChoice[];
+  selectedTeamId: string;
+  onTeamChange: (teamId: string) => void;
+  onCreateDynasty: () => void;
+  onLoadSave: (saveId: string) => void;
+}) {
+  const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
+
+  return (
+    <main className="start-screen" aria-label="Dynasty start screen">
+      <section className="start-hero card">
+        <p className="eyebrow">Men's College Lacrosse</p>
+        <h1>Sports Management Sim</h1>
+        <p className="dim">
+          Load an existing career or start a new dynasty with a fresh recruiting universe.
+        </p>
+      </section>
+
+      <section className="start-grid">
+        <article className="card new-dynasty-card" aria-label="Create dynasty">
+          <p className="eyebrow">New Dynasty</p>
+          <h2>Choose Your Program</h2>
+          <label className="field-label" htmlFor="team-select">
+            Team
+          </label>
+          <select id="team-select" value={selectedTeamId} onChange={(event) => onTeamChange(event.target.value)}>
+            {teamChoices.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name} · Prestige {team.prestige}
+              </option>
+            ))}
+          </select>
+          {selectedTeam && (
+            <p className="dim">
+              Start as {selectedTeam.name}
+              {selectedTeam.conferenceId ? ` in ${selectedTeam.conferenceId.toUpperCase()}` : ''}.
+            </p>
+          )}
+          <button type="button" className="primary-action" onClick={onCreateDynasty}>
+            Start New Dynasty
+          </button>
+        </article>
+
+        <article className="card load-dynasty-card" aria-label="Load dynasty">
+          <p className="eyebrow">Load Dynasty</p>
+          <h2>Existing Saves</h2>
+          {saves.length === 0 ? (
+            <p className="dim">No saved dynasties yet. Create one to get started.</p>
+          ) : (
+            <div className="save-list">
+              {saves.map((save) => (
+                <button key={save.saveId} type="button" className="save-slot" onClick={() => onLoadSave(save.saveId)}>
+                  <span>
+                    <strong>{save.name}</strong>
+                    <small>
+                      {save.userTeamName} · {save.seasonYear} Week {save.currentWeek} · {save.record.wins}–
+                      {save.record.losses}
+                    </small>
+                  </span>
+                  <span className="save-slot-meta">Load</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </article>
+      </section>
+    </main>
+  );
+}

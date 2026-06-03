@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
-import { DYNASTY_SAVE_KEY } from './persistence';
+import { loadActiveDynastySave, listDynastySaves } from './persistence';
 
 function installMockLocalStorage() {
   let store: Record<string, string> = {};
@@ -29,6 +29,11 @@ function installMockLocalStorage() {
   Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
 }
 
+async function renderStartedApp() {
+  render(<App />);
+  await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+}
+
 beforeEach(() => {
   installMockLocalStorage();
 });
@@ -39,8 +44,26 @@ afterEach(() => {
 });
 
 describe('Desktop App', () => {
-  it('renders the dynasty dashboard with season view by default', () => {
+  it('renders the dynasty start screen when no active save exists', () => {
     render(<App />);
+
+    expect(screen.getByLabelText(/Dynasty start screen/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Choose Your Program/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Existing Saves/i })).toBeInTheDocument();
+  });
+
+  it('creates a new dynasty for the selected team from the start screen', async () => {
+    render(<App />);
+
+    await userEvent.selectOptions(screen.getByLabelText(/^Team$/i), 'virginia-lakes');
+    await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Virginia Lakes/i);
+    expect(loadActiveDynastySave()?.dynasty.userTeamId).toBe('virginia-lakes');
+  });
+
+  it('renders the dynasty dashboard with season view after creating a dynasty', async () => {
+    await renderStartedApp();
 
     expect(screen.getByRole('heading', { name: /Sports Management Sim/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Maryland State/i);
@@ -54,13 +77,13 @@ describe('Desktop App', () => {
   });
 
   it('simulates a week and shows results', async () => {
-    render(<App />);
+    await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     expect(screen.getByText(/Results/i)).toBeInTheDocument();
   });
 
   it('switches to the team tab and shows the full roster/depth chart screen', async () => {
-    render(<App />);
+    await renderStartedApp();
 
     await userEvent.click(screen.getByRole('button', { name: /Team/i }));
 
@@ -71,7 +94,7 @@ describe('Desktop App', () => {
   });
 
   it('lets the user edit depth chart starters', async () => {
-    render(<App />);
+    await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Team/i }));
 
     const starterSelect = screen.getAllByLabelText(/Depth chart starter/i)[0] as HTMLSelectElement;
@@ -84,7 +107,7 @@ describe('Desktop App', () => {
   });
 
   it('switches to the schedule tab and shows the full season schedule', async () => {
-    render(<App />);
+    await renderStartedApp();
 
     await userEvent.click(screen.getByRole('button', { name: /Schedule/i }));
 
@@ -97,22 +120,20 @@ describe('Desktop App', () => {
     expect(screen.getAllByText(/Your game/i).length).toBeGreaterThan(0);
   });
 
-  it('saves the current dynasty to local storage', async () => {
-    render(<App />);
+  it('saves the current dynasty to an active save slot', async () => {
+    await renderStartedApp();
 
     await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
 
-    const raw = localStorage.getItem(DYNASTY_SAVE_KEY);
-    expect(raw).toBeTruthy();
-    expect(JSON.parse(raw ?? '{}')).toMatchObject({
-      version: 1,
-      dynasty: { userTeamId: 'maryland-state' },
-    });
+    const activeSave = loadActiveDynastySave();
+    expect(activeSave).toBeTruthy();
+    expect(activeSave?.dynasty.userTeamId).toBe('maryland-state');
+    expect(listDynastySaves()).toHaveLength(1);
     expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Saved locally/i);
   });
 
   it('loads an existing local dynasty save on startup', async () => {
-    render(<App />);
+    await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
     cleanup();
@@ -120,34 +141,49 @@ describe('Desktop App', () => {
     render(<App />);
 
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 2/i);
-    expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Loaded local save/i);
+    expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Loaded dynasty save/i);
   });
 
-  it('starts a fresh generated dynasty when New Dynasty is clicked', async () => {
-    render(<App />);
-    await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
-    const firstSave = JSON.parse(localStorage.getItem(DYNASTY_SAVE_KEY) ?? '{}');
-    const firstRecruitId = firstSave.dynasty.recruits[0].id;
+  it('can return to the dynasty hub and load an existing save', async () => {
+    await renderStartedApp();
+    const firstSave = loadActiveDynastySave();
 
     await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
-    await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
-    const secondSave = JSON.parse(localStorage.getItem(DYNASTY_SAVE_KEY) ?? '{}');
 
-    expect(secondSave.dynasty.seed).not.toBe(firstSave.dynasty.seed);
-    expect(secondSave.dynasty.id).not.toBe(firstSave.dynasty.id);
-    expect(secondSave.dynasty.recruits[0].id).not.toBe(firstRecruitId);
+    expect(screen.getByLabelText(/Dynasty start screen/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Maryland State 2028/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Maryland State 2028/i }));
+
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Maryland State/i);
+    expect(loadActiveDynastySave()?.dynasty.id).toBe(firstSave?.dynasty.id);
+  });
+
+  it('starts a fresh generated dynasty when New Dynasty creates another career', async () => {
+    await renderStartedApp();
+    const firstSave = loadActiveDynastySave();
+    const firstRecruitId = firstSave?.dynasty.recruits[0]?.id;
+
+    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+    const secondSave = loadActiveDynastySave();
+
+    expect(secondSave?.dynasty.seed).not.toBe(firstSave?.dynasty.seed);
+    expect(secondSave?.dynasty.id).not.toBe(firstSave?.dynasty.id);
+    expect(secondSave?.dynasty.recruits[0]?.id).not.toBe(firstRecruitId);
+    expect(listDynastySaves()).toHaveLength(2);
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   });
 
   it('switches to the recruiting tab and shows scouting controls', async () => {
-    render(<App />);
+    await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
     expect(screen.getByText(/Scouting Points/i)).toBeInTheDocument();
     expect(screen.queryAllByRole('button', { name: /Scout/i }).length).toBeGreaterThan(0);
   });
 
   it('switches to standings and shows national rankings and conference sections', async () => {
-    render(<App />);
+    await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
     expect(screen.getByRole('heading', { name: /National Rankings/i })).toBeInTheDocument();
   });
