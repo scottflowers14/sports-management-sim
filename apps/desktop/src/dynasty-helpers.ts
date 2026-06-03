@@ -21,6 +21,10 @@ import type {
 } from '@sports-management-sim/sport-lacrosse';
 import { computeSeasonAwards } from './awards';
 import type { SeasonAwards } from './awards';
+import { capturePreOffseasonSnapshot, computeDevelopmentReport } from './development-report';
+import type { DevelopmentReport, PreOffseasonSnapshot } from './development-report';
+
+export type { DevelopmentReport };
 
 export interface OffseasonSummary {
   seasonYear: number;
@@ -28,6 +32,7 @@ export interface OffseasonSummary {
   userStanding: number;
   userRecord: { wins: number; losses: number };
   graduates: { name: string; position: string; overall: number }[];
+  developmentReport: DevelopmentReport | null;
   signingClass: { name: string; position: string; starRating: number; overall: number }[];
   awards: SeasonAwards | null;
 }
@@ -203,6 +208,9 @@ export function runOffseason(
   );
   const userStanding = sortedStandings.findIndex((s) => s.teamId === userTeamId) + 1;
 
+  // Snapshot ratings before the offseason mutates them
+  const preOffseasonSnapshot = capturePreOffseasonSnapshot(userTeam);
+
   const graduates = userTeam.roster
     .filter((p) => p.classYear === 'SR' || p.classYear === 'GR')
     .map((p) => ({
@@ -250,6 +258,12 @@ export function runOffseason(
   // Compute season awards
   const awards = computeSeasonAwards(season, userTeamId);
 
+  // Compute development report (compare post-offseason ratings vs pre-offseason snapshot)
+  const postOffseasonUserTeam = teamsAfterOffseason.find((t) => t.id === userTeamId);
+  const developmentReport = postOffseasonUserTeam
+    ? computeDevelopmentReport(postOffseasonUserTeam, preOffseasonSnapshot)
+    : null;
+
   // Generate new recruiting class and board
   const newSeed = seed + newYear;
   const newRecruits = generateLacrosseRecruitingClass({ count: 80, seed: newSeed });
@@ -274,6 +288,7 @@ export function runOffseason(
     graduates,
     signingClass,
     awards,
+    developmentReport,
   };
 
   return {

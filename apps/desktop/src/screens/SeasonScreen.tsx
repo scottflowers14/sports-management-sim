@@ -1,4 +1,4 @@
-import type { LacrosseTeam, LacrosseTeamRating } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseTeam, LacrosseTeamRating } from '@sports-management-sim/sport-lacrosse';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { DepthChart } from '../components/DepthChart';
 import { ResultRow } from '../components/ResultRow';
@@ -21,6 +21,7 @@ export function SeasonScreen({
   upcomingGames,
   teamMap,
   userTeamId,
+  gameLogs,
   onSimWeek,
   onEnterTournament,
   onViewTournament,
@@ -41,6 +42,7 @@ export function SeasonScreen({
   upcomingGames: ScheduledGame[];
   teamMap: Map<string, string>;
   userTeamId: string;
+  gameLogs: Map<string, GameLog>;
   onSimWeek: () => void;
   onEnterTournament: () => void;
   onViewTournament: () => void;
@@ -80,6 +82,7 @@ export function SeasonScreen({
                     game={game}
                     teamMap={teamMap}
                     userTeamId={userTeamId}
+                    gameLogs={gameLogs}
                     onBoxScore={onBoxScore}
                   />
                 ))}

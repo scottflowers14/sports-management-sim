@@ -2,6 +2,7 @@ import type { LacrossePortalEntry, LacrosseTeam } from '@sports-management-sim/s
 import type { OffseasonSummary } from '../dynasty-helpers';
 import type { DynastySeasonRecord } from '../history';
 import type { SeasonAwards } from '../awards';
+import type { PlayerDevelopmentEntry } from '../development-report';
 import { formatTeamName } from '../ui/format';
 
 export function OffseasonScreen({
@@ -63,6 +64,10 @@ export function OffseasonScreen({
 
         {offseasonSummary.awards && (
           <AwardsSection awards={offseasonSummary.awards} />
+        )}
+
+        {offseasonSummary.developmentReport && offseasonSummary.developmentReport.entries.length > 0 && (
+          <DevelopmentReportCard entries={offseasonSummary.developmentReport.entries} />
         )}
       </div>
 
@@ -189,6 +194,71 @@ function AwardsSection({ awards }: { awards: SeasonAwards }) {
         </>
       )}
     </article>
+  );
+}
+
+function DevelopmentReportCard({ entries }: { entries: PlayerDevelopmentEntry[] }) {
+  const breakouts = entries.filter((e) => e.event === 'breakout');
+  const risers = entries.filter((e) => e.event === 'steady_rise');
+  const plateaus = entries.filter((e) => e.event === 'plateau');
+  const regressions = entries.filter((e) => e.event === 'regression');
+
+  return (
+    <article className="card dev-report-card">
+      <h2>Player Development</h2>
+      {breakouts.length > 0 && (
+        <div className="dev-section">
+          <p className="section-label dev-breakout-label">Breakouts</p>
+          {breakouts.map((e) => (
+            <DevRow key={e.playerId} entry={e} />
+          ))}
+        </div>
+      )}
+      {risers.length > 0 && (
+        <div className="dev-section">
+          <p className="section-label dev-rise-label">Steady Risers</p>
+          {risers.map((e) => (
+            <DevRow key={e.playerId} entry={e} />
+          ))}
+        </div>
+      )}
+      {plateaus.length > 0 && (
+        <div className="dev-section dev-section-dim">
+          <p className="section-label">Plateaued · {plateaus.length} players</p>
+        </div>
+      )}
+      {regressions.length > 0 && (
+        <div className="dev-section">
+          <p className="section-label dev-regress-label">Regression</p>
+          {regressions.map((e) => (
+            <DevRow key={e.playerId} entry={e} />
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function DevRow({ entry }: { entry: PlayerDevelopmentEntry }) {
+  const isBreakout = entry.event === 'breakout';
+  const isRegress = entry.event === 'regression';
+  const deltaSign = entry.delta > 0 ? '+' : '';
+  const deltaClass = isBreakout
+    ? 'dev-delta breakout'
+    : isRegress
+      ? 'dev-delta regress'
+      : 'dev-delta rise';
+
+  return (
+    <div className="dev-row">
+      <span className="dev-player-name">{entry.name}</span>
+      <span className="dev-pos-class">{entry.position} · {entry.classYear}</span>
+      <span className="dev-ovr-range">
+        {entry.oldOverall} → <strong>{entry.newOverall}</strong>
+      </span>
+      <span className={deltaClass}>{deltaSign}{entry.delta}</span>
+      {entry.traitNote && <span className="dev-trait-note">{entry.traitNote}</span>}
+    </div>
   );
 }
 

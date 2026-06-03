@@ -8,10 +8,10 @@ import {
   calculateLacrosseTeamRating,
   createNewLacrosseDynasty,
   offerLacrossePortalPlayer,
-  simulateLacrosseGame,
+  simulateLacrosseGameWithLog,
   updateLacrosseDepthChartSlot,
 } from '@sports-management-sim/sport-lacrosse';
-import type { LacrosseDynastyState, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseDynastyState, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, runOffseason, processInjuries, resolveAndApplyPortal } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
 import { computeNationalRankings } from './rankings';
@@ -83,6 +83,7 @@ export function App() {
   const [dynastyHistory, setDynastyHistory] = useState<DynastySeasonRecord[]>(loadedSave?.dynastyHistory ?? []);
   const [injuries, setInjuries] = useState<InjuredPlayer[]>(loadedSave?.injuries ?? []);
   const [selectedBoxScore, setSelectedBoxScore] = useState<BoxScoreData | null>(null);
+  const [gameLogs, setGameLogs] = useState<Map<string, GameLog>>(() => new Map());
   const [scouting, setScouting] = useState<ScoutingState>(() => loadedSave?.scouting ?? createScoutingState(3));
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded local save' : 'Autosave ready'));
@@ -128,6 +129,7 @@ export function App() {
     setDynastyHistory([]);
     setInjuries([]);
     setSelectedBoxScore(null);
+    setGameLogs(new Map());
     setScouting(createScoutingState(3));
     setSeasonStats(emptySeasonStats());
     setSaveStatus('New dynasty started');
@@ -158,9 +160,12 @@ export function App() {
     const tMap = new Map(dynasty.season.teams.map((t) => [t.id, t.name]));
 
     setDynasty((prev) => {
-      const newSeason = advanceSeasonWeek(prev.season, (_game, homeTeam, awayTeam) =>
-        simulateLacrosseGame({ homeTeam, awayTeam }),
-      );
+      const weekLogs = new Map<string, GameLog>();
+      const newSeason = advanceSeasonWeek(prev.season, (game, homeTeam, awayTeam) => {
+        const result = simulateLacrosseGameWithLog({ homeTeam, awayTeam });
+        weekLogs.set(game.id, result.log);
+        return result;
+      });
       const newRecruits = autoCommitWeekly(prev.recruits, newSeason.teams, prev.userTeamId, weekToSim, Math.random);
       const updatedUserTeam = newSeason.teams.find((t) => t.id === prev.userTeamId)!;
       const newBoard = sortRecruitBoardForTeam(updatedUserTeam, newRecruits, prev.rosterTargets);
@@ -221,6 +226,11 @@ export function App() {
         setSeasonStats((prev) => updateSeasonStats(prev, newSeasonSnap.schedule, newSeasonSnap.teams, weekToSim));
         setNewsItems((prevNews) => [...weekNews, ...recruitNews, ...injuryNews, ...prevNews].slice(0, 60));
         setLastSimWeek(weekToSim);
+        setGameLogs((prev) => {
+          const next = new Map(prev);
+          for (const [id, log] of weekLogs) next.set(id, log);
+          return next;
+        });
       }, 0);
 
       return newDynasty;
@@ -315,6 +325,7 @@ export function App() {
     setInjuries([]);
     setSelectedPlayerId(null);
     setSelectedBoxScore(null);
+    setGameLogs(new Map());
     setSeasonStats(emptySeasonStats());
     setScouting((s) => resetScoutingForNewClass(s));
     setView('season');
@@ -456,6 +467,7 @@ export function App() {
           upcomingGames={upcomingGames}
           teamMap={teamMap}
           userTeamId={dynasty.userTeamId}
+          gameLogs={gameLogs}
           onSimWeek={simWeek}
           onEnterTournament={enterTournament}
           onViewTournament={() => setView('tournament')}
@@ -483,6 +495,7 @@ export function App() {
           teamMap={teamMap}
           userTeamId={dynasty.userTeamId}
           currentWeek={dynasty.season.currentWeek}
+          gameLogs={gameLogs}
           onBoxScore={setSelectedBoxScore}
         />
       )}

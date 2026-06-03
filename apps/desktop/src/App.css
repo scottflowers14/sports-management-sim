@@ -2049,3 +2049,200 @@ li span {
   padding: 4px 12px;
   font-size: 0.78rem;
 }
+
+/* ── BoxScore panel tabs ──────────────────────────────────── */
+
+.panel-tab-bar {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+
+.panel-tab {
+  padding: 6px 18px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: #aab8ca;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  transition: background 0.12s, color 0.12s;
+}
+
+.panel-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e6edf3;
+}
+
+.panel-tab.active {
+  background: rgba(114, 242, 198, 0.12);
+  border-color: #72f2c6;
+  color: #72f2c6;
+}
+
+/* ── Play-by-play ─────────────────────────────────────────── */
+
+.pbp-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pbp-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.78rem;
+  color: #aab8ca;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pbp-period {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pbp-period-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #72f2c6;
+  margin-bottom: 6px;
+}
+
+.pbp-event {
+  display: grid;
+  grid-template-columns: 68px 56px 1fr;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.82rem;
+}
+
+.pbp-event.pbp-key {
+  background: rgba(114, 242, 198, 0.08);
+  border-left: 2px solid #72f2c6;
+}
+
+.pbp-time {
+  color: #aab8ca;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pbp-team-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pbp-home .pbp-team-badge {
+  color: #72f2c6;
+}
+
+.pbp-away .pbp-team-badge {
+  color: #8fb2ff;
+}
+
+.pbp-desc {
+  color: #e6edf3;
+  line-height: 1.4;
+}
+
+/* ── Development report ───────────────────────────────────── */
+
+.dev-report-card {
+  margin-top: 0;
+}
+
+.dev-section {
+  margin-bottom: 16px;
+}
+
+.dev-section-dim {
+  opacity: 0.6;
+}
+
+.dev-breakout-label {
+  color: #f2c472 !important;
+}
+
+.dev-rise-label {
+  color: #72f2c6 !important;
+}
+
+.dev-regress-label {
+  color: #f2726a !important;
+}
+
+.dev-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.85rem;
+}
+
+.dev-row:last-child {
+  border-bottom: none;
+}
+
+.dev-player-name {
+  font-weight: 700;
+  grid-column: 1;
+}
+
+.dev-trait-note {
+  font-size: 0.72rem;
+  color: #aab8ca;
+  font-style: italic;
+  grid-column: 1 / -1;
+  padding-left: 2px;
+  margin-top: -4px;
+}
+
+.dev-pos-class {
+  font-size: 0.78rem;
+  color: #aab8ca;
+}
+
+.dev-ovr-range {
+  font-size: 0.82rem;
+  color: #aab8ca;
+  font-variant-numeric: tabular-nums;
+}
+
+.dev-ovr-range strong {
+  color: #e6edf3;
+}
+
+.dev-delta {
+  font-weight: 800;
+  font-size: 0.88rem;
+  min-width: 36px;
+  text-align: right;
+}
+
+.dev-delta.breakout {
+  color: #f2c472;
+}
+
+.dev-delta.rise {
+  color: #72f2c6;
+}
+
+.dev-delta.regress {
+  color: #f2726a;
+}

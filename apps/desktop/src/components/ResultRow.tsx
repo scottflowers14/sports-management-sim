@@ -1,5 +1,5 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
-import type { LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName } from '../ui/format';
 import type { BoxScoreData } from '../ui/types';
 
@@ -7,11 +7,13 @@ export function ResultRow({
   game,
   teamMap,
   userTeamId,
+  gameLogs,
   onBoxScore,
 }: {
   game: ScheduledGame;
   teamMap: Map<string, string>;
   userTeamId: string;
+  gameLogs?: Map<string, GameLog>;
   onBoxScore?: (data: BoxScoreData) => void;
 }) {
   const { result } = game;
@@ -23,6 +25,7 @@ export function ResultRow({
 
   const handleClick = () => {
     if (!result.teamStats || !onBoxScore) return;
+    const log = gameLogs?.get(game.id);
     onBoxScore({
       title: `Week ${game.week}`,
       homeTeamName: teamMap.get(game.homeTeamId) ?? game.homeTeamId,
@@ -32,6 +35,7 @@ export function ResultRow({
       overtime: result.overtime,
       homeStats: result.teamStats.home as LacrosseTeamStats,
       awayStats: result.teamStats.away as LacrosseTeamStats,
+      ...(log ? { log } : {}),
     });
   };
 

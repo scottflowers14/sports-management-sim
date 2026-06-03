@@ -1,4 +1,4 @@
-import type { LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 
 export interface BoxScoreData {
   title: string;
@@ -9,4 +9,5 @@ export interface BoxScoreData {
   overtime: boolean;
   homeStats: LacrosseTeamStats;
   awayStats: LacrosseTeamStats;
+  log?: GameLog;
 }
