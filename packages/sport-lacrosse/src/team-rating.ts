@@ -1,4 +1,5 @@
 import type { LacrossePlayer, LacrossePosition, LacrosseTeam } from './models';
+import { getLacrosseOrderedPlayers, LACROSSE_STARTER_COUNTS } from './depth-chart';
 
 export interface LacrosseTeamRating {
   overall: number;
@@ -9,22 +10,13 @@ export interface LacrosseTeamRating {
   depth: number;
 }
 
-const STARTER_COUNTS: Record<LacrossePosition, number> = {
-  ATT: 3,
-  MID: 6,
-  DEF: 3,
-  GK: 1,
-  FOGO: 1,
-  LSM: 1,
-};
-
 export function calculateLacrosseTeamRating(team: LacrosseTeam): LacrosseTeamRating {
-  const attack = ratePositionGroup(team.roster, 'ATT', STARTER_COUNTS.ATT, offensivePlayerRating);
-  const midfield = ratePositionGroup(team.roster, 'MID', STARTER_COUNTS.MID, midfieldPlayerRating);
-  const defensemen = ratePositionGroup(team.roster, 'DEF', STARTER_COUNTS.DEF, defensivePlayerRating);
-  const lsms = ratePositionGroup(team.roster, 'LSM', STARTER_COUNTS.LSM, defensivePlayerRating);
-  const goalies = ratePositionGroup(team.roster, 'GK', STARTER_COUNTS.GK, goaliePlayerRating);
-  const fogos = ratePositionGroup(team.roster, 'FOGO', STARTER_COUNTS.FOGO, faceoffPlayerRating);
+  const attack = ratePositionGroup(team, 'ATT', LACROSSE_STARTER_COUNTS.ATT, offensivePlayerRating);
+  const midfield = ratePositionGroup(team, 'MID', LACROSSE_STARTER_COUNTS.MID, midfieldPlayerRating);
+  const defensemen = ratePositionGroup(team, 'DEF', LACROSSE_STARTER_COUNTS.DEF, defensivePlayerRating);
+  const lsms = ratePositionGroup(team, 'LSM', LACROSSE_STARTER_COUNTS.LSM, defensivePlayerRating);
+  const goalies = ratePositionGroup(team, 'GK', LACROSSE_STARTER_COUNTS.GK, goaliePlayerRating);
+  const fogos = ratePositionGroup(team, 'FOGO', LACROSSE_STARTER_COUNTS.FOGO, faceoffPlayerRating);
   const depth = calculateDepthRating(team.roster);
 
   const offense = weightedAverage([
@@ -57,15 +49,13 @@ export function calculateLacrosseTeamRating(team: LacrosseTeam): LacrosseTeamRat
 }
 
 function ratePositionGroup(
-  roster: LacrossePlayer[],
+  team: LacrosseTeam,
   position: LacrossePosition,
   starterCount: number,
   ratingFn: (player: LacrossePlayer) => number,
 ): number {
-  const players = roster
-    .filter((player) => player.position === position)
-    .map(ratingFn)
-    .sort((a, b) => b - a);
+  const players = getLacrosseOrderedPlayers(team, position)
+    .map(ratingFn);
 
   if (players.length === 0) {
     return 35;
@@ -85,8 +75,8 @@ function calculateDepthRating(roster: LacrossePlayer[]): number {
     return 35;
   }
 
-  const positionScores = Object.entries(STARTER_COUNTS).map(([position, starterCount]) =>
-    ratePositionGroup(roster, position as LacrossePosition, starterCount * 2, (player) => player.ratings.overall),
+  const positionScores = Object.entries(LACROSSE_STARTER_COUNTS).map(([position, starterCount]) =>
+    ratePositionGroup({ ...({} as LacrosseTeam), roster }, position as LacrossePosition, starterCount * 2, (player) => player.ratings.overall),
   );
 
   return average(positionScores);

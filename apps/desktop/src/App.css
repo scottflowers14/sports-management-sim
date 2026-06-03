@@ -1640,6 +1640,35 @@ li span {
   width: 40px;
 }
 
+.depth-slot {
+  color: #aab8ca;
+  font-size: 0.78rem;
+  font-weight: 700;
+  width: 34px;
+}
+
+.depth-select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e6edf3;
+  font: inherit;
+  font-weight: 700;
+  margin-right: 6px;
+  max-width: 180px;
+  padding: 5px 8px;
+}
+
+.depth-select:focus {
+  border-color: rgba(114, 242, 198, 0.6);
+  outline: none;
+}
+
+.depth-meta {
+  display: inline-flex;
+  gap: 4px;
+}
+
 .depth-name {
   font-weight: 600;
   margin-right: 6px;

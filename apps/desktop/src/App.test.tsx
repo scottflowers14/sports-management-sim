@@ -67,7 +67,20 @@ describe('Desktop App', () => {
     expect(screen.getByText(/Current Team/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Depth Chart/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Full Roster/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /OVR/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Team rating summary/i)).toHaveTextContent(/DEPTH/i);
+  });
+
+  it('lets the user edit depth chart starters', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Team/i }));
+
+    const starterSelect = screen.getAllByLabelText(/Depth chart starter/i)[0] as HTMLSelectElement;
+    const alternate = Array.from(starterSelect.options).find((option) => option.value !== starterSelect.value);
+    expect(alternate).toBeTruthy();
+
+    await userEvent.selectOptions(starterSelect, alternate?.value ?? starterSelect.value);
+
+    expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Depth chart updated/i);
   });
 
   it('switches to the schedule tab and shows the full season schedule', async () => {

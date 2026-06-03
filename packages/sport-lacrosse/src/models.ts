@@ -20,7 +20,9 @@ export interface LacrossePlayerTraits {
 
 export type LacrossePlayer = Player<LacrossePosition, LacrossePlayerTraits>;
 
-export type LacrosseTeam = Team<LacrossePosition, LacrossePlayerTraits>;
+export type LacrosseTeam = Team<LacrossePosition, LacrossePlayerTraits> & {
+  depthChart?: Partial<Record<LacrossePosition, string[]>>;
+};
 
 export type LacrosseSeason = Season<LacrossePosition, LacrossePlayerTraits>;
 

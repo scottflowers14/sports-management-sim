@@ -4,8 +4,13 @@ import {
   applyScholarshipOffer,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
-import { calculateLacrosseTeamRating, createNewLacrosseDynasty, simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
-import type { LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
+import {
+  calculateLacrosseTeamRating,
+  createNewLacrosseDynasty,
+  simulateLacrosseGame,
+  updateLacrosseDepthChartSlot,
+} from '@sports-management-sim/sport-lacrosse';
+import type { LacrosseDynastyState, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, runOffseason, processInjuries } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
 import { computeNationalRankings } from './rankings';
@@ -119,6 +124,21 @@ export function App() {
     setScouting(createScoutingState(3));
     setSeasonStats(emptySeasonStats());
     setSaveStatus('New dynasty started');
+  }, []);
+
+  const updateDepthChartSlot = useCallback((position: LacrossePosition, slotIndex: number, playerId: string) => {
+    setDynasty((current) => ({
+      ...current,
+      season: {
+        ...current.season,
+        teams: current.season.teams.map((team) =>
+          team.id === current.userTeamId
+            ? updateLacrosseDepthChartSlot(team, position, slotIndex, playerId)
+            : team,
+        ),
+      },
+    }));
+    setSaveStatus('Depth chart updated');
   }, []);
 
   const userTeam = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
@@ -539,6 +559,7 @@ export function App() {
           injuredCount={injuredCount}
           rating={userTeamRating}
           onSelectPlayer={setSelectedPlayerId}
+          onDepthChartChange={updateDepthChartSlot}
         />
       )}
 

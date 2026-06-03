@@ -55,6 +55,34 @@ describe('calculateLacrosseTeamRating', () => {
     expect(rating.goalie).toBe(35);
     expect(rating.faceoff).toBe(35);
   });
+
+  it('uses manual depth chart starters when calculating position strength', () => {
+    const strongAttack = makeRatedPlayer(1, 'ATT', 95);
+    const weakAttack = makeRatedPlayer(2, 'ATT', 35);
+    const team: LacrosseTeam = makeLacrosseTeam('manual-depth', [
+      strongAttack,
+      weakAttack,
+      ...makePlayers('ATT', 2, 85, 10),
+      ...makePlayers('MID', 6, 75, 20),
+      ...makePlayers('DEF', 3, 75, 40),
+      ...makePlayers('LSM', 1, 75, 50),
+      ...makePlayers('GK', 1, 75, 60),
+      ...makePlayers('FOGO', 1, 75, 70),
+    ]);
+
+    const defaultRating = calculateLacrosseTeamRating(team);
+    const benchedStarRating = calculateLacrosseTeamRating({
+      ...team,
+      depthChart: {
+        ATT: [
+          weakAttack.id,
+          ...team.roster.filter((p) => p.position === 'ATT' && p.id !== weakAttack.id).map((p) => p.id),
+        ],
+      },
+    });
+
+    expect(benchedStarRating.offense).toBeLessThan(defaultRating.offense);
+  });
 });
 
 function makePlayers(

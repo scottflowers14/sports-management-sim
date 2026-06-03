@@ -1,4 +1,4 @@
-import type { LacrosseTeam, LacrosseTeamRating } from '@sports-management-sim/sport-lacrosse';
+import type { LacrossePosition, LacrosseTeam, LacrosseTeamRating } from '@sports-management-sim/sport-lacrosse';
 import { DepthChart } from '../components/DepthChart';
 import { formatTeamName } from '../ui/format';
 
@@ -8,12 +8,14 @@ export function TeamScreen({
   injuredCount,
   rating,
   onSelectPlayer,
+  onDepthChartChange,
 }: {
   team: LacrosseTeam;
   injuries: Set<string>;
   injuredCount: number;
   rating: LacrosseTeamRating;
   onSelectPlayer: (playerId: string) => void;
+  onDepthChartChange: (position: LacrossePosition, slotIndex: number, playerId: string) => void;
 }) {
   const rosterByPosition = [...team.roster].sort(
     (a, b) => a.position.localeCompare(b.position) || b.ratings.overall - a.ratings.overall,
@@ -59,7 +61,8 @@ export function TeamScreen({
 
       <article className="card team-depth-card">
         <h2>Depth Chart</h2>
-        <DepthChart team={team} injuries={injuries} />
+        <p className="dim">Set starters by position. These choices feed the live team rating and game simulation.</p>
+        <DepthChart team={team} injuries={injuries} onDepthChartChange={onDepthChartChange} />
       </article>
 
       <article className="card team-roster-card">
