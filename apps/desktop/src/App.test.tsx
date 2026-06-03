@@ -151,9 +151,9 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
 
     expect(screen.getByLabelText(/Dynasty start screen/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Maryland State 2028/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Load Maryland State 2028/i })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /Maryland State 2028/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Load Maryland State 2028/i }));
 
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Maryland State/i);
     expect(loadActiveDynastySave()?.dynasty.id).toBe(firstSave?.dynasty.id);
@@ -173,6 +173,28 @@ describe('Desktop App', () => {
     expect(secondSave?.dynasty.recruits[0]?.id).not.toBe(firstRecruitId);
     expect(listDynastySaves()).toHaveLength(2);
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
+  });
+
+  it('deletes saves from the dynasty hub without touching the remaining careers', async () => {
+    await renderStartedApp();
+    const firstSaveId = loadActiveDynastySave()?.saveId;
+
+    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.selectOptions(screen.getByLabelText(/^Team$/i), 'virginia-lakes');
+    await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+    const secondSaveId = loadActiveDynastySave()?.saveId;
+
+    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+
+    expect(listDynastySaves()).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: /Delete Maryland State 2028/i }));
+
+    const remainingSaves = listDynastySaves();
+    expect(remainingSaves).toHaveLength(1);
+    expect(remainingSaves[0]?.saveId).toBe(secondSaveId);
+    expect(remainingSaves[0]?.saveId).not.toBe(firstSaveId);
+    expect(screen.queryByRole('button', { name: /Load Maryland State 2028/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Load Virginia Lakes 2028/i })).toBeInTheDocument();
   });
 
   it('switches to the recruiting tab and shows scouting controls', async () => {

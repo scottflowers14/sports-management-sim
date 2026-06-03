@@ -2313,16 +2313,15 @@ li span {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   color: #e6edf3;
-  cursor: pointer;
   display: flex;
+  gap: 16px;
   justify-content: space-between;
   padding: 14px 16px;
   text-align: left;
 }
 
 .save-slot:hover {
-  border-color: rgba(114, 242, 198, 0.45);
-  transform: translateY(-1px);
+  border-color: rgba(114, 242, 198, 0.3);
 }
 
 .save-slot strong,
@@ -2335,10 +2334,32 @@ li span {
   margin-top: 4px;
 }
 
-.save-slot-meta {
-  color: #72f2c6;
-  font-size: 0.78rem;
+.save-slot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.save-slot-action {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.74rem;
   font-weight: 900;
   letter-spacing: 0.08em;
+  padding: 8px 11px;
   text-transform: uppercase;
+}
+
+.save-slot-action.load {
+  background: rgba(114, 242, 198, 0.16);
+  color: #72f2c6;
+}
+
+.save-slot-action.delete {
+  background: rgba(255, 96, 96, 0.12);
+  color: #ff9c9c;
+}
+
+.save-slot-action:hover {
+  transform: translateY(-1px);
 }

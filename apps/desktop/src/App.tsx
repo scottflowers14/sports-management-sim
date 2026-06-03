@@ -51,6 +51,7 @@ import { formatTeamName } from './ui/format';
 import type { BoxScoreData } from './ui/types';
 import {
   createDynastySaveId,
+  deleteDynastySave,
   getActiveDynastySaveId,
   listDynastySaves,
   loadActiveDynastySave,
@@ -190,6 +191,15 @@ export function App() {
     refreshSaves();
     setSaveStatus('Loaded dynasty save');
   }, [refreshSaves]);
+
+  const deleteSave = useCallback((saveId: string) => {
+    deleteDynastySave(saveId);
+    if (activeSaveId === saveId) {
+      setActiveSaveId(null);
+    }
+    refreshSaves();
+    setSaveStatus('Save deleted');
+  }, [activeSaveId, refreshSaves]);
 
   const resetDynasty = useCallback(() => {
     setActiveSaveId(null);
@@ -413,6 +423,7 @@ export function App() {
         onTeamChange={setSelectedNewTeamId}
         onCreateDynasty={startNewDynasty}
         onLoadSave={loadSave}
+        onDeleteSave={deleteSave}
       />
     );
   }

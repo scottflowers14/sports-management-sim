@@ -8,6 +8,7 @@ export function StartScreen({
   onTeamChange,
   onCreateDynasty,
   onLoadSave,
+  onDeleteSave,
 }: {
   saves: DynastySaveMetadata[];
   teamChoices: DynastyTeamChoice[];
@@ -15,6 +16,7 @@ export function StartScreen({
   onTeamChange: (teamId: string) => void;
   onCreateDynasty: () => void;
   onLoadSave: (saveId: string) => void;
+  onDeleteSave: (saveId: string) => void;
 }) {
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
 
@@ -61,7 +63,7 @@ export function StartScreen({
           ) : (
             <div className="save-list">
               {saves.map((save) => (
-                <button key={save.saveId} type="button" className="save-slot" onClick={() => onLoadSave(save.saveId)}>
+                <div key={save.saveId} className="save-slot">
                   <span>
                     <strong>{save.name}</strong>
                     <small>
@@ -69,8 +71,25 @@ export function StartScreen({
                       {save.record.losses}
                     </small>
                   </span>
-                  <span className="save-slot-meta">Load</span>
-                </button>
+                  <span className="save-slot-actions">
+                    <button
+                      type="button"
+                      className="save-slot-action load"
+                      aria-label={`Load ${save.name}`}
+                      onClick={() => onLoadSave(save.saveId)}
+                    >
+                      Load
+                    </button>
+                    <button
+                      type="button"
+                      className="save-slot-action delete"
+                      aria-label={`Delete ${save.name}`}
+                      onClick={() => onDeleteSave(save.saveId)}
+                    >
+                      Delete
+                    </button>
+                  </span>
+                </div>
               ))}
             </div>
           )}

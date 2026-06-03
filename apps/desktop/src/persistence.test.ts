@@ -10,6 +10,7 @@ import {
   dynastySaveSlotKey,
   listDynastySaves,
   loadActiveDynastySave,
+  deleteDynastySave,
   saveDynastySlot,
   saveDynastyState,
   setActiveDynastySave,
@@ -83,6 +84,22 @@ describe('multi-save persistence', () => {
     expect(storage.getItem(ACTIVE_DYNASTY_SAVE_KEY)).toBe(saves[0]?.saveId);
     expect(storage.getItem(dynastySaveSlotKey(saves[0]?.saveId ?? 'missing'))).toBeTruthy();
     expect(loadActiveDynastySave(storage)?.dynasty.id).toBe(legacy.dynasty.id);
+  });
+
+  it('removes a save slot and clears active pointer when deleting the active save', () => {
+    const storage = makeStorage();
+    const maryland = makeSave(3001, 'maryland-state');
+    const virginia = makeSave(3002, 'virginia-lakes');
+
+    saveDynastySlot({ saveId: 'save-a', name: 'Maryland Career', state: maryland, storage });
+    saveDynastySlot({ saveId: 'save-b', name: 'Virginia Career', state: virginia, storage });
+
+    deleteDynastySave('save-b', storage);
+
+    expect(listDynastySaves(storage)).toHaveLength(1);
+    expect(listDynastySaves(storage)[0]?.saveId).toBe('save-a');
+    expect(loadActiveDynastySave(storage)).toBeNull();
+    expect(storage.getItem(dynastySaveSlotKey('save-b'))).toBeNull();
   });
 
   it('creates stable save IDs from seed and timestamp', () => {
