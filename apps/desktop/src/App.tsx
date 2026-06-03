@@ -6,7 +6,6 @@ import {
 } from '@sports-management-sim/engine-core';
 import {
   calculateLacrosseTeamRating,
-  createNewLacrosseDynasty,
   offerLacrossePortalPlayer,
   simulateLacrosseGameWithLog,
   updateLacrosseDepthChartSlot,
@@ -50,13 +49,8 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { formatTeamName } from './ui/format';
 import type { BoxScoreData } from './ui/types';
 import { clearDynastyState, loadDynastyState, saveDynastyState } from './persistence';
+import { createFreshLacrosseDynasty } from './dynasty-factory';
 import './App.css';
-
-const initialDynasty = createNewLacrosseDynasty({
-  seed: 2028,
-  userTeamId: 'maryland-state',
-  seasonYear: 2028,
-});
 
 type View =
   | 'season'
@@ -72,7 +66,7 @@ type View =
 
 export function App() {
   const [loadedSave] = useState(() => loadDynastyState());
-  const [dynasty, setDynasty] = useState<LacrosseDynastyState>(loadedSave?.dynasty ?? initialDynasty);
+  const [dynasty, setDynasty] = useState<LacrosseDynastyState>(() => loadedSave?.dynasty ?? createFreshLacrosseDynasty());
   const [view, setView] = useState<View>('season');
   const [lastSimWeek, setLastSimWeek] = useState<number | null>(loadedSave?.lastSimWeek ?? null);
   const [offseasonSummary, setOffseasonSummary] = useState<OffseasonSummary | null>(loadedSave?.offseasonSummary ?? null);
@@ -121,7 +115,7 @@ export function App() {
 
   const resetDynasty = useCallback(() => {
     clearDynastyState();
-    setDynasty(initialDynasty);
+    setDynasty(createFreshLacrosseDynasty());
     setView('season');
     setLastSimWeek(null);
     setOffseasonSummary(null);

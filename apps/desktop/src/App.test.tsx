@@ -123,6 +123,22 @@ describe('Desktop App', () => {
     expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Loaded local save/i);
   });
 
+  it('starts a fresh generated dynasty when New Dynasty is clicked', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
+    const firstSave = JSON.parse(localStorage.getItem(DYNASTY_SAVE_KEY) ?? '{}');
+    const firstRecruitId = firstSave.dynasty.recruits[0].id;
+
+    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
+    const secondSave = JSON.parse(localStorage.getItem(DYNASTY_SAVE_KEY) ?? '{}');
+
+    expect(secondSave.dynasty.seed).not.toBe(firstSave.dynasty.seed);
+    expect(secondSave.dynasty.id).not.toBe(firstSave.dynasty.id);
+    expect(secondSave.dynasty.recruits[0].id).not.toBe(firstRecruitId);
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
+  });
+
   it('switches to the recruiting tab and shows scouting controls', async () => {
     render(<App />);
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
