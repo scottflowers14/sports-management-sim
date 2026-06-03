@@ -24,20 +24,30 @@ export function progressPlayer<Position extends string, SportTraits>(
 ): Player<Position, SportTraits> {
   const potentialGap = Math.max(0, player.ratings.potential - player.ratings.overall);
   const workEthicMultiplier = 0.5 + player.ratings.workEthic / 100;
-  const gain = Math.min(potentialGap, Math.max(0, Math.round((1 + developmentRoll * 3) * workEthicMultiplier)));
-  const nextOverall = Math.min(player.ratings.potential, player.ratings.overall + gain);
+
+  let delta: number;
+  if (potentialGap === 0) {
+    // At ceiling: regression chance inversely scaled by work ethic
+    // workEthic 100 → ~10% chance, workEthic 0 → ~40% chance
+    const regressionThreshold = 0.4 - player.ratings.workEthic * 0.003;
+    delta = developmentRoll < regressionThreshold ? -1 : 0;
+  } else {
+    delta = Math.min(potentialGap, Math.max(0, Math.round((1 + developmentRoll * 3) * workEthicMultiplier)));
+  }
+
+  const nextOverall = Math.min(player.ratings.potential, Math.max(1, player.ratings.overall + delta));
 
   return {
     ...player,
     ratings: {
       ...player.ratings,
       overall: nextOverall,
-      athleticism: progressRating(player.ratings.athleticism, player.ratings.potential, gain),
-      speed: progressRating(player.ratings.speed, player.ratings.potential, gain),
-      strength: progressRating(player.ratings.strength, player.ratings.potential, gain),
-      stamina: progressRating(player.ratings.stamina, player.ratings.potential, gain),
-      skill: progressRating(player.ratings.skill, player.ratings.potential, gain),
-      iq: progressRating(player.ratings.iq, player.ratings.potential, gain),
+      athleticism: shiftRating(player.ratings.athleticism, player.ratings.potential, delta),
+      speed: shiftRating(player.ratings.speed, player.ratings.potential, delta),
+      strength: shiftRating(player.ratings.strength, player.ratings.potential, delta),
+      stamina: shiftRating(player.ratings.stamina, player.ratings.potential, delta),
+      skill: shiftRating(player.ratings.skill, player.ratings.potential, delta),
+      iq: shiftRating(player.ratings.iq, player.ratings.potential, delta),
     },
   };
 }
@@ -85,8 +95,11 @@ export function runTeamOffseason<Position extends string, SportTraits>(
   };
 }
 
-function progressRating(current: number, potential: number, gain: number): number {
-  return Math.min(potential, current + Math.max(0, Math.floor(gain / 2)));
+function shiftRating(current: number, potential: number, delta: number): number {
+  if (delta >= 0) {
+    return Math.min(potential, current + Math.max(0, Math.floor(delta / 2)));
+  }
+  return Math.max(1, current + Math.ceil(delta / 2));
 }
 
 function emptyRecord(): TeamRecord {

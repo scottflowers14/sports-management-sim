@@ -123,6 +123,34 @@ describe('offseason progression', () => {
     expect(progressPlayer(player, 1).ratings.overall).toBe(75);
   });
 
+  it('regresses a player at potential ceiling on low development roll', () => {
+    const player = makePlayer('p1', 'SR', {
+      ratings: {
+        ...makePlayer('base', 'SR').ratings,
+        overall: 80,
+        potential: 80,
+        workEthic: 50,
+      },
+    });
+
+    const regressed = progressPlayer(player, 0.0);
+    expect(regressed.ratings.overall).toBe(79);
+  });
+
+  it('does not regress a player at potential ceiling on high development roll with high work ethic', () => {
+    const player = makePlayer('p1', 'SR', {
+      ratings: {
+        ...makePlayer('base', 'SR').ratings,
+        overall: 80,
+        potential: 80,
+        workEthic: 100,
+      },
+    });
+
+    const result = progressPlayer(player, 0.95);
+    expect(result.ratings.overall).toBe(80);
+  });
+
   it('graduates seniors, advances classes, resets fatigue, updates eligibility, and recalculates scholarships', () => {
     const freshman = makePlayer('freshman', 'FR', { scholarshipPercent: 25 });
     const junior = makePlayer('junior', 'JR', { scholarshipPercent: 50 });

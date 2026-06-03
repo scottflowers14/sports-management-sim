@@ -144,10 +144,12 @@ export function runOffseason(
   // Evolve program prestige based on season performance
   const teamsWithPrestige = evolvePrestige(season.teams, sortedStandings, nationalChampionId);
 
-  // Intake signing class and run offseason for every team
+  // Run offseason for returning players first (advances class years, graduates seniors),
+  // then add the signing class as true freshmen for the upcoming season.
   const teamsAfterOffseason = teamsWithPrestige.map((team) => {
-    const withClass = addSignedRecruitsToTeam(team, signed, season.year);
-    return runTeamOffseason(withClass);
+    const afterOffseason = runTeamOffseason(team);
+    const withClass = addSignedRecruitsToTeam(afterOffseason, signed, season.year);
+    return pruneDepthChart(withClass);
   });
 
   // Capture user team signing class for summary
@@ -236,6 +238,18 @@ function evolvePrestige(
       reputation: { ...team.reputation, recentSuccess, nationalPrestige },
     };
   });
+}
+
+function pruneDepthChart(team: LacrosseTeam): LacrosseTeam {
+  const dc = (team as LacrosseTeam & { depthChart?: Record<string, string[]> }).depthChart;
+  if (!dc) return team;
+  const rosterIds = new Set(team.roster.map((p) => p.id));
+  return {
+    ...team,
+    depthChart: Object.fromEntries(
+      Object.entries(dc).map(([pos, ids]) => [pos, ids.filter((id) => rosterIds.has(id))]),
+    ),
+  } as LacrosseTeam;
 }
 
 // Each CPU team extends offers to their top 15 open recruits at 50% scholarship
