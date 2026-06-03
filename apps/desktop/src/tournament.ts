@@ -128,12 +128,18 @@ function playTournamentGame(game: TournamentGame, teams: LacrosseTeam[]): Tourna
   const awayTeam = teams.find((t) => t.id === game.awayTeamId)!;
   const result = simulateLacrosseGame({ homeTeam, awayTeam });
   const homeWon = result.winnerTeamId === homeTeam.id;
-  return {
+  const tournamentResult: TournamentGameResult = {
     winnerId: result.winnerTeamId,
     loserId: result.loserTeamId,
     winnerScore: homeWon ? result.homeScore : result.awayScore,
     loserScore: homeWon ? result.awayScore : result.homeScore,
     overtime: result.overtime,
-    teamStats: result.teamStats,
   };
+
+  return result.teamStats === undefined
+    ? tournamentResult
+    : {
+        ...tournamentResult,
+        teamStats: result.teamStats,
+      };
 }
