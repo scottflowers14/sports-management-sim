@@ -13,6 +13,17 @@ import {
 import type { GameLog, LacrosseDynastyState, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, runOffseason, processInjuries, resolveAndApplyPortal } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
+import {
+  createCoachProfile,
+  generateCoachName,
+  generateSeasonGoals,
+  evaluateSeasonGoals,
+  updateADConfidence,
+  advanceCoachTenure,
+  getJobSecurityLabel,
+  getJobSecurityColor,
+} from './coach-profile';
+import type { CoachProfile, SeasonGoals } from './coach-profile';
 import { computeNationalRankings } from './rankings';
 import type { RankingEntry } from './rankings';
 import { generateWeeklyNews, generateRecruitingNews } from './news-feed';
@@ -100,6 +111,11 @@ export function App() {
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded dynasty save' : 'Choose or create a dynasty'));
   const [recruitPosFilter, setRecruitPosFilter] = useState<LacrossePosition | 'ALL'>('ALL');
   const [recruitTab, setRecruitTab] = useState<'board' | 'portal'>('board');
+  const [coachProfile, setCoachProfile] = useState<CoachProfile | null>(() => loadedSave?.coachProfile ?? null);
+  const [adConfidence, setAdConfidence] = useState<number>(() => loadedSave?.adConfidence ?? 60);
+  const [seasonGoals, setSeasonGoals] = useState<SeasonGoals | null>(() => loadedSave?.seasonGoals ?? null);
+  const [bestNatRank, setBestNatRank] = useState<number | null>(() => loadedSave?.bestNatRank ?? null);
+  const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
 
   const saveState = useCallback((): DynastySaveState => ({
     dynasty,
@@ -113,7 +129,11 @@ export function App() {
     scouting,
     seasonStats,
     gameLogs: Object.fromEntries(gameLogs),
-  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, gameLogs]);
+    coachProfile,
+    adConfidence,
+    seasonGoals,
+    bestNatRank,
+  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -133,6 +153,10 @@ export function App() {
     setSeasonStats(emptySeasonStats());
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
+    setCoachProfile(null);
+    setAdConfidence(60);
+    setSeasonGoals(null);
+    setBestNatRank(null);
   }, []);
 
   const persistDynasty = useCallback((status = 'Saved locally') => {
@@ -146,8 +170,16 @@ export function App() {
   const startNewDynasty = useCallback(() => {
     const nextDynasty = createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId });
     const saveId = createDynastySaveId(nextDynasty.seed);
+    const newCoach = createCoachProfile(selectedNewCoachName.trim() || generateCoachName(nextDynasty.seed));
+    const userTeamForGoals = nextDynasty.season.teams.find((t) => t.id === selectedNewTeamId);
+    const prestige = userTeamForGoals?.reputation.nationalPrestige ?? 50;
+    const goals = generateSeasonGoals(prestige, nextDynasty.season.year);
     resetUiState();
     setDynasty(nextDynasty);
+    setCoachProfile(newCoach);
+    setAdConfidence(60);
+    setSeasonGoals(goals);
+    setBestNatRank(null);
     const state: DynastySaveState = {
       dynasty: nextDynasty,
       lastSimWeek: null,
@@ -160,12 +192,16 @@ export function App() {
       scouting: createScoutingState(3),
       seasonStats: emptySeasonStats(),
       gameLogs: {},
+      coachProfile: newCoach,
+      adConfidence: 60,
+      seasonGoals: goals,
+      bestNatRank: null,
     };
     saveDynastySlot({ saveId, state });
     setActiveSaveId(saveId);
     refreshSaves();
     setSaveStatus('New dynasty started');
-  }, [refreshSaves, resetUiState, selectedNewTeamId]);
+  }, [refreshSaves, resetUiState, selectedNewTeamId, selectedNewCoachName]);
 
   const loadSave = useCallback((saveId: string) => {
     const save = loadDynastySaveSlot(saveId);
@@ -183,6 +219,10 @@ export function App() {
     setGameLogs(new Map(Object.entries(save.gameLogs ?? {})));
     setScouting(save.scouting);
     setSeasonStats(save.seasonStats);
+    setCoachProfile(save.coachProfile ?? null);
+    setAdConfidence(save.adConfidence ?? 60);
+    setSeasonGoals(save.seasonGoals ?? null);
+    setBestNatRank(save.bestNatRank ?? null);
     setView('season');
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
@@ -314,6 +354,10 @@ export function App() {
           for (const [id, log] of weekLogs) next.set(id, log);
           return next;
         });
+        const userRank = newRanks.find((r) => r.teamId === prev.userTeamId)?.rank ?? null;
+        if (userRank !== null) {
+          setBestNatRank((prev) => (prev === null || userRank < prev ? userRank : prev));
+        }
       }, 0);
 
       return newDynasty;
@@ -395,11 +439,45 @@ export function App() {
       return newDynasty;
     });
 
+    // Evaluate season goals and update AD confidence
+    if (coachProfile && seasonGoals) {
+      const userTeamData = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+      const userRecord = userTeamData?.record ?? { wins: 0, losses: 0 };
+      const recruitClassSize = dynasty.recruits.filter(
+        (r) => r.signedTeamId === dynasty.userTeamId || r.committedTeamId === dynasty.userTeamId,
+      ).length;
+      const evaluated = evaluateSeasonGoals(
+        seasonGoals,
+        userRecord,
+        bestNatRank,
+        isConfChamp ?? false,
+        recruitClassSize,
+      );
+      const { confidence: newConfidence } = updateADConfidence(
+        adConfidence,
+        evaluated,
+        isNatChamp,
+        coachProfile,
+      );
+      const advancedCoach = advanceCoachTenure(coachProfile);
+      setSeasonGoals(evaluated);
+      setAdConfidence(newConfidence);
+      setCoachProfile(advancedCoach);
+    }
+
     setView('offseason');
-  }, [tournament, dynasty.userTeamId, dynasty.season.teams, dynasty.season.standings, dynasty.season.conferences, rankings]);
+  }, [tournament, dynasty.userTeamId, dynasty.season.teams, dynasty.season.standings, dynasty.season.conferences, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, dynasty.recruits]);
 
   const startNewSeason = useCallback(() => {
-    setDynasty((prev) => resolveAndApplyPortal(prev));
+    setDynasty((prev) => {
+      const nextDynasty = resolveAndApplyPortal(prev);
+      const userTeamData = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
+      const prestige = userTeamData?.reputation.nationalPrestige ?? 50;
+      const goals = generateSeasonGoals(prestige, nextDynasty.season.year);
+      setSeasonGoals(goals);
+      setBestNatRank(null);
+      return nextDynasty;
+    });
     setOffseasonSummary(null);
     setNewsItems([]);
     setLastSimWeek(null);
@@ -420,7 +498,9 @@ export function App() {
         saves={saves}
         teamChoices={teamChoices}
         selectedTeamId={selectedNewTeamId}
+        coachName={selectedNewCoachName}
         onTeamChange={setSelectedNewTeamId}
+        onCoachNameChange={setSelectedNewCoachName}
         onCreateDynasty={startNewDynasty}
         onLoadSave={loadSave}
         onDeleteSave={deleteSave}
@@ -493,6 +573,53 @@ export function App() {
           )}
           {injuredCount > 0 && (
             <span className="injury-count">{injuredCount} injured</span>
+          )}
+          {coachProfile && (
+            <div className="coach-block">
+              <span className="coach-name">HC {coachProfile.name}</span>
+              <span className="coach-tenure">
+                Year {coachProfile.tenureSeasons + 1} · {coachProfile.contractYearsRemaining}yr left
+              </span>
+              <div className="ad-confidence-row">
+                <span className="ad-confidence-label" style={{ color: getJobSecurityColor(adConfidence) }}>
+                  {getJobSecurityLabel(adConfidence)}
+                </span>
+                <div className="ad-confidence-bar-track">
+                  <div
+                    className="ad-confidence-bar-fill"
+                    style={{
+                      width: `${adConfidence}%`,
+                      background: getJobSecurityColor(adConfidence),
+                    }}
+                  />
+                </div>
+                <span className="ad-confidence-pct">{adConfidence}</span>
+              </div>
+            </div>
+          )}
+          {seasonGoals && (
+            <div className="season-goals">
+              <span className="label">Season Goals</span>
+              <ul className="goals-list">
+                {seasonGoals.goals.map((goal) => (
+                  <li
+                    key={goal.id}
+                    className={
+                      goal.achieved === true
+                        ? 'goal-met'
+                        : goal.achieved === false
+                          ? 'goal-missed'
+                          : 'goal-pending'
+                    }
+                  >
+                    <span className="goal-icon">
+                      {goal.achieved === true ? '✓' : goal.achieved === false ? '✗' : '·'}
+                    </span>
+                    {goal.description}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <div className="save-actions" aria-label="Save controls">
             <button type="button" onClick={() => persistDynasty()}>

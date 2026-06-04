@@ -5,7 +5,9 @@ export function StartScreen({
   saves,
   teamChoices,
   selectedTeamId,
+  coachName,
   onTeamChange,
+  onCoachNameChange,
   onCreateDynasty,
   onLoadSave,
   onDeleteSave,
@@ -13,7 +15,9 @@ export function StartScreen({
   saves: DynastySaveMetadata[];
   teamChoices: DynastyTeamChoice[];
   selectedTeamId: string;
+  coachName: string;
   onTeamChange: (teamId: string) => void;
+  onCoachNameChange: (name: string) => void;
   onCreateDynasty: () => void;
   onLoadSave: (saveId: string) => void;
   onDeleteSave: (saveId: string) => void;
@@ -34,6 +38,18 @@ export function StartScreen({
         <article className="card new-dynasty-card" aria-label="Create dynasty">
           <p className="eyebrow">New Dynasty</p>
           <h2>Choose Your Program</h2>
+          <label className="field-label" htmlFor="coach-name-input">
+            Head Coach Name
+          </label>
+          <input
+            id="coach-name-input"
+            type="text"
+            value={coachName}
+            maxLength={40}
+            onChange={(event) => onCoachNameChange(event.target.value)}
+            placeholder="Enter coach name"
+            className="start-text-input"
+          />
           <label className="field-label" htmlFor="team-select">
             Team
           </label>

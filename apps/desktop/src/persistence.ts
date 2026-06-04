@@ -6,6 +6,7 @@ import type { TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
 import type { ScoutingState } from './scouting';
 import type { SeasonStatsMap } from './stats';
+import type { CoachProfile, SeasonGoals } from './coach-profile';
 import { formatTeamName } from './ui/format';
 
 export const DYNASTY_SAVE_VERSION = 1;
@@ -27,6 +28,11 @@ export interface DynastySaveState {
   seasonStats: SeasonStatsMap;
   /** Keyed by game ID. Maps don't JSON-serialize so stored as a plain Record. */
   gameLogs: Record<string, GameLog>;
+  coachProfile: CoachProfile | null;
+  adConfidence: number;
+  seasonGoals: SeasonGoals | null;
+  /** Best national rank achieved this season (lowest number = best). */
+  bestNatRank: number | null;
 }
 
 export interface DynastySaveMetadata {
@@ -232,6 +238,18 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     }
     if (!parsed.gameLogs) {
       parsed.gameLogs = {};
+    }
+    if (parsed.coachProfile === undefined) {
+      parsed.coachProfile = null;
+    }
+    if (parsed.adConfidence === undefined) {
+      parsed.adConfidence = 60;
+    }
+    if (parsed.seasonGoals === undefined) {
+      parsed.seasonGoals = null;
+    }
+    if (parsed.bestNatRank === undefined) {
+      parsed.bestNatRank = null;
     }
     return parsed as PersistedDynastySave;
   } catch {
