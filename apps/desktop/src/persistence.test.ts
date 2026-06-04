@@ -50,6 +50,10 @@ function makeSave(seedTime: number, userTeamId = 'maryland-state'): DynastySaveS
     scouting: createScoutingState(3),
     seasonStats: emptySeasonStats(),
     gameLogs: {},
+    coachProfile: null,
+    adConfidence: 60,
+    seasonGoals: null,
+    bestNatRank: null,
   };
 }
 
