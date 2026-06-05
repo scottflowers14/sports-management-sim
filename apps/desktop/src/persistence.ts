@@ -2,7 +2,7 @@ import type { GameLog, LacrosseDynastyState } from '@sports-management-sim/sport
 import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
-import type { TournamentState } from './tournament';
+import type { ConferenceBracket, TournamentGame, TournamentPhase, TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
 import type { ScoutingState } from './scouting';
 import type { SeasonStatsMap } from './stats';
@@ -256,9 +256,25 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     if (parsed.version !== DYNASTY_SAVE_VERSION || !parsed.dynasty) {
       return null;
     }
-    // Migrate old 2-bracket tournament format to new conferenceBrackets array
+    // Migrate old 2-bracket tournament format { accBracket, necBracket, ... } to new shape.
     if (parsed.tournament && !('conferenceBrackets' in parsed.tournament)) {
-      parsed.tournament = null;
+      const old = parsed.tournament as Record<string, unknown>;
+      const conferenceBrackets: ConferenceBracket[] = [];
+      if (old['accBracket']) conferenceBrackets.push(old['accBracket'] as ConferenceBracket);
+      if (old['necBracket']) conferenceBrackets.push(old['necBracket'] as ConferenceBracket);
+      const phaseMap: Record<string, TournamentPhase> = {
+        semis: 'conf_semis',
+        finals: 'conf_finals',
+        national: 'national_final',
+        complete: 'complete',
+      };
+      const phase: TournamentPhase = phaseMap[old['phase'] as string] ?? 'conf_semis';
+      parsed.tournament = {
+        phase,
+        conferenceBrackets,
+        ...(old['nationalGame'] ? { nationalGame: old['nationalGame'] as TournamentGame } : {}),
+        ...(old['nationalChampion'] ? { nationalChampion: old['nationalChampion'] as string } : {}),
+      };
     }
     if (!parsed.dynasty.portalEntries) {
       parsed.dynasty = { ...parsed.dynasty, portalEntries: [] };

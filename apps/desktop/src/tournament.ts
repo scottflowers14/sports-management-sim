@@ -58,17 +58,29 @@ export function advanceTournamentSemis(state: TournamentState, teams: LacrosseTe
 export function advanceTournamentFinals(state: TournamentState, teams: LacrosseTeam[]): TournamentState {
   const updatedBrackets = state.conferenceBrackets.map((bracket) => simulateFinal(bracket, teams));
   const champions = updatedBrackets.map((b) => b.champion!);
-  // seed1 vs seed4, seed2 vs seed3 (by bracket index order)
+
+  // With exactly 2 conferences skip national semis — go straight to the championship game.
+  if (champions.length === 2) {
+    const nationalGame: TournamentGame = {
+      id: 'national-championship',
+      homeTeamId: champions[0]!,
+      awayTeamId: champions[1]!,
+      conferenceId: null,
+    };
+    return { ...state, phase: 'national_final', conferenceBrackets: updatedBrackets, nationalGame };
+  }
+
+  // 4+ conferences: seed1 vs seed4, seed2 vs seed3 (by bracket index).
   const nationalSemiFinal1: TournamentGame = {
     id: 'national-semi-1',
     homeTeamId: champions[0]!,
-    awayTeamId: champions[3] ?? champions[0]!,
+    awayTeamId: champions[champions.length - 1]!,
     conferenceId: null,
   };
   const nationalSemiFinal2: TournamentGame = {
     id: 'national-semi-2',
-    homeTeamId: champions[1] ?? champions[0]!,
-    awayTeamId: champions[2] ?? champions[1] ?? champions[0]!,
+    homeTeamId: champions[1]!,
+    awayTeamId: champions[champions.length - 2]!,
     conferenceId: null,
   };
   return { ...state, phase: 'national_semis', conferenceBrackets: updatedBrackets, nationalSemiFinal1, nationalSemiFinal2 };

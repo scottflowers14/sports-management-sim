@@ -520,8 +520,9 @@ export function App() {
     if ('error' in result) {
       setSaveStatus(`Import failed: ${result.error}`);
     } else {
+      setActiveSaveId(result.saveId);
       refreshSaves();
-      setSaveStatus('Save imported successfully');
+      setSaveStatus('Save imported — click Continue or Load to play');
     }
   }, [refreshSaves]);
 
@@ -540,6 +541,7 @@ export function App() {
         {...(activeSaveId ? { onContinue: () => setScreen('game') } : {})}
         onExportSave={handleExportSave}
         onImportSave={handleImportSave}
+        saveStatus={saveStatus}
       />
     );
   }

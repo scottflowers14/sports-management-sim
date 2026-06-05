@@ -15,6 +15,7 @@ export function StartScreen({
   onContinue,
   onExportSave,
   onImportSave,
+  saveStatus,
 }: {
   saves: DynastySaveMetadata[];
   teamChoices: DynastyTeamChoice[];
@@ -28,6 +29,7 @@ export function StartScreen({
   onContinue?: () => void;
   onExportSave?: (saveId: string) => void;
   onImportSave?: (json: string) => void;
+  saveStatus?: string;
 }) {
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -145,6 +147,8 @@ export function StartScreen({
               ))}
             </div>
           )}
+
+          {saveStatus && <p className="save-status-msg dim">{saveStatus}</p>}
 
           {onImportSave && (
             <div className="import-save-row">
