@@ -9,6 +9,7 @@ export function TournamentScreen({
   seasonComplete,
   onSimSemis,
   onSimFinals,
+  onSimNationalSemis,
   onSimNational,
   onEnterOffseason,
   onInitTournament,
@@ -20,6 +21,7 @@ export function TournamentScreen({
   seasonComplete: boolean;
   onSimSemis: () => void;
   onSimFinals: () => void;
+  onSimNationalSemis: () => void;
   onSimNational: () => void;
   onEnterOffseason: () => void;
   onInitTournament: () => void;
@@ -43,26 +45,47 @@ export function TournamentScreen({
     );
   }
 
+  const phase = tournament.phase;
+
   return (
     <div className="tournament-layout">
       <div className="tournament-conferences">
-        <ConferenceBracketCard
-          bracket={tournament.accBracket}
-          confLabel="ACC"
-          teamMap={teamMap}
-          userTeamId={userTeamId}
-          onBoxScore={onBoxScore}
-        />
-        <ConferenceBracketCard
-          bracket={tournament.necBracket}
-          confLabel="NEC"
-          teamMap={teamMap}
-          userTeamId={userTeamId}
-          onBoxScore={onBoxScore}
-        />
+        {tournament.conferenceBrackets.map((bracket) => (
+          <ConferenceBracketCard
+            key={bracket.conferenceId}
+            bracket={bracket}
+            confLabel={bracket.conferenceId.toUpperCase()}
+            teamMap={teamMap}
+            userTeamId={userTeamId}
+            onBoxScore={onBoxScore}
+          />
+        ))}
       </div>
 
-      {(tournament.phase === 'national' || tournament.phase === 'complete') && tournament.nationalGame && (
+      {(phase === 'national_semis' || phase === 'national_final' || phase === 'complete') &&
+        tournament.nationalSemiFinal1 && tournament.nationalSemiFinal2 && (
+        <article className="card national-champ-card">
+          <h2>National Semifinals</h2>
+          <BracketMatchup
+            game={tournament.nationalSemiFinal1}
+            seeds={[]}
+            teamMap={teamMap}
+            userTeamId={userTeamId}
+            onBoxScore={onBoxScore}
+            title="National Semifinal 1"
+          />
+          <BracketMatchup
+            game={tournament.nationalSemiFinal2}
+            seeds={[]}
+            teamMap={teamMap}
+            userTeamId={userTeamId}
+            onBoxScore={onBoxScore}
+            title="National Semifinal 2"
+          />
+        </article>
+      )}
+
+      {(phase === 'national_final' || phase === 'complete') && tournament.nationalGame && (
         <article className="card national-champ-card">
           <h2>National Championship</h2>
           <BracketMatchup
@@ -85,16 +108,19 @@ export function TournamentScreen({
       )}
 
       <div className="tournament-controls">
-        {tournament.phase === 'semis' && (
+        {phase === 'conf_semis' && (
           <button className="sim-btn" onClick={onSimSemis}>Sim Conference Semifinals</button>
         )}
-        {tournament.phase === 'finals' && (
+        {phase === 'conf_finals' && (
           <button className="sim-btn" onClick={onSimFinals}>Sim Conference Finals</button>
         )}
-        {tournament.phase === 'national' && (
+        {phase === 'national_semis' && (
+          <button className="sim-btn" onClick={onSimNationalSemis}>Sim National Semifinals</button>
+        )}
+        {phase === 'national_final' && (
           <button className="sim-btn" onClick={onSimNational}>Sim National Championship</button>
         )}
-        {tournament.phase === 'complete' && (
+        {phase === 'complete' && (
           <button className="offseason-btn" onClick={onEnterOffseason}>Enter Offseason →</button>
         )}
       </div>

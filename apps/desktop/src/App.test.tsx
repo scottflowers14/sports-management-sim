@@ -140,6 +140,9 @@ describe('Desktop App', () => {
 
     render(<App />);
 
+    // App always shows StartScreen first; click Continue to resume the saved dynasty
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 2/i);
     expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Loaded dynasty save/i);
   });

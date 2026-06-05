@@ -32,6 +32,7 @@ import {
   initTournament,
   advanceTournamentSemis,
   advanceTournamentFinals,
+  advanceTournamentNationalSemis,
   advanceNationalChampionship,
 } from './tournament';
 import type { TournamentState } from './tournament';
@@ -63,7 +64,9 @@ import type { BoxScoreData } from './ui/types';
 import {
   createDynastySaveId,
   deleteDynastySave,
+  exportSaveAsJson,
   getActiveDynastySaveId,
+  importSaveFromJson,
   listDynastySaves,
   loadActiveDynastySave,
   loadDynastySaveSlot,
@@ -87,6 +90,7 @@ type View =
   | 'stats';
 
 export function App() {
+  const [screen, setScreen] = useState<'start' | 'game'>('start');
   const [loadedSave] = useState(() => loadActiveDynastySave());
   const [activeSaveId, setActiveSaveId] = useState<string | null>(() => getActiveDynastySaveId());
   const [saves, setSaves] = useState<DynastySaveMetadata[]>(() => listDynastySaves());
@@ -201,6 +205,7 @@ export function App() {
     setActiveSaveId(saveId);
     refreshSaves();
     setSaveStatus('New dynasty started');
+    setScreen('game');
   }, [refreshSaves, resetUiState, selectedNewTeamId, selectedNewCoachName]);
 
   const loadSave = useCallback((saveId: string) => {
@@ -230,6 +235,7 @@ export function App() {
     setActiveSaveId(saveId);
     refreshSaves();
     setSaveStatus('Loaded dynasty save');
+    setScreen('game');
   }, [refreshSaves]);
 
   const deleteSave = useCallback((saveId: string) => {
@@ -245,6 +251,7 @@ export function App() {
     setActiveSaveId(null);
     setSaveStatus('Choose or create a dynasty');
     refreshSaves();
+    setScreen('start');
   }, [refreshSaves]);
 
   const rankingsRef = useRef<RankingEntry[]>(rankings);
@@ -385,9 +392,9 @@ export function App() {
   }, []);
 
   const enterTournament = useCallback(() => {
-    setTournament(initTournament(dynasty.season.standings));
+    setTournament(initTournament(dynasty.season.standings, dynasty.season.conferences));
     setView('tournament');
-  }, [dynasty.season.standings]);
+  }, [dynasty.season.standings, dynasty.season.conferences]);
 
   const simTournamentSemis = useCallback(() => {
     setTournament((prev) => prev ? advanceTournamentSemis(prev, dynasty.season.teams) : prev);
@@ -397,6 +404,10 @@ export function App() {
     setTournament((prev) => prev ? advanceTournamentFinals(prev, dynasty.season.teams) : prev);
   }, [dynasty.season.teams]);
 
+  const simTournamentNationalSemis = useCallback(() => {
+    setTournament((prev) => prev ? advanceTournamentNationalSemis(prev, dynasty.season.teams) : prev);
+  }, [dynasty.season.teams]);
+
   const simTournamentNational = useCallback(() => {
     setTournament((prev) => prev ? advanceNationalChampionship(prev, dynasty.season.teams) : prev);
   }, [dynasty.season.teams]);
@@ -404,7 +415,7 @@ export function App() {
   const enterOffseason = useCallback(() => {
     const tournamentChampion = tournament?.nationalChampion;
     const userConfId = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId)?.conferenceId;
-    const userBracket = userConfId === 'acc' ? tournament?.accBracket : tournament?.necBracket;
+    const userBracket = tournament?.conferenceBrackets.find(b => b.conferenceId === userConfId);
     const isConfChamp = userBracket?.champion === dynasty.userTeamId;
     const isNatChamp = tournamentChampion === dynasty.userTeamId;
     const currentNatRank = rankings.find((r) => r.teamId === dynasty.userTeamId)?.rank ?? null;
@@ -492,7 +503,30 @@ export function App() {
     setView('season');
   }, []);
 
-  if (!activeSaveId) {
+  const handleExportSave = useCallback((saveId: string) => {
+    const json = exportSaveAsJson(saveId);
+    if (!json) return;
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dynasty-save-${saveId}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleImportSave = useCallback((json: string) => {
+    const result = importSaveFromJson(json);
+    if ('error' in result) {
+      setSaveStatus(`Import failed: ${result.error}`);
+    } else {
+      setActiveSaveId(result.saveId);
+      refreshSaves();
+      setSaveStatus('Save imported — click Continue or Load to play');
+    }
+  }, [refreshSaves]);
+
+  if (screen === 'start') {
     return (
       <StartScreen
         saves={saves}
@@ -502,8 +536,12 @@ export function App() {
         onTeamChange={setSelectedNewTeamId}
         onCoachNameChange={setSelectedNewCoachName}
         onCreateDynasty={startNewDynasty}
-        onLoadSave={loadSave}
+        onLoadSave={(saveId) => { loadSave(saveId); setScreen('game'); }}
         onDeleteSave={deleteSave}
+        {...(activeSaveId ? { onContinue: () => setScreen('game') } : {})}
+        onExportSave={handleExportSave}
+        onImportSave={handleImportSave}
+        saveStatus={saveStatus}
       />
     );
   }
@@ -761,6 +799,7 @@ export function App() {
           seasonComplete={seasonComplete}
           onSimSemis={simTournamentSemis}
           onSimFinals={simTournamentFinals}
+          onSimNationalSemis={simTournamentNationalSemis}
           onSimNational={simTournamentNational}
           onEnterOffseason={enterOffseason}
           onInitTournament={enterTournament}

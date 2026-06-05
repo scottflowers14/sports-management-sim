@@ -1,6 +1,6 @@
 import { simulateLacrosseGameWithLog } from '@sports-management-sim/sport-lacrosse';
 import type { GameLog, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
-import type { StandingsEntry } from '@sports-management-sim/engine-core';
+import type { Conference, StandingsEntry } from '@sports-management-sim/engine-core';
 
 export interface TournamentGameResult {
   winnerId: string;
@@ -29,46 +29,80 @@ export interface ConferenceBracket {
   champion?: string;
 }
 
-export type TournamentPhase = 'semis' | 'finals' | 'national' | 'complete';
+export type TournamentPhase = 'conf_semis' | 'conf_finals' | 'national_semis' | 'national_final' | 'complete';
 
 export interface TournamentState {
   phase: TournamentPhase;
-  accBracket: ConferenceBracket;
-  necBracket: ConferenceBracket;
+  conferenceBrackets: ConferenceBracket[];
+  nationalSemiFinal1?: TournamentGame;
+  nationalSemiFinal2?: TournamentGame;
   nationalGame?: TournamentGame;
   nationalChampion?: string;
 }
 
-const ACC_IDS = ['maryland-state', 'virginia-lakes', 'long-island-tech', 'georgetown-prep'];
-const NEC_IDS = ['new-england-college', 'colorado-front-range', 'syracuse-heights', 'penn-state-valley'];
-
-export function initTournament(standings: StandingsEntry[]): TournamentState {
+export function initTournament(standings: StandingsEntry[], conferences: Conference[]): TournamentState {
   return {
-    phase: 'semis',
-    accBracket: buildBracket('acc', ACC_IDS, standings),
-    necBracket: buildBracket('nec', NEC_IDS, standings),
+    phase: 'conf_semis',
+    conferenceBrackets: conferences.map((conf) => buildBracket(conf.id, conf.teamIds, standings)),
   };
 }
 
 export function advanceTournamentSemis(state: TournamentState, teams: LacrosseTeam[]): TournamentState {
   return {
     ...state,
-    phase: 'finals',
-    accBracket: simulateSemifinals(state.accBracket, teams),
-    necBracket: simulateSemifinals(state.necBracket, teams),
+    phase: 'conf_finals',
+    conferenceBrackets: state.conferenceBrackets.map((bracket) => simulateSemifinals(bracket, teams)),
   };
 }
 
 export function advanceTournamentFinals(state: TournamentState, teams: LacrosseTeam[]): TournamentState {
-  const accBracket = simulateFinal(state.accBracket, teams);
-  const necBracket = simulateFinal(state.necBracket, teams);
-  const nationalGame: TournamentGame = {
-    id: 'national-championship',
-    homeTeamId: accBracket.champion!,
-    awayTeamId: necBracket.champion!,
+  const updatedBrackets = state.conferenceBrackets.map((bracket) => simulateFinal(bracket, teams));
+  const champions = updatedBrackets.map((b) => b.champion!);
+
+  // With exactly 2 conferences skip national semis — go straight to the championship game.
+  if (champions.length === 2) {
+    const nationalGame: TournamentGame = {
+      id: 'national-championship',
+      homeTeamId: champions[0]!,
+      awayTeamId: champions[1]!,
+      conferenceId: null,
+    };
+    return { ...state, phase: 'national_final', conferenceBrackets: updatedBrackets, nationalGame };
+  }
+
+  // 4+ conferences: seed1 vs seed4, seed2 vs seed3 (by bracket index).
+  const nationalSemiFinal1: TournamentGame = {
+    id: 'national-semi-1',
+    homeTeamId: champions[0]!,
+    awayTeamId: champions[champions.length - 1]!,
     conferenceId: null,
   };
-  return { ...state, phase: 'national', accBracket, necBracket, nationalGame };
+  const nationalSemiFinal2: TournamentGame = {
+    id: 'national-semi-2',
+    homeTeamId: champions[1]!,
+    awayTeamId: champions[champions.length - 2]!,
+    conferenceId: null,
+  };
+  return { ...state, phase: 'national_semis', conferenceBrackets: updatedBrackets, nationalSemiFinal1, nationalSemiFinal2 };
+}
+
+export function advanceTournamentNationalSemis(state: TournamentState, teams: LacrosseTeam[]): TournamentState {
+  if (!state.nationalSemiFinal1 || !state.nationalSemiFinal2) return state;
+  const result1 = playTournamentGame(state.nationalSemiFinal1, teams);
+  const result2 = playTournamentGame(state.nationalSemiFinal2, teams);
+  const nationalGame: TournamentGame = {
+    id: 'national-championship',
+    homeTeamId: result1.winnerId,
+    awayTeamId: result2.winnerId,
+    conferenceId: null,
+  };
+  return {
+    ...state,
+    phase: 'national_final',
+    nationalSemiFinal1: { ...state.nationalSemiFinal1, result: result1 },
+    nationalSemiFinal2: { ...state.nationalSemiFinal2, result: result2 },
+    nationalGame,
+  };
 }
 
 export function advanceNationalChampionship(state: TournamentState, teams: LacrosseTeam[]): TournamentState {
