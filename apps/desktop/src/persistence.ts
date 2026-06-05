@@ -227,11 +227,38 @@ function defaultSaveName(dynasty: LacrosseDynastyState): string {
   return `${userTeam ? formatTeamName(userTeam.name) : dynasty.userTeamId} ${dynasty.season.year}`;
 }
 
+export function exportSaveAsJson(saveId: string, storage: Storage = window.localStorage): string | null {
+  const raw = storage.getItem(dynastySaveSlotKey(saveId));
+  return raw ?? null;
+}
+
+export function importSaveFromJson(
+  json: string,
+  storage: Storage = window.localStorage,
+): { saveId: string } | { error: string } {
+  try {
+    const parsed = parsePersistedSave(json);
+    if (!parsed) return { error: 'Invalid or incompatible save file.' };
+    const saveId = (parsed as PersistedDynastySave & { saveId?: string }).saveId
+      ?? createDynastySaveId(parsed.dynasty.seed);
+    const name = (parsed as PersistedDynastySave & { name?: string }).name
+      ?? defaultSaveName(parsed.dynasty);
+    saveDynastySlot({ saveId, name, state: parsed, storage });
+    return { saveId };
+  } catch {
+    return { error: 'Failed to parse save file.' };
+  }
+}
+
 function parsePersistedSave(raw: string): PersistedDynastySave | null {
   try {
     const parsed = JSON.parse(raw) as Partial<PersistedDynastySave>;
     if (parsed.version !== DYNASTY_SAVE_VERSION || !parsed.dynasty) {
       return null;
+    }
+    // Migrate old 2-bracket tournament format to new conferenceBrackets array
+    if (parsed.tournament && !('conferenceBrackets' in parsed.tournament)) {
+      parsed.tournament = null;
     }
     if (!parsed.dynasty.portalEntries) {
       parsed.dynasty = { ...parsed.dynasty, portalEntries: [] };

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { DynastySaveMetadata } from '../persistence';
 import type { DynastyTeamChoice } from '../dynasty-factory';
 
@@ -11,6 +12,9 @@ export function StartScreen({
   onCreateDynasty,
   onLoadSave,
   onDeleteSave,
+  onContinue,
+  onExportSave,
+  onImportSave,
 }: {
   saves: DynastySaveMetadata[];
   teamChoices: DynastyTeamChoice[];
@@ -21,8 +25,25 @@ export function StartScreen({
   onCreateDynasty: () => void;
   onLoadSave: (saveId: string) => void;
   onDeleteSave: (saveId: string) => void;
+  onContinue?: () => void;
+  onExportSave?: (saveId: string) => void;
+  onImportSave?: (json: string) => void;
 }) {
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !onImportSave) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result;
+      if (typeof text === 'string') onImportSave(text);
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be re-selected
+    event.target.value = '';
+  };
 
   return (
     <main className="start-screen" aria-label="Dynasty start screen">
@@ -32,6 +53,11 @@ export function StartScreen({
         <p className="dim">
           Load an existing career or start a new dynasty with a fresh recruiting universe.
         </p>
+        {onContinue && (
+          <button type="button" className="primary-action continue-btn" onClick={onContinue}>
+            Continue
+          </button>
+        )}
       </section>
 
       <section className="start-grid">
@@ -96,6 +122,16 @@ export function StartScreen({
                     >
                       Load
                     </button>
+                    {onExportSave && (
+                      <button
+                        type="button"
+                        className="save-slot-action export"
+                        aria-label={`Export ${save.name}`}
+                        onClick={() => onExportSave(save.saveId)}
+                      >
+                        Export
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="save-slot-action delete"
@@ -107,6 +143,26 @@ export function StartScreen({
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {onImportSave && (
+            <div className="import-save-row">
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".json,application/json"
+                style={{ display: 'none' }}
+                onChange={handleImportFile}
+                aria-label="Import save file"
+              />
+              <button
+                type="button"
+                className="save-slot-action import"
+                onClick={() => importInputRef.current?.click()}
+              >
+                Import Save from File
+              </button>
             </div>
           )}
         </article>
