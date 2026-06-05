@@ -32,7 +32,7 @@ describe('multi-season dynasty rollover', () => {
       dynasty = simFullSeason(dynasty);
 
       expect(dynasty.season.schedule.every((g) => g.status === 'final')).toBe(true);
-      expect(dynasty.season.standings).toHaveLength(8);
+      expect(dynasty.season.standings).toHaveLength(16);
 
       const { newDynasty } = runOffseason(dynasty);
       dynasty = newDynasty;

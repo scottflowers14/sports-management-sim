@@ -153,6 +153,94 @@ const TEAM_OVERRIDES: Record<string, TeamOverride> = {
     fanSupport: 68,
     recentSuccess: 63,
   },
+  'ohio-summit': {
+    name: 'Ohio Summit',
+    regionId: 'ohio-valley',
+    conferenceId: 'b10',
+    nationalPrestige: 65,
+    academicPrestige: 72,
+    coachingPrestige: 63,
+    facilities: 67,
+    fanSupport: 62,
+    recentSuccess: 58,
+  },
+  'michigan-bay': {
+    name: 'Michigan Bay',
+    regionId: 'great-lakes',
+    conferenceId: 'b10',
+    nationalPrestige: 68,
+    academicPrestige: 74,
+    coachingPrestige: 66,
+    facilities: 70,
+    fanSupport: 65,
+    recentSuccess: 62,
+  },
+  'penn-grove': {
+    name: 'Penn Grove',
+    regionId: 'mid-atlantic',
+    conferenceId: 'b10',
+    nationalPrestige: 62,
+    academicPrestige: 76,
+    coachingPrestige: 60,
+    facilities: 64,
+    fanSupport: 58,
+    recentSuccess: 55,
+  },
+  'illinois-central': {
+    name: 'Illinois Central',
+    regionId: 'midwest',
+    conferenceId: 'b10',
+    nationalPrestige: 58,
+    academicPrestige: 70,
+    coachingPrestige: 56,
+    facilities: 60,
+    fanSupport: 55,
+    recentSuccess: 50,
+  },
+  'california-coast': {
+    name: 'California Coast',
+    regionId: 'california',
+    conferenceId: 'pac',
+    nationalPrestige: 55,
+    academicPrestige: 68,
+    coachingPrestige: 54,
+    facilities: 58,
+    fanSupport: 52,
+    recentSuccess: 48,
+  },
+  'denver-ridge': {
+    name: 'Denver Ridge',
+    regionId: 'rocky-mountain',
+    conferenceId: 'pac',
+    nationalPrestige: 60,
+    academicPrestige: 65,
+    coachingPrestige: 58,
+    facilities: 62,
+    fanSupport: 56,
+    recentSuccess: 52,
+  },
+  'utah-canyon': {
+    name: 'Utah Canyon',
+    regionId: 'rocky-mountain',
+    conferenceId: 'pac',
+    nationalPrestige: 52,
+    academicPrestige: 62,
+    coachingPrestige: 50,
+    facilities: 54,
+    fanSupport: 48,
+    recentSuccess: 44,
+  },
+  'oregon-cascade': {
+    name: 'Oregon Cascade',
+    regionId: 'pacific-northwest',
+    conferenceId: 'pac',
+    nationalPrestige: 50,
+    academicPrestige: 64,
+    coachingPrestige: 48,
+    facilities: 52,
+    fanSupport: 46,
+    recentSuccess: 42,
+  },
 };
 
 function makeTeamWithOverride(id: string): LacrosseTeam {
@@ -182,9 +270,13 @@ function makeTeamWithOverride(id: string): LacrosseTeam {
 export function createLacrosseSeasonSchedule(seasonYear: number): ScheduledGame[] {
   const accIds = ['maryland-state', 'virginia-lakes', 'long-island-tech', 'georgetown-prep'];
   const necIds = ['new-england-college', 'colorado-front-range', 'syracuse-heights', 'penn-state-valley'];
+  const b10Ids = ['ohio-summit', 'michigan-bay', 'penn-grove', 'illinois-central'];
+  const pacIds = ['california-coast', 'denver-ridge', 'utah-canyon', 'oregon-cascade'];
   const accSchedule = createRoundRobinSchedule(accIds, seasonYear, { conferenceGame: true, startWeek: 1 });
   const necSchedule = createRoundRobinSchedule(necIds, seasonYear, { conferenceGame: true, startWeek: 1 });
-  return [...accSchedule, ...necSchedule, ...createCrossConferenceSchedule(seasonYear)];
+  const b10Schedule = createRoundRobinSchedule(b10Ids, seasonYear, { conferenceGame: true, startWeek: 1 });
+  const pacSchedule = createRoundRobinSchedule(pacIds, seasonYear, { conferenceGame: true, startWeek: 1 });
+  return [...accSchedule, ...necSchedule, ...b10Schedule, ...pacSchedule, ...createCrossConferenceSchedule(seasonYear)];
 }
 
 export function createNewLacrosseDynasty({
@@ -204,8 +296,10 @@ export function createNewLacrosseDynasty({
 
   const accIds = ['maryland-state', 'virginia-lakes', 'long-island-tech', 'georgetown-prep'];
   const necIds = ['new-england-college', 'colorado-front-range', 'syracuse-heights', 'penn-state-valley'];
+  const b10Ids = ['ohio-summit', 'michigan-bay', 'penn-grove', 'illinois-central'];
+  const pacIds = ['california-coast', 'denver-ridge', 'utah-canyon', 'oregon-cascade'];
   const schedule = createLacrosseSeasonSchedule(seasonYear);
-  const conferences = createConferences(accIds, necIds);
+  const conferences = createConferences(accIds, necIds, b10Ids, pacIds);
   const regions = createRegions();
 
   return {
@@ -467,19 +561,39 @@ function createInitialTeams(): LacrosseTeam[] {
     makeTeamWithOverride('colorado-front-range'),
     makeTeamWithOverride('syracuse-heights'),
     makeTeamWithOverride('penn-state-valley'),
+    makeTeamWithOverride('ohio-summit'),
+    makeTeamWithOverride('michigan-bay'),
+    makeTeamWithOverride('penn-grove'),
+    makeTeamWithOverride('illinois-central'),
+    makeTeamWithOverride('california-coast'),
+    makeTeamWithOverride('denver-ridge'),
+    makeTeamWithOverride('utah-canyon'),
+    makeTeamWithOverride('oregon-cascade'),
   ];
 }
 
 function createCrossConferenceSchedule(seasonYear: number): ScheduledGame[] {
   const matchups: Array<{ week: number; homeTeamId: string; awayTeamId: string }> = [
+    // ACC vs NEC (weeks 7-10)
     { week: 7, homeTeamId: 'maryland-state', awayTeamId: 'new-england-college' },
     { week: 8, homeTeamId: 'virginia-lakes', awayTeamId: 'colorado-front-range' },
     { week: 9, homeTeamId: 'long-island-tech', awayTeamId: 'syracuse-heights' },
     { week: 10, homeTeamId: 'georgetown-prep', awayTeamId: 'penn-state-valley' },
-    { week: 11, homeTeamId: 'new-england-college', awayTeamId: 'long-island-tech' },
-    { week: 12, homeTeamId: 'colorado-front-range', awayTeamId: 'maryland-state' },
-    { week: 13, homeTeamId: 'syracuse-heights', awayTeamId: 'georgetown-prep' },
-    { week: 14, homeTeamId: 'penn-state-valley', awayTeamId: 'virginia-lakes' },
+    // B10 vs PAC (weeks 7-10)
+    { week: 7, homeTeamId: 'ohio-summit', awayTeamId: 'california-coast' },
+    { week: 8, homeTeamId: 'michigan-bay', awayTeamId: 'denver-ridge' },
+    { week: 9, homeTeamId: 'penn-grove', awayTeamId: 'utah-canyon' },
+    { week: 10, homeTeamId: 'illinois-central', awayTeamId: 'oregon-cascade' },
+    // ACC vs B10 (weeks 11-14)
+    { week: 11, homeTeamId: 'maryland-state', awayTeamId: 'ohio-summit' },
+    { week: 12, homeTeamId: 'virginia-lakes', awayTeamId: 'michigan-bay' },
+    { week: 13, homeTeamId: 'long-island-tech', awayTeamId: 'penn-grove' },
+    { week: 14, homeTeamId: 'georgetown-prep', awayTeamId: 'illinois-central' },
+    // NEC vs PAC (weeks 11-14)
+    { week: 11, homeTeamId: 'new-england-college', awayTeamId: 'california-coast' },
+    { week: 12, homeTeamId: 'colorado-front-range', awayTeamId: 'denver-ridge' },
+    { week: 13, homeTeamId: 'syracuse-heights', awayTeamId: 'utah-canyon' },
+    { week: 14, homeTeamId: 'penn-state-valley', awayTeamId: 'oregon-cascade' },
   ];
 
   return matchups.map(({ week, homeTeamId, awayTeamId }) => ({
@@ -493,7 +607,7 @@ function createCrossConferenceSchedule(seasonYear: number): ScheduledGame[] {
   }));
 }
 
-function createConferences(accIds: string[], necIds: string[]): Conference[] {
+function createConferences(accIds: string[], necIds: string[], b10Ids: string[], pacIds: string[]): Conference[] {
   return [
     {
       id: 'acc',
@@ -510,6 +624,22 @@ function createConferences(accIds: string[], necIds: string[]): Conference[] {
       teamIds: necIds,
       prestige: 70,
       regionIds: ['new-england', 'colorado', 'upstate-ny', 'mid-atlantic'],
+    },
+    {
+      id: 'b10',
+      name: 'Midwest Lacrosse Conference',
+      shortName: 'MLC',
+      teamIds: b10Ids,
+      prestige: 62,
+      regionIds: ['ohio-valley', 'great-lakes', 'midwest', 'mid-atlantic'],
+    },
+    {
+      id: 'pac',
+      name: 'Western Lacrosse Conference',
+      shortName: 'WLC',
+      teamIds: pacIds,
+      prestige: 55,
+      regionIds: ['california', 'rocky-mountain', 'pacific-northwest'],
     },
   ];
 }
@@ -530,7 +660,12 @@ function createRegions(): Region[] {
     { id: 'new-england', name: 'New England', country: 'USA', recruitingHotbedScore: 82 },
     { id: 'colorado', name: 'Colorado', country: 'USA', state: 'CO', recruitingHotbedScore: 76 },
     { id: 'southeast', name: 'Southeast', country: 'USA', recruitingHotbedScore: 58 },
-    { id: 'midwest', name: 'Midwest', country: 'USA', recruitingHotbedScore: 52 },
+    { id: 'midwest', name: 'Midwest', country: 'USA', recruitingHotbedScore: 55 },
     { id: 'west', name: 'West', country: 'USA', recruitingHotbedScore: 45 },
+    { id: 'ohio-valley', name: 'Ohio Valley', country: 'USA', recruitingHotbedScore: 68 },
+    { id: 'great-lakes', name: 'Great Lakes', country: 'USA', recruitingHotbedScore: 65 },
+    { id: 'california', name: 'California', country: 'USA', state: 'CA', recruitingHotbedScore: 62 },
+    { id: 'rocky-mountain', name: 'Rocky Mountain', country: 'USA', recruitingHotbedScore: 58 },
+    { id: 'pacific-northwest', name: 'Pacific Northwest', country: 'USA', recruitingHotbedScore: 50 },
   ];
 }

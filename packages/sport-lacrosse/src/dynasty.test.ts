@@ -18,17 +18,17 @@ describe('createNewLacrosseDynasty', () => {
     expect(dynasty.userTeamId).toBe('maryland-state');
     expect(dynasty.season.year).toBe(2028);
     expect(dynasty.season.phase).toBe('regular_season');
-    expect(dynasty.season.teams).toHaveLength(8);
+    expect(dynasty.season.teams).toHaveLength(16);
     expect(dynasty.recruits).toHaveLength(80);
     expect(dynasty.recruitBoard.length).toBeGreaterThan(0);
     expect(dynasty.recruitBoard[0]?.recruit.id).toBeDefined();
   });
 
-  it('creates valid lacrosse rosters and a complete schedule with 20 games across two conferences', () => {
+  it('creates valid lacrosse rosters and a complete schedule with 40 games across four conferences', () => {
     const dynasty = createNewLacrosseDynasty({ seed: 99, userTeamId: 'maryland-state', seasonYear: 2028 });
 
     expect(dynasty.season.teams.every((team) => validateLacrosseRoster(team).ok)).toBe(true);
-    expect(dynasty.season.schedule).toHaveLength(20);
+    expect(dynasty.season.schedule).toHaveLength(40);
     expect(dynasty.season.schedule.every((game) => game.status === 'scheduled')).toBe(true);
     expect(dynasty.season.currentWeek).toBe(1);
   });
@@ -86,15 +86,15 @@ describe('advanceLacrosseDynastyWeek', () => {
     expect(advanced).not.toBe(dynasty);
     expect(advanced.season).not.toBe(dynasty.season);
     expect(advanced.season.currentWeek).toBe(2);
-    expect(advanced.season.schedule.filter((game) => game.week === 1)).toHaveLength(2);
-    expect(advanced.season.schedule.filter((game) => game.week === 1 && game.status === 'final')).toHaveLength(2);
-    expect(dynasty.season.schedule.filter((game) => game.week === 1 && game.status === 'scheduled')).toHaveLength(2);
-    expect(advanced.season.standings).toHaveLength(8);
+    expect(advanced.season.schedule.filter((game) => game.week === 1)).toHaveLength(4);
+    expect(advanced.season.schedule.filter((game) => game.week === 1 && game.status === 'final')).toHaveLength(4);
+    expect(dynasty.season.schedule.filter((game) => game.week === 1 && game.status === 'scheduled')).toHaveLength(4);
+    expect(advanced.season.standings).toHaveLength(16);
 
     const totalWins = advanced.season.teams.reduce((sum, team) => sum + team.record.wins, 0);
     const totalLosses = advanced.season.teams.reduce((sum, team) => sum + team.record.losses, 0);
-    expect(totalWins).toBe(2);
-    expect(totalLosses).toBe(2);
+    expect(totalWins).toBe(4);
+    expect(totalLosses).toBe(4);
   });
 
   it('marks the season complete after the final scheduled week is simulated', () => {
