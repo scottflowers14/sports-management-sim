@@ -8,6 +8,8 @@
     "apps/*"
   ],
   "scripts": {
+    "build": "npm run build -w packages/engine-core -w packages/sport-lacrosse",
+    "dev": "npm run build && npm run dev -w apps/desktop",
     "test": "vitest run",
     "typecheck": "tsc -b"
   },
