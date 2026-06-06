@@ -274,7 +274,7 @@ export function runOffseason(
     ...season,
     year: newYear,
     teams: teamsAfterOffseason,
-    schedule: createLacrosseSeasonSchedule(newYear),
+    schedule: createLacrosseSeasonSchedule(newYear, season.conferences),
     standings: [],
     currentWeek: 1,
     phase: 'regular_season',

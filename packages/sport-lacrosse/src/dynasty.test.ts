@@ -101,7 +101,8 @@ describe('advanceLacrosseDynastyWeek', () => {
     const dynasty = createNewLacrosseDynasty({ seed: 2028, userTeamId: 'maryland-state', seasonYear: 2028 });
 
     let completed = dynasty;
-    for (let week = 1; week <= 14; week += 1) {
+    // Season runs conf games (weeks 1-6) plus cross-conf games (weeks 7-22).
+    for (let week = 1; week <= 22; week += 1) {
       completed = advanceLacrosseDynastyWeek(completed);
     }
 

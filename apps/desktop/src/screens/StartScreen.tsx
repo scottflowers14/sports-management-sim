@@ -15,6 +15,10 @@ export function StartScreen({
   onContinue,
   onExportSave,
   onImportSave,
+  onExportTeamsTemplate,
+  onImportTeams,
+  onClearCustomTeams,
+  hasCustomTeams,
   saveStatus,
 }: {
   saves: DynastySaveMetadata[];
@@ -29,10 +33,15 @@ export function StartScreen({
   onContinue?: () => void;
   onExportSave?: (saveId: string) => void;
   onImportSave?: (json: string) => void;
+  onExportTeamsTemplate?: () => void;
+  onImportTeams?: (json: string) => void;
+  onClearCustomTeams?: (() => void) | undefined;
+  hasCustomTeams?: boolean | undefined;
   saveStatus?: string;
 }) {
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
   const importInputRef = useRef<HTMLInputElement>(null);
+  const teamsInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -43,7 +52,18 @@ export function StartScreen({
       if (typeof text === 'string') onImportSave(text);
     };
     reader.readAsText(file);
-    // Reset input so the same file can be re-selected
+    event.target.value = '';
+  };
+
+  const handleTeamsFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !onImportTeams) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result;
+      if (typeof text === 'string') onImportTeams(text);
+    };
+    reader.readAsText(file);
     event.target.value = '';
   };
 
@@ -148,8 +168,6 @@ export function StartScreen({
             </div>
           )}
 
-          {saveStatus && <p className="save-status-msg dim">{saveStatus}</p>}
-
           {onImportSave && (
             <div className="import-save-row">
               <input
@@ -170,6 +188,50 @@ export function StartScreen({
             </div>
           )}
         </article>
+      </section>
+
+      <section className="card teams-config-card" aria-label="Custom teams configuration">
+        <p className="eyebrow">Custom Teams</p>
+        <h2>Schools &amp; Conferences</h2>
+        {hasCustomTeams ? (
+          <p className="dim">Custom teams are active. New dynasties will use your imported schools.</p>
+        ) : (
+          <p className="dim">
+            Export the default schools as a JSON template, edit it to add your own programs, then import it before starting a new dynasty.
+          </p>
+        )}
+        <div className="teams-config-actions">
+          {onExportTeamsTemplate && (
+            <button type="button" className="save-slot-action export" onClick={onExportTeamsTemplate}>
+              Export Teams Template
+            </button>
+          )}
+          {onImportTeams && (
+            <>
+              <input
+                ref={teamsInputRef}
+                type="file"
+                accept=".json,application/json"
+                style={{ display: 'none' }}
+                onChange={handleTeamsFile}
+                aria-label="Import custom teams file"
+              />
+              <button
+                type="button"
+                className="save-slot-action import"
+                onClick={() => teamsInputRef.current?.click()}
+              >
+                Import Custom Teams
+              </button>
+            </>
+          )}
+          {onClearCustomTeams && (
+            <button type="button" className="save-slot-action delete" onClick={onClearCustomTeams}>
+              Restore Defaults
+            </button>
+          )}
+        </div>
+        {saveStatus && <p className="save-status-msg dim">{saveStatus}</p>}
       </section>
     </main>
   );

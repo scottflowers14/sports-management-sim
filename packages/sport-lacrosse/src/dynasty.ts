@@ -41,6 +41,86 @@ export interface CreateNewLacrosseDynastyOptions {
   seed: number;
   userTeamId: string;
   seasonYear: number;
+  customTeams?: CustomTeamsFile;
+}
+
+// ── Custom teams config (import/export schema) ────────────────────────────────
+
+export interface CustomTeamDefinition {
+  id: string;
+  name: string;
+  conferenceId: string;
+  regionId: string;
+  nationalPrestige: number;
+  academicPrestige: number;
+  coachingPrestige: number;
+  facilities: number;
+  fanSupport: number;
+  recentSuccess: number;
+}
+
+export interface CustomConferenceDefinition {
+  id: string;
+  name: string;
+  shortName: string;
+  prestige: number;
+}
+
+export interface CustomRegionDefinition {
+  id: string;
+  name: string;
+  recruitingHotbedScore: number;
+}
+
+export interface CustomTeamsFile {
+  version: 1;
+  teams: CustomTeamDefinition[];
+  conferences: CustomConferenceDefinition[];
+  regions?: CustomRegionDefinition[];
+}
+
+export type CustomTeamsValidationError =
+  | { type: 'bad_version' }
+  | { type: 'missing_teams' }
+  | { type: 'missing_conferences' }
+  | { type: 'duplicate_team_id'; id: string }
+  | { type: 'unknown_conference'; teamId: string; conferenceId: string }
+  | { type: 'conference_too_small'; conferenceId: string; count: number };
+
+export function validateCustomTeamsFile(
+  raw: unknown,
+): { ok: true; value: CustomTeamsFile } | { ok: false; errors: CustomTeamsValidationError[] } {
+  const errors: CustomTeamsValidationError[] = [];
+  if (typeof raw !== 'object' || raw === null) {
+    return { ok: false, errors: [{ type: 'bad_version' }] };
+  }
+  const obj = raw as Record<string, unknown>;
+  if (obj['version'] !== 1) errors.push({ type: 'bad_version' });
+  if (!Array.isArray(obj['teams']) || obj['teams'].length === 0) errors.push({ type: 'missing_teams' });
+  if (!Array.isArray(obj['conferences']) || obj['conferences'].length === 0) errors.push({ type: 'missing_conferences' });
+  if (errors.length > 0) return { ok: false, errors };
+
+  const teams = obj['teams'] as CustomTeamDefinition[];
+  const conferences = obj['conferences'] as CustomConferenceDefinition[];
+  const confIds = new Set(conferences.map((c) => c.id));
+  const seenIds = new Set<string>();
+
+  for (const t of teams) {
+    if (seenIds.has(t.id)) errors.push({ type: 'duplicate_team_id', id: t.id });
+    seenIds.add(t.id);
+    if (!confIds.has(t.conferenceId)) errors.push({ type: 'unknown_conference', teamId: t.id, conferenceId: t.conferenceId });
+  }
+
+  for (const conf of conferences) {
+    const count = teams.filter((t) => t.conferenceId === conf.id).length;
+    if (count < 4) errors.push({ type: 'conference_too_small', conferenceId: conf.id, count });
+  }
+
+  if (errors.length > 0) return { ok: false, errors };
+
+  const result: CustomTeamsFile = { version: 1, teams, conferences };
+  if (Array.isArray(obj['regions'])) result.regions = obj['regions'] as CustomRegionDefinition[];
+  return { ok: true, value: result };
 }
 
 export const DEFAULT_LACROSSE_ROSTER_TARGETS: Record<LacrossePosition, number> = {
@@ -267,24 +347,24 @@ function makeTeamWithOverride(id: string): LacrosseTeam {
   };
 }
 
-export function createLacrosseSeasonSchedule(seasonYear: number): ScheduledGame[] {
-  const accIds = ['maryland-state', 'virginia-lakes', 'long-island-tech', 'georgetown-prep'];
-  const necIds = ['new-england-college', 'colorado-front-range', 'syracuse-heights', 'penn-state-valley'];
-  const b10Ids = ['ohio-summit', 'michigan-bay', 'penn-grove', 'illinois-central'];
-  const pacIds = ['california-coast', 'denver-ridge', 'utah-canyon', 'oregon-cascade'];
-  const accSchedule = createRoundRobinSchedule(accIds, seasonYear, { conferenceGame: true, startWeek: 1 });
-  const necSchedule = createRoundRobinSchedule(necIds, seasonYear, { conferenceGame: true, startWeek: 1 });
-  const b10Schedule = createRoundRobinSchedule(b10Ids, seasonYear, { conferenceGame: true, startWeek: 1 });
-  const pacSchedule = createRoundRobinSchedule(pacIds, seasonYear, { conferenceGame: true, startWeek: 1 });
-  return [...accSchedule, ...necSchedule, ...b10Schedule, ...pacSchedule, ...createCrossConferenceSchedule(seasonYear)];
+export function createLacrosseSeasonSchedule(
+  seasonYear: number,
+  conferences: Array<{ id: string; teamIds: string[] }>,
+): ScheduledGame[] {
+  const confSchedules = conferences.flatMap((conf) =>
+    createRoundRobinSchedule(conf.teamIds, seasonYear, { conferenceGame: true, startWeek: 1 }),
+  );
+  const crossConf = createAutoCrossConferenceSchedule(seasonYear, conferences);
+  return [...confSchedules, ...crossConf];
 }
 
 export function createNewLacrosseDynasty({
   seed,
   userTeamId,
   seasonYear,
+  customTeams,
 }: CreateNewLacrosseDynastyOptions): LacrosseDynastyState {
-  const teams = createInitialTeams();
+  const teams = customTeams ? buildTeamsFromConfig(customTeams) : createInitialTeams();
   const userTeam = teams.find((team) => team.id === userTeamId);
 
   if (userTeam === undefined) {
@@ -294,13 +374,9 @@ export function createNewLacrosseDynasty({
   const recruits = generateLacrosseRecruitingClass({ count: 80, seed });
   const recruitBoard = sortRecruitBoardForTeam(userTeam, openRecruits(recruits), DEFAULT_LACROSSE_ROSTER_TARGETS);
 
-  const accIds = ['maryland-state', 'virginia-lakes', 'long-island-tech', 'georgetown-prep'];
-  const necIds = ['new-england-college', 'colorado-front-range', 'syracuse-heights', 'penn-state-valley'];
-  const b10Ids = ['ohio-summit', 'michigan-bay', 'penn-grove', 'illinois-central'];
-  const pacIds = ['california-coast', 'denver-ridge', 'utah-canyon', 'oregon-cascade'];
-  const schedule = createLacrosseSeasonSchedule(seasonYear);
-  const conferences = createConferences(accIds, necIds, b10Ids, pacIds);
-  const regions = createRegions();
+  const conferences = customTeams ? buildConferencesFromConfig(customTeams, teams) : createDefaultConferences();
+  const regions = customTeams ? buildRegionsFromConfig(customTeams) : createRegions();
+  const schedule = createLacrosseSeasonSchedule(seasonYear, conferences);
 
   return {
     id: `lacrosse-dynasty-${seed}`,
@@ -572,76 +648,95 @@ function createInitialTeams(): LacrosseTeam[] {
   ];
 }
 
-function createCrossConferenceSchedule(seasonYear: number): ScheduledGame[] {
-  const matchups: Array<{ week: number; homeTeamId: string; awayTeamId: string }> = [
-    // ACC vs NEC (weeks 7-10)
-    { week: 7, homeTeamId: 'maryland-state', awayTeamId: 'new-england-college' },
-    { week: 8, homeTeamId: 'virginia-lakes', awayTeamId: 'colorado-front-range' },
-    { week: 9, homeTeamId: 'long-island-tech', awayTeamId: 'syracuse-heights' },
-    { week: 10, homeTeamId: 'georgetown-prep', awayTeamId: 'penn-state-valley' },
-    // B10 vs PAC (weeks 7-10)
-    { week: 7, homeTeamId: 'ohio-summit', awayTeamId: 'california-coast' },
-    { week: 8, homeTeamId: 'michigan-bay', awayTeamId: 'denver-ridge' },
-    { week: 9, homeTeamId: 'penn-grove', awayTeamId: 'utah-canyon' },
-    { week: 10, homeTeamId: 'illinois-central', awayTeamId: 'oregon-cascade' },
-    // ACC vs B10 (weeks 11-14)
-    { week: 11, homeTeamId: 'maryland-state', awayTeamId: 'ohio-summit' },
-    { week: 12, homeTeamId: 'virginia-lakes', awayTeamId: 'michigan-bay' },
-    { week: 13, homeTeamId: 'long-island-tech', awayTeamId: 'penn-grove' },
-    { week: 14, homeTeamId: 'georgetown-prep', awayTeamId: 'illinois-central' },
-    // NEC vs PAC (weeks 11-14)
-    { week: 11, homeTeamId: 'new-england-college', awayTeamId: 'california-coast' },
-    { week: 12, homeTeamId: 'colorado-front-range', awayTeamId: 'denver-ridge' },
-    { week: 13, homeTeamId: 'syracuse-heights', awayTeamId: 'utah-canyon' },
-    { week: 14, homeTeamId: 'penn-state-valley', awayTeamId: 'oregon-cascade' },
-  ];
+// Auto-generates cross-conference games: each conference plays one game against
+// the "next" conference (circular), matched by team index within each conference.
+function createAutoCrossConferenceSchedule(
+  seasonYear: number,
+  conferences: Array<{ id: string; teamIds: string[] }>,
+  startWeek = 7,
+): ScheduledGame[] {
+  const games: ScheduledGame[] = [];
+  let weekNum = startWeek;
+  const n = conferences.length;
 
-  return matchups.map(({ week, homeTeamId, awayTeamId }) => ({
-    id: `${seasonYear}-week-${week}-${homeTeamId}-vs-${awayTeamId}`,
-    seasonYear,
-    week,
-    homeTeamId,
-    awayTeamId,
-    conferenceGame: false,
-    status: 'scheduled',
+  for (let i = 0; i < n; i++) {
+    const confA = conferences[i]!;
+    const confB = conferences[(i + 1) % n]!;
+    for (let k = 0; k < confA.teamIds.length; k++) {
+      const homeId = confA.teamIds[k];
+      const awayId = confB.teamIds[k % confB.teamIds.length];
+      if (homeId && awayId) {
+        games.push({
+          id: `${seasonYear}-week-${weekNum}-${homeId}-vs-${awayId}`,
+          seasonYear,
+          week: weekNum,
+          homeTeamId: homeId,
+          awayTeamId: awayId,
+          conferenceGame: false,
+          status: 'scheduled',
+        });
+        weekNum++;
+      }
+    }
+  }
+
+  return games;
+}
+
+function createDefaultConferences(): Conference[] {
+  const accIds = ['maryland-state', 'virginia-lakes', 'long-island-tech', 'georgetown-prep'];
+  const necIds = ['new-england-college', 'colorado-front-range', 'syracuse-heights', 'penn-state-valley'];
+  const b10Ids = ['ohio-summit', 'michigan-bay', 'penn-grove', 'illinois-central'];
+  const pacIds = ['california-coast', 'denver-ridge', 'utah-canyon', 'oregon-cascade'];
+  return [
+    { id: 'acc', name: 'Atlantic Coast Conference', shortName: 'ACC', teamIds: accIds, prestige: 80, regionIds: ['mid-atlantic', 'long-island'] },
+    { id: 'nec', name: 'Northeast Conference', shortName: 'NEC', teamIds: necIds, prestige: 70, regionIds: ['new-england', 'colorado', 'upstate-ny', 'mid-atlantic'] },
+    { id: 'b10', name: 'Midwest Lacrosse Conference', shortName: 'MLC', teamIds: b10Ids, prestige: 62, regionIds: ['ohio-valley', 'great-lakes', 'midwest', 'mid-atlantic'] },
+    { id: 'pac', name: 'Western Lacrosse Conference', shortName: 'WLC', teamIds: pacIds, prestige: 55, regionIds: ['california', 'rocky-mountain', 'pacific-northwest'] },
+  ];
+}
+
+function buildConferencesFromConfig(config: CustomTeamsFile, teams: LacrosseTeam[]): Conference[] {
+  return config.conferences.map((conf) => ({
+    id: conf.id,
+    name: conf.name,
+    shortName: conf.shortName,
+    teamIds: teams.filter((t) => t.conferenceId === conf.id).map((t) => t.id),
+    prestige: conf.prestige,
+    regionIds: [...new Set(teams.filter((t) => t.conferenceId === conf.id).map((t) => t.regionId))],
   }));
 }
 
-function createConferences(accIds: string[], necIds: string[], b10Ids: string[], pacIds: string[]): Conference[] {
-  return [
-    {
-      id: 'acc',
-      name: 'Atlantic Coast Conference',
-      shortName: 'ACC',
-      teamIds: accIds,
-      prestige: 80,
-      regionIds: ['mid-atlantic', 'long-island'],
-    },
-    {
-      id: 'nec',
-      name: 'Northeast Conference',
-      shortName: 'NEC',
-      teamIds: necIds,
-      prestige: 70,
-      regionIds: ['new-england', 'colorado', 'upstate-ny', 'mid-atlantic'],
-    },
-    {
-      id: 'b10',
-      name: 'Midwest Lacrosse Conference',
-      shortName: 'MLC',
-      teamIds: b10Ids,
-      prestige: 62,
-      regionIds: ['ohio-valley', 'great-lakes', 'midwest', 'mid-atlantic'],
-    },
-    {
-      id: 'pac',
-      name: 'Western Lacrosse Conference',
-      shortName: 'WLC',
-      teamIds: pacIds,
-      prestige: 55,
-      regionIds: ['california', 'rocky-mountain', 'pacific-northwest'],
-    },
-  ];
+function buildRegionsFromConfig(config: CustomTeamsFile): Region[] {
+  const defaults = createRegions();
+  const customIds = new Set((config.regions ?? []).map((r) => r.id));
+  const merged = defaults.filter((r) => !customIds.has(r.id));
+  for (const r of config.regions ?? []) {
+    merged.push({ id: r.id, name: r.name, country: 'USA', recruitingHotbedScore: r.recruitingHotbedScore });
+  }
+  return merged;
+}
+
+function buildTeamsFromConfig(config: CustomTeamsFile): LacrosseTeam[] {
+  return config.teams.map((def) => {
+    const base = makeLacrosseTeam(def.id);
+    return {
+      ...base,
+      name: def.name,
+      shortName: def.name,
+      schoolName: def.name,
+      regionId: def.regionId,
+      conferenceId: def.conferenceId,
+      reputation: {
+        nationalPrestige: def.nationalPrestige,
+        academicPrestige: def.academicPrestige,
+        coachingPrestige: def.coachingPrestige,
+        facilities: def.facilities,
+        fanSupport: def.fanSupport,
+        recentSuccess: def.recentSuccess,
+      },
+    };
+  });
 }
 
 function createSeededRandom(seed: number): () => number {

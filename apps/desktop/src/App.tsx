@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   advanceSeasonWeek,
   applyScholarshipOffer,
@@ -74,7 +74,16 @@ import {
   type DynastySaveMetadata,
   type DynastySaveState,
 } from './persistence';
-import { createFreshLacrosseDynasty, getLacrosseDynastyTeamChoices } from './dynasty-factory';
+import {
+  clearCustomTeamsConfig,
+  createFreshLacrosseDynasty,
+  exportDefaultTeamsConfigJson,
+  getLacrosseDynastyTeamChoices,
+  loadCustomTeamsConfig,
+  parseAndValidateCustomTeamsJson,
+  saveCustomTeamsConfig,
+} from './dynasty-factory';
+import type { CustomTeamsFile } from '@sports-management-sim/sport-lacrosse';
 import './App.css';
 
 type View =
@@ -94,7 +103,8 @@ export function App() {
   const [loadedSave] = useState(() => loadActiveDynastySave());
   const [activeSaveId, setActiveSaveId] = useState<string | null>(() => getActiveDynastySaveId());
   const [saves, setSaves] = useState<DynastySaveMetadata[]>(() => listDynastySaves());
-  const teamChoices = useState(() => getLacrosseDynastyTeamChoices())[0];
+  const [customTeams, setCustomTeams] = useState<CustomTeamsFile | null>(() => loadCustomTeamsConfig());
+  const teamChoices = useMemo(() => getLacrosseDynastyTeamChoices(customTeams ?? undefined), [customTeams]);
   const [selectedNewTeamId, setSelectedNewTeamId] = useState(() => teamChoices[0]?.id ?? 'maryland-state');
   const [dynasty, setDynasty] = useState<LacrosseDynastyState>(() => loadedSave?.dynasty ?? createFreshLacrosseDynasty());
   const [view, setView] = useState<View>('season');
@@ -172,7 +182,7 @@ export function App() {
   }, [activeSaveId, dynasty.seed, refreshSaves, saveState]);
 
   const startNewDynasty = useCallback(() => {
-    const nextDynasty = createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId });
+    const nextDynasty = createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId, ...(customTeams ? { customTeams } : {}) });
     const saveId = createDynastySaveId(nextDynasty.seed);
     const newCoach = createCoachProfile(selectedNewCoachName.trim() || generateCoachName(nextDynasty.seed));
     const userTeamForGoals = nextDynasty.season.teams.find((t) => t.id === selectedNewTeamId);
@@ -526,6 +536,36 @@ export function App() {
     }
   }, [refreshSaves]);
 
+  const handleExportTeamsTemplate = useCallback(() => {
+    const json = exportDefaultTeamsConfigJson();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'teams-template.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleImportTeams = useCallback((json: string) => {
+    const result = parseAndValidateCustomTeamsJson(json);
+    if (!result.ok) {
+      setSaveStatus(`Teams import failed: ${result.message}`);
+      return;
+    }
+    saveCustomTeamsConfig(result.value);
+    setCustomTeams(result.value);
+    setSelectedNewTeamId(result.value.teams[0]?.id ?? 'maryland-state');
+    setSaveStatus(`Custom teams loaded: ${result.value.teams.length} teams across ${result.value.conferences.length} conferences`);
+  }, []);
+
+  const handleClearCustomTeams = useCallback(() => {
+    clearCustomTeamsConfig();
+    setCustomTeams(null);
+    setSelectedNewTeamId('maryland-state');
+    setSaveStatus('Restored default teams');
+  }, []);
+
   if (screen === 'start') {
     return (
       <StartScreen
@@ -541,6 +581,10 @@ export function App() {
         {...(activeSaveId ? { onContinue: () => setScreen('game') } : {})}
         onExportSave={handleExportSave}
         onImportSave={handleImportSave}
+        onExportTeamsTemplate={handleExportTeamsTemplate}
+        onImportTeams={handleImportTeams}
+        onClearCustomTeams={customTeams ? handleClearCustomTeams : undefined}
+        hasCustomTeams={customTeams !== null}
         saveStatus={saveStatus}
       />
     );
