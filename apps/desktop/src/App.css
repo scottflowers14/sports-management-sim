@@ -2352,86 +2352,140 @@ li span {
 .start-screen {
   min-height: 100vh;
   padding: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .start-hero {
-  margin: 0 auto 24px;
+  margin: 0 auto;
   max-width: 1120px;
+  width: 100%;
+  position: relative;
+}
+
+.start-hero h1 {
+  font-size: clamp(2.4rem, 6vw, 5rem);
+  margin-top: 10px;
+  background: linear-gradient(135deg, #e6edf3 30%, #72f2c6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.start-hero .eyebrow {
+  font-size: 0.72rem;
+}
+
+.start-hero .dim {
+  margin-top: 10px;
+  font-size: 1rem;
+}
+
+.continue-btn {
+  margin-top: 20px;
+  font-size: 1rem;
+  padding: 14px 32px;
+  border-radius: 14px;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.continue-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
 }
 
 .start-grid {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
+  grid-template-columns: minmax(340px, 0.9fr) minmax(400px, 1.1fr);
   margin: 0 auto;
   max-width: 1120px;
+  width: 100%;
 }
 
 .new-dynasty-card,
 .load-dynasty-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .field-label {
-  color: #aab8ca;
-  font-size: 0.78rem;
+  color: #72b4c8;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  margin-bottom: -6px;
 }
 
 .new-dynasty-card select,
 .start-text-input {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   color: #e6edf3;
-  padding: 12px 14px;
+  padding: 11px 14px;
+  transition: border-color 0.15s;
+}
+
+.new-dynasty-card select:focus,
+.start-text-input:focus {
+  border-color: rgba(114, 242, 198, 0.5);
+  outline: none;
+}
+
+.new-dynasty-card select option {
+  background: #0e1a2f;
 }
 
 .start-text-input {
   width: 100%;
   box-sizing: border-box;
-  outline: none;
-}
-
-.start-text-input:focus {
-  border-color: rgba(114, 242, 198, 0.5);
 }
 
 .primary-action {
-  background: linear-gradient(135deg, #72f2c6, #4da3ff);
+  background: linear-gradient(135deg, #72f2c6 0%, #4da3ff 100%);
   border: 0;
   border-radius: 14px;
   color: #07111f;
   cursor: pointer;
+  font-size: 0.95rem;
   font-weight: 900;
+  letter-spacing: 0.02em;
   padding: 13px 16px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.primary-action:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 .save-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .save-slot {
   align-items: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
   color: #e6edf3;
   display: flex;
-  gap: 16px;
+  gap: 12px;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 12px 16px;
   text-align: left;
+  transition: border-color 0.15s;
 }
 
 .save-slot:hover {
-  border-color: rgba(114, 242, 198, 0.3);
+  border-color: rgba(114, 242, 198, 0.25);
 }
 
 .save-slot strong,
@@ -2441,35 +2495,104 @@ li span {
 
 .save-slot small {
   color: #aab8ca;
-  margin-top: 4px;
+  font-size: 0.78rem;
+  margin-top: 3px;
 }
 
 .save-slot-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .save-slot-action {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
+  color: #aab8ca;
   cursor: pointer;
-  font-size: 0.74rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  padding: 8px 11px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  padding: 7px 12px;
   text-transform: uppercase;
-}
-
-.save-slot-action.load {
-  background: rgba(114, 242, 198, 0.16);
-  color: #72f2c6;
-}
-
-.save-slot-action.delete {
-  background: rgba(255, 96, 96, 0.12);
-  color: #ff9c9c;
+  transition: background 0.12s, color 0.12s, transform 0.1s;
+  white-space: nowrap;
 }
 
 .save-slot-action:hover {
   transform: translateY(-1px);
+}
+
+.save-slot-action.load {
+  background: rgba(114, 242, 198, 0.12);
+  border-color: rgba(114, 242, 198, 0.3);
+  color: #72f2c6;
+}
+
+.save-slot-action.load:hover {
+  background: rgba(114, 242, 198, 0.22);
+}
+
+.save-slot-action.export {
+  background: rgba(61, 127, 255, 0.1);
+  border-color: rgba(61, 127, 255, 0.3);
+  color: #8fb2ff;
+}
+
+.save-slot-action.export:hover {
+  background: rgba(61, 127, 255, 0.2);
+}
+
+.save-slot-action.import {
+  background: rgba(200, 130, 255, 0.1);
+  border-color: rgba(200, 130, 255, 0.3);
+  color: #c882ff;
+}
+
+.save-slot-action.import:hover {
+  background: rgba(200, 130, 255, 0.2);
+}
+
+.save-slot-action.delete {
+  background: rgba(242, 114, 114, 0.08);
+  border-color: rgba(242, 114, 114, 0.2);
+  color: #f28888;
+}
+
+.save-slot-action.delete:hover {
+  background: rgba(242, 114, 114, 0.18);
+}
+
+.import-save-row {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Custom teams card ────────────────────────────────────── */
+
+.teams-config-card {
+  margin: 0 auto;
+  max-width: 1120px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.teams-config-card h2 {
+  margin-bottom: 0;
+}
+
+.teams-config-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.save-status-msg {
+  font-size: 0.82rem;
+  margin-top: 2px;
 }
