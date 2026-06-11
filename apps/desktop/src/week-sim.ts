@@ -1,10 +1,12 @@
 import { advanceSeasonWeek, sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
 import {
   DEFAULT_GAME_PLAN,
+  deriveCpuGamePlan,
   simulateLacrosseGameWithLog,
   type GameLog,
   type LacrosseDynastyState,
   type LacrosseGamePlan,
+  type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, processInjuries } from './dynasty-helpers';
 import type { InjuredPlayer } from './dynasty-helpers';
@@ -42,13 +44,15 @@ export function simulateOneWeek(
   const teamMap = new Map(dynasty.season.teams.map((t) => [t.id, t.name]));
 
   const weekLogs = new Map<string, GameLog>();
+  const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
+    team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
   const newSeason = advanceSeasonWeek(dynasty.season, (game, homeTeam, awayTeam) => {
     const result = simulateLacrosseGameWithLog({
       homeTeam,
       awayTeam,
       random,
-      homeGamePlan: homeTeam.id === dynasty.userTeamId ? userGamePlan : DEFAULT_GAME_PLAN,
-      awayGamePlan: awayTeam.id === dynasty.userTeamId ? userGamePlan : DEFAULT_GAME_PLAN,
+      homeGamePlan: planFor(homeTeam),
+      awayGamePlan: planFor(awayTeam),
     });
     weekLogs.set(game.id, result.log);
     return result;
@@ -97,6 +101,9 @@ export function simulateOneWeek(
       })),
   ];
 
+  const newSeasonStats = updateSeasonStats(state.seasonStats, newSeason.schedule, newSeason.teams, weekToSim);
+  const playerOfWeekNews = buildPlayerOfWeekNews(weekToSim, state.seasonStats, newSeasonStats, newSeason.teams);
+
   const mergedLogs = new Map(state.gameLogs);
   for (const [id, log] of weekLogs) mergedLogs.set(id, log);
 
@@ -110,13 +117,52 @@ export function simulateOneWeek(
     dynasty: newDynasty,
     rankings: newRankings,
     injuries: newInjuries,
-    newsItems: [...weekNews, ...recruitNews, ...injuryNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
+    newsItems: [...playerOfWeekNews, ...weekNews, ...recruitNews, ...injuryNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
     scouting: advanceScoutingWeek(state.scouting),
-    seasonStats: updateSeasonStats(state.seasonStats, newSeason.schedule, newSeason.teams, weekToSim),
+    seasonStats: newSeasonStats,
     gameLogs: mergedLogs,
     bestNatRank,
     lastSimWeek: weekToSim,
   };
+}
+
+function buildPlayerOfWeekNews(
+  week: number,
+  previousStats: SeasonStatsMap,
+  newStats: SeasonStatsMap,
+  teams: LacrosseTeam[],
+): NewsItem[] {
+  let best: { playerId: string; score: number; goals: number; assists: number } | null = null;
+
+  for (const stats of Object.values(newStats)) {
+    const prev = previousStats[stats.playerId];
+    const goals = stats.goals - (prev?.goals ?? 0);
+    const assists = stats.assists - (prev?.assists ?? 0);
+    if (goals + assists <= 0) continue;
+    const score = goals * 2 + assists;
+    if (!best || score > best.score) {
+      best = { playerId: stats.playerId, score, goals, assists };
+    }
+  }
+
+  if (!best) return [];
+  const top = best;
+
+  for (const team of teams) {
+    const player = team.roster.find((p) => p.id === top.playerId);
+    if (player) {
+      return [
+        {
+          id: `potw-${week}`,
+          week,
+          category: 'award' as const,
+          headline: `Player of the Week: ${player.name.first} ${player.name.last} (${team.name}) — ${top.goals}G, ${top.assists}A`,
+        },
+      ];
+    }
+  }
+
+  return [];
 }
 
 export function simulateRemainingWeeks(

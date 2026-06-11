@@ -7,3 +7,4 @@ export * from './simulate-game';
 export * from './team-rating';
 export * from './depth-chart';
 export * from './game-plan';
+export * from './cpu-game-plan';

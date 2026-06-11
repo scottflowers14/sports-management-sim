@@ -199,7 +199,7 @@ function AwardsSection({ awards }: { awards: SeasonAwards }) {
             <div className="award-label">{label}</div>
             <div className="award-player">{winner.playerName}</div>
             <div className="award-detail">
-              {winner.position} · {formatTeamName(winner.teamName)} · {winner.overall} OVR
+              {winner.position} · {formatTeamName(winner.teamName)} · {winner.statLine ?? `${winner.overall} OVR`}
             </div>
           </div>
         ))}
@@ -210,7 +210,7 @@ function AwardsSection({ awards }: { awards: SeasonAwards }) {
           <table className="standings-table">
             <thead>
               <tr>
-                <th>Player</th><th>Pos</th><th>Team</th><th>OVR</th>
+                <th>Player</th><th>Pos</th><th>Team</th><th>Season</th>
               </tr>
             </thead>
             <tbody>
@@ -219,7 +219,7 @@ function AwardsSection({ awards }: { awards: SeasonAwards }) {
                   <td>{winner.playerName}</td>
                   <td>{winner.position}</td>
                   <td>{formatTeamName(winner.teamName)}</td>
-                  <td>{winner.overall}</td>
+                  <td>{winner.statLine ?? `${winner.overall} OVR`}</td>
                 </tr>
               ))}
             </tbody>
