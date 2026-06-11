@@ -14,6 +14,12 @@ import {
 } from '@sports-management-sim/engine-core';
 import type { LacrossePlayerTraits, LacrossePosition, LacrosseSeason, LacrosseTeam } from './models';
 import { generateLacrosseRecruitingClass, type LacrosseRecruit } from './recruit-generation';
+import {
+  buildRosterFromCustomPlayers,
+  generateLacrosseRoster,
+  rosterScholarshipsUsed,
+  type CustomPlayerDefinition,
+} from './roster-generation';
 import { makeLacrosseTeam } from './test-fixtures';
 import { simulateLacrosseGame } from './simulate-game';
 
@@ -57,6 +63,8 @@ export interface CustomTeamDefinition {
   facilities: number;
   fanSupport: number;
   recentSuccess: number;
+  /** Optional custom roster; omitted teams get a prestige-driven generated roster. */
+  roster?: CustomPlayerDefinition[];
 }
 
 export interface CustomConferenceDefinition {
@@ -85,7 +93,8 @@ export type CustomTeamsValidationError =
   | { type: 'missing_conferences' }
   | { type: 'duplicate_team_id'; id: string }
   | { type: 'unknown_conference'; teamId: string; conferenceId: string }
-  | { type: 'conference_too_small'; conferenceId: string; count: number };
+  | { type: 'conference_too_small'; conferenceId: string; count: number }
+  | { type: 'invalid_roster'; teamId: string; reason: string };
 
 export function validateCustomTeamsFile(
   raw: unknown,
@@ -109,6 +118,10 @@ export function validateCustomTeamsFile(
     if (seenIds.has(t.id)) errors.push({ type: 'duplicate_team_id', id: t.id });
     seenIds.add(t.id);
     if (!confIds.has(t.conferenceId)) errors.push({ type: 'unknown_conference', teamId: t.id, conferenceId: t.conferenceId });
+    if (t.roster !== undefined) {
+      const reason = validateCustomRoster(t.roster);
+      if (reason !== null) errors.push({ type: 'invalid_roster', teamId: t.id, reason });
+    }
   }
 
   for (const conf of conferences) {
@@ -121,6 +134,42 @@ export function validateCustomTeamsFile(
   const result: CustomTeamsFile = { version: 1, teams, conferences };
   if (Array.isArray(obj['regions'])) result.regions = obj['regions'] as CustomRegionDefinition[];
   return { ok: true, value: result };
+}
+
+const VALID_POSITIONS = new Set(['ATT', 'MID', 'DEF', 'GK', 'FOGO', 'LSM']);
+const VALID_CLASS_YEARS = new Set(['FR', 'SO', 'JR', 'SR']);
+
+function validateCustomRoster(roster: unknown): string | null {
+  if (!Array.isArray(roster)) return 'roster must be an array of players';
+  if (roster.length < 12) return `roster has ${roster.length} players; minimum 12 required`;
+  if (roster.length > 45) return `roster has ${roster.length} players; maximum 45 allowed`;
+
+  for (const [i, p] of roster.entries()) {
+    if (typeof p !== 'object' || p === null) return `player ${i + 1} is not an object`;
+    const player = p as Record<string, unknown>;
+    if (typeof player['firstName'] !== 'string' || typeof player['lastName'] !== 'string') {
+      return `player ${i + 1} needs firstName and lastName`;
+    }
+    if (!VALID_POSITIONS.has(player['position'] as string)) {
+      return `player ${i + 1} has invalid position "${String(player['position'])}"`;
+    }
+    if (!VALID_CLASS_YEARS.has(player['classYear'] as string)) {
+      return `player ${i + 1} has invalid classYear "${String(player['classYear'])}" (use FR/SO/JR/SR)`;
+    }
+    const overall = player['overall'];
+    if (typeof overall !== 'number' || overall < 1 || overall > 99) {
+      return `player ${i + 1} needs an overall rating between 1 and 99`;
+    }
+    const potential = player['potential'];
+    if (potential !== undefined && (typeof potential !== 'number' || potential < overall || potential > 99)) {
+      return `player ${i + 1} potential must be a number between overall and 99`;
+    }
+  }
+
+  const positions = roster.map((p) => (p as Record<string, unknown>)['position']);
+  if (!positions.includes('GK')) return 'roster needs at least one GK';
+  if (!positions.includes('FOGO')) return 'roster needs at least one FOGO';
+  return null;
 }
 
 export const DEFAULT_LACROSSE_ROSTER_TARGETS: Record<LacrossePosition, number> = {
@@ -323,9 +372,16 @@ const TEAM_OVERRIDES: Record<string, TeamOverride> = {
   },
 };
 
-function makeTeamWithOverride(id: string): LacrosseTeam {
-  const base = makeLacrosseTeam(id);
+function makeTeamWithOverride(id: string, seed: number, seasonYear: number): LacrosseTeam {
   const override = TEAM_OVERRIDES[id];
+  const prestige = override?.nationalPrestige ?? 60;
+  const roster = generateLacrosseRoster({
+    seed: seed + hashTeamId(id),
+    prestige,
+    createdSeason: seasonYear,
+  });
+  const base = makeLacrosseTeam(id, roster);
+  base.resources = { ...base.resources, scholarshipUsed: rosterScholarshipsUsed(roster) };
   if (override === undefined) {
     return base;
   }
@@ -347,6 +403,14 @@ function makeTeamWithOverride(id: string): LacrosseTeam {
   };
 }
 
+function hashTeamId(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
 export function createLacrosseSeasonSchedule(
   seasonYear: number,
   conferences: Array<{ id: string; teamIds: string[] }>,
@@ -364,7 +428,7 @@ export function createNewLacrosseDynasty({
   seasonYear,
   customTeams,
 }: CreateNewLacrosseDynastyOptions): LacrosseDynastyState {
-  const teams = customTeams ? buildTeamsFromConfig(customTeams) : createInitialTeams();
+  const teams = customTeams ? buildTeamsFromConfig(customTeams, seed, seasonYear) : createInitialTeams(seed, seasonYear);
   const userTeam = teams.find((team) => team.id === userTeamId);
 
   if (userTeam === undefined) {
@@ -627,25 +691,8 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function createInitialTeams(): LacrosseTeam[] {
-  return [
-    makeTeamWithOverride('maryland-state'),
-    makeTeamWithOverride('virginia-lakes'),
-    makeTeamWithOverride('long-island-tech'),
-    makeTeamWithOverride('georgetown-prep'),
-    makeTeamWithOverride('new-england-college'),
-    makeTeamWithOverride('colorado-front-range'),
-    makeTeamWithOverride('syracuse-heights'),
-    makeTeamWithOverride('penn-state-valley'),
-    makeTeamWithOverride('ohio-summit'),
-    makeTeamWithOverride('michigan-bay'),
-    makeTeamWithOverride('penn-grove'),
-    makeTeamWithOverride('illinois-central'),
-    makeTeamWithOverride('california-coast'),
-    makeTeamWithOverride('denver-ridge'),
-    makeTeamWithOverride('utah-canyon'),
-    makeTeamWithOverride('oregon-cascade'),
-  ];
+function createInitialTeams(seed: number, seasonYear: number): LacrosseTeam[] {
+  return Object.keys(TEAM_OVERRIDES).map((id) => makeTeamWithOverride(id, seed, seasonYear));
 }
 
 // Auto-generates cross-conference games: each conference plays one game against
@@ -717,9 +764,14 @@ function buildRegionsFromConfig(config: CustomTeamsFile): Region[] {
   return merged;
 }
 
-function buildTeamsFromConfig(config: CustomTeamsFile): LacrosseTeam[] {
+function buildTeamsFromConfig(config: CustomTeamsFile, seed: number, seasonYear: number): LacrosseTeam[] {
   return config.teams.map((def) => {
-    const base = makeLacrosseTeam(def.id);
+    const teamSeed = seed + hashTeamId(def.id);
+    const roster = def.roster
+      ? buildRosterFromCustomPlayers(def.roster, { seed: teamSeed, createdSeason: seasonYear })
+      : generateLacrosseRoster({ seed: teamSeed, prestige: def.nationalPrestige, createdSeason: seasonYear });
+    const base = makeLacrosseTeam(def.id, roster);
+    base.resources = { ...base.resources, scholarshipUsed: rosterScholarshipsUsed(roster) };
     return {
       ...base,
       name: def.name,

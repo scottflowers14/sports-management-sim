@@ -83,7 +83,7 @@ export function generateLacrosseRecruitingClass({
   });
 }
 
-function createSportTraits(position: LacrossePosition, base: number, random: () => number): LacrossePlayerTraits {
+export function createSportTraits(position: LacrossePosition, base: number, random: () => number): LacrossePlayerTraits {
   return {
     shooting: ratingAround(position === 'ATT' ? base + 8 : base, random),
     passing: ratingAround(position === 'MID' ? base + 5 : base, random),

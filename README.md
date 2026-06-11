@@ -19,3 +19,19 @@ Gameplay features:
 - Offseason training focus that accelerates development for a chosen position group.
 - Coach career pressure: season goals, AD confidence, and firings — get fired and rebuild at a lower-prestige program from job offers.
 - Conference and national tournaments, national rankings, news feed, box scores with play-by-play logs, and save slots with import/export.
+- Prestige-driven generated rosters: every program starts with a full 42-man roster (position groups, class-year spread, scholarship distribution) whose talent level tracks its national prestige.
+
+Custom teams files (Start screen → import teams) may optionally include a `roster` array per team:
+
+```json
+{
+  "id": "my-team",
+  "name": "My Team",
+  "...": "...",
+  "roster": [
+    { "firstName": "Pat", "lastName": "Spencer", "position": "ATT", "classYear": "SR", "overall": 92, "potential": 95 }
+  ]
+}
+```
+
+Positions are `ATT`/`MID`/`DEF`/`LSM`/`GK`/`FOGO`; class years `FR`/`SO`/`JR`/`SR`; `potential` is optional. Rosters need 12–45 players including at least one GK and one FOGO. Teams without a `roster` get a generated one matching their prestige.

@@ -198,7 +198,11 @@ export function App() {
     const newCoach = createCoachProfile(selectedNewCoachName.trim() || generateCoachName(nextDynasty.seed));
     const userTeamForGoals = nextDynasty.season.teams.find((t) => t.id === selectedNewTeamId);
     const prestige = userTeamForGoals?.reputation.nationalPrestige ?? 50;
-    const goals = generateSeasonGoals(prestige, nextDynasty.season.year);
+    const goals = generateSeasonGoals(
+      prestige,
+      nextDynasty.season.year,
+      countUserGames(nextDynasty.season.schedule, selectedNewTeamId),
+    );
     resetUiState();
     setDynasty(nextDynasty);
     setCoachProfile(newCoach);
@@ -486,7 +490,11 @@ export function App() {
       const nextDynasty = resolveAndApplyPortal(prev);
       const userTeamData = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
       const prestige = userTeamData?.reputation.nationalPrestige ?? 50;
-      const goals = generateSeasonGoals(prestige, nextDynasty.season.year);
+      const goals = generateSeasonGoals(
+        prestige,
+        nextDynasty.season.year,
+        countUserGames(nextDynasty.season.schedule, nextDynasty.userTeamId),
+      );
       setSeasonGoals(goals);
       setBestNatRank(null);
       return nextDynasty;
@@ -917,6 +925,13 @@ export function App() {
       )}
     </main>
   );
+}
+
+function countUserGames(
+  schedule: Array<{ homeTeamId: string; awayTeamId: string }>,
+  userTeamId: string,
+): number {
+  return schedule.filter((g) => g.homeTeamId === userTeamId || g.awayTeamId === userTeamId).length;
 }
 
 function buildPlayerLookup(
