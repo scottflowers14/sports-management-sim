@@ -194,6 +194,56 @@ export function updateADConfidence(
   return { confidence, events };
 }
 
+export interface JobOffer {
+  teamId: string;
+  teamName: string;
+  prestige: number;
+  contractYears: number;
+}
+
+/**
+ * Fired when confidence collapses. Early-tenure coaches only lose their job
+ * on a total collapse; established coaches are out once the AD loses faith.
+ */
+export function shouldFireCoach(confidence: number, tenureSeasons: number): boolean {
+  if (confidence <= 5) return true;
+  return tenureSeasons >= 3 && confidence < 20;
+}
+
+export function generateJobOffers(
+  teams: { id: string; name: string; reputation: { nationalPrestige: number } }[],
+  firedFromTeamId: string,
+  seed: number,
+): JobOffer[] {
+  const candidates = teams
+    .filter((team) => team.id !== firedFromTeamId)
+    .sort((a, b) => a.reputation.nationalPrestige - b.reputation.nationalPrestige);
+
+  // A fired coach restarts at modest programs: offers come from the bottom half
+  const pool = candidates.slice(0, Math.max(3, Math.ceil(candidates.length / 2)));
+
+  const offers: JobOffer[] = [];
+  let state = Math.abs(seed) >>> 0;
+  const nextRandom = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+
+  const remaining = [...pool];
+  while (offers.length < 3 && remaining.length > 0) {
+    const idx = Math.floor(nextRandom() * remaining.length);
+    const team = remaining.splice(idx, 1)[0]!;
+    offers.push({
+      teamId: team.id,
+      teamName: team.name,
+      prestige: team.reputation.nationalPrestige,
+      contractYears: 4,
+    });
+  }
+
+  return offers.sort((a, b) => b.prestige - a.prestige);
+}
+
 export function getJobSecurityLabel(confidence: number): string {
   if (confidence >= 80) return 'On Extension Watch';
   if (confidence >= 60) return 'Secure';

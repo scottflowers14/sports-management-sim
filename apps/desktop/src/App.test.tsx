@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
@@ -80,6 +80,31 @@ describe('Desktop App', () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     expect(screen.getByText(/Results/i)).toBeInTheDocument();
+  });
+
+  it('simulates the rest of the season with Sim to End', async () => {
+    await renderStartedApp();
+
+    await userEvent.click(screen.getByRole('button', { name: /Sim to End of Season/i }));
+
+    expect(screen.getByRole('button', { name: /Enter Conference Tournaments/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Sim Week/i })).not.toBeInTheDocument();
+  });
+
+  it('shows coaching controls and persists a game plan change', async () => {
+    await renderStartedApp();
+
+    expect(screen.getByRole('heading', { name: /^Coaching$/i })).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText(/Offensive Tempo/i), 'uptempo');
+    await userEvent.selectOptions(screen.getByLabelText(/Training Focus/i), 'goalies');
+
+    expect(screen.getByLabelText(/Offensive Tempo/i)).toHaveValue('uptempo');
+    expect(await screen.findByText(/Push transition/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(loadActiveDynastySave()?.gamePlan?.tempo).toBe('uptempo');
+      expect(loadActiveDynastySave()?.trainingFocus).toBe('goalies');
+    });
   });
 
   it('switches to the team tab and shows the full roster/depth chart screen', async () => {

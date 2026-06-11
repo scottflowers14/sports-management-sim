@@ -26,6 +26,25 @@ import type { DevelopmentReport, PreOffseasonSnapshot } from './development-repo
 
 export type { DevelopmentReport };
 
+export type TrainingFocus = 'balanced' | 'offense' | 'defense' | 'goalies' | 'faceoffs';
+
+export const TRAINING_FOCUS_LABELS: Record<TrainingFocus, { label: string; hint: string }> = {
+  balanced: { label: 'Balanced', hint: 'Even development across the roster' },
+  offense: { label: 'Offense', hint: 'Extra reps for attackmen and midfielders' },
+  defense: { label: 'Defense', hint: 'Extra reps for close defense and LSMs' },
+  goalies: { label: 'Goalies', hint: 'Extra reps for the goalie room' },
+  faceoffs: { label: 'Faceoffs', hint: 'Extra reps for FOGOs' },
+};
+
+const TRAINING_FOCUS_POSITIONS: Record<Exclude<TrainingFocus, 'balanced'>, readonly string[]> = {
+  offense: ['ATT', 'MID'],
+  defense: ['DEF', 'LSM'],
+  goalies: ['GK'],
+  faceoffs: ['FOGO'],
+};
+
+const TRAINING_FOCUS_BONUS = 0.25;
+
 export interface OffseasonSummary {
   seasonYear: number;
   finalStandings: StandingsEntry[];
@@ -198,6 +217,7 @@ function clamp(value: number, min: number, max: number): number {
 export function runOffseason(
   dynasty: LacrosseDynastyState,
   nationalChampionId?: string,
+  trainingFocus: TrainingFocus = 'balanced',
 ): { newDynasty: LacrosseDynastyState; summary: OffseasonSummary } {
   const { season, recruits, userTeamId, seed, rosterTargets } = dynasty;
   const newYear = season.year + 1;
@@ -239,8 +259,14 @@ export function runOffseason(
 
   // Run offseason for returning players first (advances class years, graduates seniors),
   // then add the signing class as true freshmen for the upcoming season.
+  const focusPositions = trainingFocus !== 'balanced' ? TRAINING_FOCUS_POSITIONS[trainingFocus] : null;
   const teamsAfterOffseason = teamsWithPrestige.map((team) => {
-    const afterOffseason = runTeamOffseason(team);
+    const afterOffseason =
+      team.id === userTeamId && focusPositions
+        ? runTeamOffseason(team, {
+            developmentBonusFor: (player) => (focusPositions.includes(player.position) ? TRAINING_FOCUS_BONUS : 0),
+          })
+        : runTeamOffseason(team);
     const withClass = addSignedRecruitsToTeam(afterOffseason, signed, newYear);
     return pruneDepthChart(withClass);
   });

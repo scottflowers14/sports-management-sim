@@ -1,7 +1,9 @@
 import type { Player, PlayerClass, Team, TeamRecord } from './models';
 
-export interface RunTeamOffseasonOptions {
+export interface RunTeamOffseasonOptions<Position extends string = string, SportTraits = unknown> {
   developmentRandom?: () => number;
+  /** Extra development roll (0–1 scale) added per player, e.g. from a training focus. */
+  developmentBonusFor?: (player: Player<Position, SportTraits>) => number;
 }
 
 export function advancePlayerClass(classYear: PlayerClass): PlayerClass | null {
@@ -54,7 +56,7 @@ export function progressPlayer<Position extends string, SportTraits>(
 
 export function runTeamOffseason<Position extends string, SportTraits>(
   team: Team<Position, SportTraits>,
-  options: RunTeamOffseasonOptions = {},
+  options: RunTeamOffseasonOptions<Position, SportTraits> = {},
 ): Team<Position, SportTraits> {
   const developmentRandom = options.developmentRandom ?? Math.random;
   const returningPlayers = team.roster.flatMap((player) => {
@@ -64,7 +66,9 @@ export function runTeamOffseason<Position extends string, SportTraits>(
       return [];
     }
 
-    const progressed = progressPlayer(player, developmentRandom());
+    const bonus = options.developmentBonusFor?.(player) ?? 0;
+    const roll = Math.min(1, Math.max(0, developmentRandom() + bonus));
+    const progressed = progressPlayer(player, roll);
 
     return [
       {

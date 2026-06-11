@@ -2596,3 +2596,113 @@ li span {
   font-size: 0.82rem;
   margin-top: 2px;
 }
+
+/* ── Coaching card (game plan + training focus) ───────────── */
+
+.sim-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.sim-actions .sim-btn {
+  margin-bottom: 0;
+}
+
+.sim-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #aab8ca;
+  font-weight: 600;
+}
+
+.sim-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.gameplan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.gameplan-label {
+  color: #aab8ca;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gameplan-row select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e6edf3;
+  font: inherit;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
+.gameplan-row select:focus {
+  border-color: rgba(114, 242, 198, 0.6);
+  outline: none;
+}
+
+.gameplan-hint {
+  color: #6b7787;
+  font-size: 0.75rem;
+  margin: 4px 0 0;
+}
+
+/* ── Coaching news + fired flow ───────────────────────────── */
+
+.chip-coaching {
+  background: rgba(242, 114, 114, 0.18);
+  color: #ff9b8a;
+}
+
+.fired-card {
+  border: 1px solid rgba(242, 76, 76, 0.45);
+}
+
+.fired-note {
+  color: #aab8ca;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.job-offer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.job-offer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.job-offer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.job-offer-meta {
+  color: #6b7787;
+  font-size: 0.78rem;
+}
+
+.job-offer-row .offer-btn {
+  width: auto;
+}

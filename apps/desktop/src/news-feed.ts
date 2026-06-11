@@ -1,7 +1,7 @@
 import type { LacrosseSeason } from '@sports-management-sim/sport-lacrosse';
 import type { LacrosseRecruit } from '@sports-management-sim/sport-lacrosse';
 
-export type NewsCategory = 'game' | 'recruiting' | 'rankings' | 'award' | 'injury';
+export type NewsCategory = 'game' | 'recruiting' | 'rankings' | 'award' | 'injury' | 'coaching';
 
 export interface NewsItem {
   id: string;
