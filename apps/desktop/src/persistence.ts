@@ -1,12 +1,13 @@
-import type { GameLog, LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
-import type { OffseasonSummary, InjuredPlayer } from './dynasty-helpers';
+import { DEFAULT_GAME_PLAN } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseDynastyState, LacrosseGamePlan } from '@sports-management-sim/sport-lacrosse';
+import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
 import type { ConferenceBracket, TournamentGame, TournamentPhase, TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
 import type { ScoutingState } from './scouting';
 import type { SeasonStatsMap } from './stats';
-import type { CoachProfile, SeasonGoals } from './coach-profile';
+import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
 import { formatTeamName } from './ui/format';
 
 export const DYNASTY_SAVE_VERSION = 1;
@@ -33,6 +34,10 @@ export interface DynastySaveState {
   seasonGoals: SeasonGoals | null;
   /** Best national rank achieved this season (lowest number = best). */
   bestNatRank: number | null;
+  gamePlan: LacrosseGamePlan;
+  trainingFocus: TrainingFocus;
+  /** Job offers awaiting a decision after the coach was fired, null otherwise. */
+  pendingJobOffers: JobOffer[] | null;
 }
 
 export interface DynastySaveMetadata {
@@ -293,6 +298,15 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     }
     if (parsed.bestNatRank === undefined) {
       parsed.bestNatRank = null;
+    }
+    if (parsed.gamePlan === undefined) {
+      parsed.gamePlan = DEFAULT_GAME_PLAN;
+    }
+    if (parsed.trainingFocus === undefined) {
+      parsed.trainingFocus = 'balanced';
+    }
+    if (parsed.pendingJobOffers === undefined) {
+      parsed.pendingJobOffers = null;
     }
     return parsed as PersistedDynastySave;
   } catch {

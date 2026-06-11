@@ -1,4 +1,5 @@
 import type { GameResult } from '@sports-management-sim/engine-core';
+import { DEFAULT_GAME_PLAN, getGamePlanModifiers, type LacrosseGamePlan } from './game-plan';
 import type { LacrosseTeam, LacrosseTeamStats } from './models';
 import { calculateLacrosseTeamRating, type LacrosseTeamRating } from './team-rating';
 
@@ -8,6 +9,8 @@ export interface SimulateLacrosseGameInput {
   homeTeam: LacrosseTeam;
   awayTeam: LacrosseTeam;
   random?: RandomSource;
+  homeGamePlan?: LacrosseGamePlan;
+  awayGamePlan?: LacrosseGamePlan;
 }
 
 export type LacrosseGameResult = GameResult<LacrosseTeamStats>;
@@ -16,16 +19,26 @@ export function simulateLacrosseGame({
   homeTeam,
   awayTeam,
   random = Math.random,
+  homeGamePlan = DEFAULT_GAME_PLAN,
+  awayGamePlan = DEFAULT_GAME_PLAN,
 }: SimulateLacrosseGameInput): LacrosseGameResult {
   const homeRating = calculateLacrosseTeamRating(homeTeam);
   const awayRating = calculateLacrosseTeamRating(awayTeam);
   const homePossessionEdge = (homeRating.faceoff - awayRating.faceoff) / 12;
+  const homeMods = getGamePlanModifiers(homeGamePlan);
+  const awayMods = getGamePlanModifiers(awayGamePlan);
 
-  const homePossessions = Math.round(44 + Math.floor(random() * 12) + homePossessionEdge);
-  const awayPossessions = Math.round(44 + Math.floor(random() * 12) - homePossessionEdge);
+  const homePossessions = Math.max(
+    30,
+    Math.round(44 + Math.floor(random() * 12) + homePossessionEdge + homeMods.ownPossessions + awayMods.oppPossessions),
+  );
+  const awayPossessions = Math.max(
+    30,
+    Math.round(44 + Math.floor(random() * 12) - homePossessionEdge + awayMods.ownPossessions + homeMods.oppPossessions),
+  );
 
-  let homeScore = simulateGoals(homePossessions, homeRating, awayRating, random);
-  let awayScore = simulateGoals(awayPossessions, awayRating, homeRating, random);
+  let homeScore = simulateGoals(homePossessions, homeRating, awayRating, random, homeMods.ownScoringChance + awayMods.oppScoringChance);
+  let awayScore = simulateGoals(awayPossessions, awayRating, homeRating, random, awayMods.ownScoringChance + homeMods.oppScoringChance);
   let overtime = false;
 
   if (homeScore === awayScore) {
@@ -57,10 +70,11 @@ function simulateGoals(
   offenseRating: LacrosseTeamRating,
   defenseRating: LacrosseTeamRating,
   random: RandomSource,
+  chanceModifier = 0,
 ): number {
   const ratingEdge = offenseRating.offense - defenseRating.defense;
   const goalieEdge = offenseRating.offense - defenseRating.goalie;
-  const scoringChance = clamp(0.23 + ratingEdge / 320 + goalieEdge / 900, 0.1, 0.48);
+  const scoringChance = clamp(0.23 + ratingEdge / 320 + goalieEdge / 900 + chanceModifier, 0.1, 0.48);
   let goals = 0;
 
   for (let possession = 0; possession < possessions; possession += 1) {

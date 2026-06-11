@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_GAME_PLAN } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptySeasonStats } from './stats';
@@ -54,6 +55,9 @@ function makeSave(seedTime: number, userTeamId = 'maryland-state'): DynastySaveS
     adConfidence: 60,
     seasonGoals: null,
     bestNatRank: null,
+    gamePlan: DEFAULT_GAME_PLAN,
+    trainingFocus: 'balanced',
+    pendingJobOffers: null,
   };
 }
 

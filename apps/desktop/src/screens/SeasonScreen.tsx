@@ -1,9 +1,19 @@
-import type { GameLog, LacrosseTeam, LacrosseTeamRating } from '@sports-management-sim/sport-lacrosse';
+import {
+  DEFENSE_LABELS,
+  TEMPO_LABELS,
+  type DefensiveStyle,
+  type GameLog,
+  type LacrosseGamePlan,
+  type LacrosseTeam,
+  type LacrosseTeamRating,
+  type OffensiveTempo,
+} from '@sports-management-sim/sport-lacrosse';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { DepthChart } from '../components/DepthChart';
 import { ResultRow } from '../components/ResultRow';
 import type { TournamentState } from '../tournament';
 import type { NewsItem } from '../news-feed';
+import { TRAINING_FOCUS_LABELS, type TrainingFocus } from '../dynasty-helpers';
 import type { BoxScoreData } from '../ui/types';
 import { formatTeamName } from '../ui/format';
 
@@ -22,7 +32,12 @@ export function SeasonScreen({
   teamMap,
   userTeamId,
   gameLogs,
+  gamePlan,
+  trainingFocus,
+  onGamePlanChange,
+  onTrainingFocusChange,
   onSimWeek,
+  onSimToEnd,
   onEnterTournament,
   onViewTournament,
   onEnterOffseason,
@@ -43,7 +58,12 @@ export function SeasonScreen({
   teamMap: Map<string, string>;
   userTeamId: string;
   gameLogs: Map<string, GameLog>;
+  gamePlan: LacrosseGamePlan;
+  trainingFocus: TrainingFocus;
+  onGamePlanChange: (plan: LacrosseGamePlan) => void;
+  onTrainingFocusChange: (focus: TrainingFocus) => void;
   onSimWeek: () => void;
+  onSimToEnd: () => void;
   onEnterTournament: () => void;
   onViewTournament: () => void;
   onEnterOffseason: () => void;
@@ -56,9 +76,14 @@ export function SeasonScreen({
         <article className="card">
           <h2>This Week</h2>
           {!seasonComplete ? (
-            <button className="sim-btn" onClick={onSimWeek}>
-              Sim Week {currentWeek}
-            </button>
+            <div className="sim-actions">
+              <button className="sim-btn" onClick={onSimWeek}>
+                Sim Week {currentWeek}
+              </button>
+              <button className="sim-btn sim-btn-secondary" onClick={onSimToEnd}>
+                Sim to End of Season ⏩
+              </button>
+            </div>
           ) : !tournament ? (
             <button className="tournament-btn" onClick={onEnterTournament}>
               Enter Conference Tournaments →
@@ -110,6 +135,52 @@ export function SeasonScreen({
       </div>
 
       <div className="season-sidebar">
+        <article className="card gameplan-card">
+          <h2>Coaching</h2>
+          <label className="gameplan-row">
+            <span className="gameplan-label">Offensive Tempo</span>
+            <select
+              value={gamePlan.tempo}
+              onChange={(e) => onGamePlanChange({ ...gamePlan, tempo: e.target.value as OffensiveTempo })}
+            >
+              {(Object.keys(TEMPO_LABELS) as OffensiveTempo[]).map((tempo) => (
+                <option key={tempo} value={tempo}>
+                  {TEMPO_LABELS[tempo].label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="gameplan-hint">{TEMPO_LABELS[gamePlan.tempo].hint}</p>
+          <label className="gameplan-row">
+            <span className="gameplan-label">Defensive Style</span>
+            <select
+              value={gamePlan.defense}
+              onChange={(e) => onGamePlanChange({ ...gamePlan, defense: e.target.value as DefensiveStyle })}
+            >
+              {(Object.keys(DEFENSE_LABELS) as DefensiveStyle[]).map((style) => (
+                <option key={style} value={style}>
+                  {DEFENSE_LABELS[style].label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="gameplan-hint">{DEFENSE_LABELS[gamePlan.defense].hint}</p>
+          <label className="gameplan-row">
+            <span className="gameplan-label">Training Focus</span>
+            <select
+              value={trainingFocus}
+              onChange={(e) => onTrainingFocusChange(e.target.value as TrainingFocus)}
+            >
+              {(Object.keys(TRAINING_FOCUS_LABELS) as TrainingFocus[]).map((focus) => (
+                <option key={focus} value={focus}>
+                  {TRAINING_FOCUS_LABELS[focus].label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="gameplan-hint">{TRAINING_FOCUS_LABELS[trainingFocus].hint} · applies in the offseason</p>
+        </article>
+
         <article className="card">
           <h2>Roster</h2>
           <p className="metric">{userTeam.roster.length} players</p>

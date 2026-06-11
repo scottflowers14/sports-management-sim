@@ -171,4 +171,39 @@ describe('offseason progression', () => {
     expect(nextTeam.record.wins).toBe(0);
     expect(nextTeam.record.losses).toBe(0);
   });
+
+  it('applies a development bonus to matching players only', () => {
+    const focused = makePlayer('focused', 'FR', {
+      position: 'GENERIC',
+      ratings: { ...makePlayer('base', 'FR').ratings, overall: 60, potential: 80, workEthic: 60 },
+    });
+    const team = makeTeam([focused]);
+
+    const withoutBonus = runTeamOffseason(team, { developmentRandom: () => 0.2 });
+    const withBonus = runTeamOffseason(team, {
+      developmentRandom: () => 0.2,
+      developmentBonusFor: (player) => (player.id === 'focused' ? 0.5 : 0),
+    });
+    const withNonMatchingBonus = runTeamOffseason(team, {
+      developmentRandom: () => 0.2,
+      developmentBonusFor: (player) => (player.id === 'someone-else' ? 0.5 : 0),
+    });
+
+    expect(withBonus.roster[0]!.ratings.overall).toBeGreaterThan(withoutBonus.roster[0]!.ratings.overall);
+    expect(withNonMatchingBonus.roster[0]!.ratings.overall).toBe(withoutBonus.roster[0]!.ratings.overall);
+  });
+
+  it('clamps the boosted development roll so progression never exceeds potential', () => {
+    const nearCeiling = makePlayer('near-ceiling', 'FR', {
+      ratings: { ...makePlayer('base', 'FR').ratings, overall: 79, potential: 80, workEthic: 100 },
+    });
+    const team = makeTeam([nearCeiling]);
+
+    const result = runTeamOffseason(team, {
+      developmentRandom: () => 0.9,
+      developmentBonusFor: () => 0.5,
+    });
+
+    expect(result.roster[0]!.ratings.overall).toBe(80);
+  });
 });

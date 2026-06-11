@@ -2,6 +2,7 @@ import type { LacrossePortalEntry, LacrosseTeam } from '@sports-management-sim/s
 import type { OffseasonSummary } from '../dynasty-helpers';
 import type { DynastySeasonRecord } from '../history';
 import type { SeasonAwards } from '../awards';
+import type { JobOffer } from '../coach-profile';
 import type { PlayerDevelopmentEntry } from '../development-report';
 import { formatTeamName } from '../ui/format';
 
@@ -13,6 +14,9 @@ export function OffseasonScreen({
   dynastyHistory,
   seasonYear,
   userTeamId,
+  jobOffers,
+  coachName,
+  onAcceptJobOffer,
   onStartNewSeason,
   onOfferPortalPlayer,
 }: {
@@ -23,6 +27,9 @@ export function OffseasonScreen({
   dynastyHistory: DynastySeasonRecord[];
   seasonYear: number;
   userTeamId: string;
+  jobOffers: JobOffer[] | null;
+  coachName: string | null;
+  onAcceptJobOffer: (teamId: string) => void;
   onStartNewSeason: () => void;
   onOfferPortalPlayer: (entryId: string) => void;
 }) {
@@ -143,9 +150,35 @@ export function OffseasonScreen({
           </article>
         )}
 
-        <button className="sim-btn new-season-btn" onClick={onStartNewSeason}>
-          Start {seasonYear} Season →
-        </button>
+        {jobOffers && jobOffers.length > 0 ? (
+          <article className="card fired-card">
+            <h2>You&apos;ve Been Fired</h2>
+            <p className="fired-note">
+              The athletic director has relieved {coachName ?? 'you'} of head coaching duties at{' '}
+              {formatTeamName(teamMap.get(userTeamId) ?? userTeamId)}. Other programs are calling —
+              pick where the next chapter starts.
+            </p>
+            <div className="job-offer-list">
+              {jobOffers.map((offer) => (
+                <div key={offer.teamId} className="job-offer-row">
+                  <div className="job-offer-info">
+                    <strong>{formatTeamName(offer.teamName)}</strong>
+                    <span className="job-offer-meta">
+                      Prestige {offer.prestige} · {offer.contractYears}-year deal
+                    </span>
+                  </div>
+                  <button className="offer-btn" onClick={() => onAcceptJobOffer(offer.teamId)}>
+                    Accept Job
+                  </button>
+                </div>
+              ))}
+            </div>
+          </article>
+        ) : (
+          <button className="sim-btn new-season-btn" onClick={onStartNewSeason}>
+            Start {seasonYear} Season →
+          </button>
+        )}
       </div>
     </div>
   );
