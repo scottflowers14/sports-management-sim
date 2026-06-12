@@ -261,6 +261,34 @@ describe('Desktop App', () => {
     expect(screen.queryAllByRole('button', { name: /Scout/i }).length).toBeGreaterThan(0);
   });
 
+  it('pins recruits to My Board, persists the shortlist, and auto-pins on offers', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
+
+    // Starts on the national list with an empty board.
+    await userEvent.click(screen.getByRole('button', { name: /My Board/i }));
+    expect(screen.getByText(/Your board is empty/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Browse All Recruits/i }));
+
+    // Pin one recruit, scout + offer a different one (offer should auto-pin).
+    await userEvent.click(screen.getAllByRole('button', { name: /Add .* to board/i })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Scout \(1 pt\)$/i })[1]!);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Offer$/i })[0]!);
+
+    await userEvent.click(screen.getByRole('button', { name: /My Board/i }));
+    expect(screen.getByText(/2 on board/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 offers out/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Remove .* from board/i })).toHaveLength(2);
+
+    await waitFor(() => {
+      expect(loadActiveDynastySave()?.shortlistIds).toHaveLength(2);
+    });
+
+    // Unpinning takes a recruit off the board.
+    await userEvent.click(screen.getAllByRole('button', { name: /Remove .* from board/i })[0]!);
+    expect(screen.getByText(/1 on board/i)).toBeInTheDocument();
+  });
+
   it('switches to standings and shows national rankings and conference sections', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
