@@ -6,10 +6,11 @@ import {
 import {
   DEFAULT_GAME_PLAN,
   calculateLacrosseTeamRating,
+  deriveCpuGamePlan,
   offerLacrossePortalPlayer,
   updateLacrosseDepthChartSlot,
 } from '@sports-management-sim/sport-lacrosse';
-import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { runOffseason, resolveAndApplyPortal } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { simulateOneWeek, simulateRemainingWeeks } from './week-sim';
@@ -197,7 +198,11 @@ export function App() {
     const newCoach = createCoachProfile(selectedNewCoachName.trim() || generateCoachName(nextDynasty.seed));
     const userTeamForGoals = nextDynasty.season.teams.find((t) => t.id === selectedNewTeamId);
     const prestige = userTeamForGoals?.reputation.nationalPrestige ?? 50;
-    const goals = generateSeasonGoals(prestige, nextDynasty.season.year);
+    const goals = generateSeasonGoals(
+      prestige,
+      nextDynasty.season.year,
+      countUserGames(nextDynasty.season.schedule, selectedNewTeamId),
+    );
     resetUiState();
     setDynasty(nextDynasty);
     setCoachProfile(newCoach);
@@ -360,21 +365,26 @@ export function App() {
     setView('tournament');
   }, [dynasty.season.standings, dynasty.season.conferences]);
 
+  const tournamentPlanFor = useCallback(
+    (team: LacrosseTeam) => (team.id === dynasty.userTeamId ? gamePlan : deriveCpuGamePlan(team)),
+    [dynasty.userTeamId, gamePlan],
+  );
+
   const simTournamentSemis = useCallback(() => {
-    setTournament((prev) => prev ? advanceTournamentSemis(prev, dynasty.season.teams) : prev);
-  }, [dynasty.season.teams]);
+    setTournament((prev) => prev ? advanceTournamentSemis(prev, dynasty.season.teams, tournamentPlanFor) : prev);
+  }, [dynasty.season.teams, tournamentPlanFor]);
 
   const simTournamentFinals = useCallback(() => {
-    setTournament((prev) => prev ? advanceTournamentFinals(prev, dynasty.season.teams) : prev);
-  }, [dynasty.season.teams]);
+    setTournament((prev) => prev ? advanceTournamentFinals(prev, dynasty.season.teams, tournamentPlanFor) : prev);
+  }, [dynasty.season.teams, tournamentPlanFor]);
 
   const simTournamentNationalSemis = useCallback(() => {
-    setTournament((prev) => prev ? advanceTournamentNationalSemis(prev, dynasty.season.teams) : prev);
-  }, [dynasty.season.teams]);
+    setTournament((prev) => prev ? advanceTournamentNationalSemis(prev, dynasty.season.teams, tournamentPlanFor) : prev);
+  }, [dynasty.season.teams, tournamentPlanFor]);
 
   const simTournamentNational = useCallback(() => {
-    setTournament((prev) => prev ? advanceNationalChampionship(prev, dynasty.season.teams) : prev);
-  }, [dynasty.season.teams]);
+    setTournament((prev) => prev ? advanceNationalChampionship(prev, dynasty.season.teams, tournamentPlanFor) : prev);
+  }, [dynasty.season.teams, tournamentPlanFor]);
 
   const enterOffseason = useCallback(() => {
     const tournamentChampion = tournament?.nationalChampion;
@@ -385,7 +395,7 @@ export function App() {
     const currentNatRank = rankings.find((r) => r.teamId === dynasty.userTeamId)?.rank ?? null;
 
     setDynasty((prev) => {
-      const { newDynasty, summary } = runOffseason(prev, tournamentChampion, trainingFocus);
+      const { newDynasty, summary } = runOffseason(prev, tournamentChampion, trainingFocus, seasonStats);
 
       const confId = prev.season.teams.find((t) => t.id === prev.userTeamId)?.conferenceId;
       const confTeamIds = prev.season.conferences.find((c) => c.id === confId)?.teamIds ?? [];
@@ -460,7 +470,7 @@ export function App() {
     }
 
     setView('offseason');
-  }, [tournament, dynasty.userTeamId, dynasty.season.teams, dynasty.season.standings, dynasty.season.conferences, dynasty.season.year, dynasty.season.currentWeek, dynasty.seed, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, dynasty.recruits, trainingFocus]);
+  }, [tournament, dynasty.userTeamId, dynasty.season.teams, dynasty.season.standings, dynasty.season.conferences, dynasty.season.year, dynasty.season.currentWeek, dynasty.seed, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, dynasty.recruits, trainingFocus, seasonStats]);
 
   const acceptJobOffer = useCallback((teamId: string) => {
     setDynasty((prev) => {
@@ -480,7 +490,11 @@ export function App() {
       const nextDynasty = resolveAndApplyPortal(prev);
       const userTeamData = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
       const prestige = userTeamData?.reputation.nationalPrestige ?? 50;
-      const goals = generateSeasonGoals(prestige, nextDynasty.season.year);
+      const goals = generateSeasonGoals(
+        prestige,
+        nextDynasty.season.year,
+        countUserGames(nextDynasty.season.schedule, nextDynasty.userTeamId),
+      );
       setSeasonGoals(goals);
       setBestNatRank(null);
       return nextDynasty;
@@ -608,6 +622,24 @@ export function App() {
   const userTeamRating = calculateLacrosseTeamRating(userTeam);
 
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
+
+  const nextUserGame = dynasty.season.schedule.find(
+    (g) => g.status === 'scheduled' && (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
+  );
+  const nextOpponentTeam = nextUserGame
+    ? dynasty.season.teams.find(
+        (t) => t.id === (nextUserGame.homeTeamId === dynasty.userTeamId ? nextUserGame.awayTeamId : nextUserGame.homeTeamId),
+      )
+    : undefined;
+  const nextOpponentScout = nextUserGame && nextOpponentTeam
+    ? {
+        week: nextUserGame.week,
+        name: formatTeamName(nextOpponentTeam.name),
+        isHome: nextUserGame.homeTeamId === dynasty.userTeamId,
+        plan: deriveCpuGamePlan(nextOpponentTeam),
+        rating: calculateLacrosseTeamRating(nextOpponentTeam).overall,
+      }
+    : null;
 
   const selectedPlayer = selectedPlayerId ? userTeam.roster.find((p) => p.id === selectedPlayerId) : null;
 
@@ -762,6 +794,7 @@ export function App() {
           gameLogs={gameLogs}
           gamePlan={gamePlan}
           trainingFocus={trainingFocus}
+          nextOpponentScout={nextOpponentScout}
           onGamePlanChange={setGamePlan}
           onTrainingFocusChange={setTrainingFocus}
           onSimWeek={simWeek}
@@ -892,6 +925,13 @@ export function App() {
       )}
     </main>
   );
+}
+
+function countUserGames(
+  schedule: Array<{ homeTeamId: string; awayTeamId: string }>,
+  userTeamId: string,
+): number {
+  return schedule.filter((g) => g.homeTeamId === userTeamId || g.awayTeamId === userTeamId).length;
 }
 
 function buildPlayerLookup(

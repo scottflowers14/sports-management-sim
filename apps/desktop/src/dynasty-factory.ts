@@ -139,6 +139,7 @@ function formatValidationErrors(errors: CustomTeamsValidationError[]): string {
         case 'duplicate_team_id': return `Duplicate team ID: "${e.id}".`;
         case 'unknown_conference': return `Team "${e.teamId}" references unknown conference "${e.conferenceId}".`;
         case 'conference_too_small': return `Conference "${e.conferenceId}" has only ${e.count} team(s); minimum 4 required.`;
+        case 'invalid_roster': return `Team "${e.teamId}" roster: ${e.reason}.`;
       }
     })
     .join(' ');

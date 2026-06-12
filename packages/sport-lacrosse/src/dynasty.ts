@@ -14,6 +14,12 @@ import {
 } from '@sports-management-sim/engine-core';
 import type { LacrossePlayerTraits, LacrossePosition, LacrosseSeason, LacrosseTeam } from './models';
 import { generateLacrosseRecruitingClass, type LacrosseRecruit } from './recruit-generation';
+import {
+  buildRosterFromCustomPlayers,
+  generateLacrosseRoster,
+  rosterScholarshipsUsed,
+  type CustomPlayerDefinition,
+} from './roster-generation';
 import { makeLacrosseTeam } from './test-fixtures';
 import { simulateLacrosseGame } from './simulate-game';
 
@@ -57,6 +63,8 @@ export interface CustomTeamDefinition {
   facilities: number;
   fanSupport: number;
   recentSuccess: number;
+  /** Optional custom roster; omitted teams get a prestige-driven generated roster. */
+  roster?: CustomPlayerDefinition[];
 }
 
 export interface CustomConferenceDefinition {
@@ -85,7 +93,8 @@ export type CustomTeamsValidationError =
   | { type: 'missing_conferences' }
   | { type: 'duplicate_team_id'; id: string }
   | { type: 'unknown_conference'; teamId: string; conferenceId: string }
-  | { type: 'conference_too_small'; conferenceId: string; count: number };
+  | { type: 'conference_too_small'; conferenceId: string; count: number }
+  | { type: 'invalid_roster'; teamId: string; reason: string };
 
 export function validateCustomTeamsFile(
   raw: unknown,
@@ -109,6 +118,10 @@ export function validateCustomTeamsFile(
     if (seenIds.has(t.id)) errors.push({ type: 'duplicate_team_id', id: t.id });
     seenIds.add(t.id);
     if (!confIds.has(t.conferenceId)) errors.push({ type: 'unknown_conference', teamId: t.id, conferenceId: t.conferenceId });
+    if (t.roster !== undefined) {
+      const reason = validateCustomRoster(t.roster);
+      if (reason !== null) errors.push({ type: 'invalid_roster', teamId: t.id, reason });
+    }
   }
 
   for (const conf of conferences) {
@@ -121,6 +134,42 @@ export function validateCustomTeamsFile(
   const result: CustomTeamsFile = { version: 1, teams, conferences };
   if (Array.isArray(obj['regions'])) result.regions = obj['regions'] as CustomRegionDefinition[];
   return { ok: true, value: result };
+}
+
+const VALID_POSITIONS = new Set(['ATT', 'MID', 'DEF', 'GK', 'FOGO', 'LSM']);
+const VALID_CLASS_YEARS = new Set(['FR', 'SO', 'JR', 'SR']);
+
+function validateCustomRoster(roster: unknown): string | null {
+  if (!Array.isArray(roster)) return 'roster must be an array of players';
+  if (roster.length < 12) return `roster has ${roster.length} players; minimum 12 required`;
+  if (roster.length > 45) return `roster has ${roster.length} players; maximum 45 allowed`;
+
+  for (const [i, p] of roster.entries()) {
+    if (typeof p !== 'object' || p === null) return `player ${i + 1} is not an object`;
+    const player = p as Record<string, unknown>;
+    if (typeof player['firstName'] !== 'string' || typeof player['lastName'] !== 'string') {
+      return `player ${i + 1} needs firstName and lastName`;
+    }
+    if (!VALID_POSITIONS.has(player['position'] as string)) {
+      return `player ${i + 1} has invalid position "${String(player['position'])}"`;
+    }
+    if (!VALID_CLASS_YEARS.has(player['classYear'] as string)) {
+      return `player ${i + 1} has invalid classYear "${String(player['classYear'])}" (use FR/SO/JR/SR)`;
+    }
+    const overall = player['overall'];
+    if (typeof overall !== 'number' || overall < 1 || overall > 99) {
+      return `player ${i + 1} needs an overall rating between 1 and 99`;
+    }
+    const potential = player['potential'];
+    if (potential !== undefined && (typeof potential !== 'number' || potential < overall || potential > 99)) {
+      return `player ${i + 1} potential must be a number between overall and 99`;
+    }
+  }
+
+  const positions = roster.map((p) => (p as Record<string, unknown>)['position']);
+  if (!positions.includes('GK')) return 'roster needs at least one GK';
+  if (!positions.includes('FOGO')) return 'roster needs at least one FOGO';
+  return null;
 }
 
 export const DEFAULT_LACROSSE_ROSTER_TARGETS: Record<LacrossePosition, number> = {
@@ -144,188 +193,84 @@ interface TeamOverride {
   recentSuccess: number;
 }
 
+function ov(
+  name: string,
+  regionId: string,
+  conferenceId: string,
+  nationalPrestige: number,
+  academicPrestige: number,
+  coachingPrestige: number,
+  facilities: number,
+  fanSupport: number,
+  recentSuccess: number,
+): TeamOverride {
+  return { name, regionId, conferenceId, nationalPrestige, academicPrestige, coachingPrestige, facilities, fanSupport, recentSuccess };
+}
+
 const TEAM_OVERRIDES: Record<string, TeamOverride> = {
-  'maryland-state': {
-    name: 'Maryland State',
-    regionId: 'mid-atlantic',
-    conferenceId: 'acc',
-    nationalPrestige: 85,
-    academicPrestige: 72,
-    coachingPrestige: 82,
-    facilities: 88,
-    fanSupport: 80,
-    recentSuccess: 78,
-  },
-  'virginia-lakes': {
-    name: 'Virginia Lakes',
-    regionId: 'mid-atlantic',
-    conferenceId: 'acc',
-    nationalPrestige: 75,
-    academicPrestige: 78,
-    coachingPrestige: 74,
-    facilities: 76,
-    fanSupport: 70,
-    recentSuccess: 68,
-  },
-  'long-island-tech': {
-    name: 'Long Island Tech',
-    regionId: 'long-island',
-    conferenceId: 'acc',
-    nationalPrestige: 80,
-    academicPrestige: 68,
-    coachingPrestige: 78,
-    facilities: 82,
-    fanSupport: 75,
-    recentSuccess: 74,
-  },
-  'georgetown-prep': {
-    name: 'Georgetown Prep',
-    regionId: 'mid-atlantic',
-    conferenceId: 'acc',
-    nationalPrestige: 68,
-    academicPrestige: 88,
-    coachingPrestige: 66,
-    facilities: 70,
-    fanSupport: 65,
-    recentSuccess: 60,
-  },
-  'new-england-college': {
-    name: 'New England College',
-    regionId: 'new-england',
-    conferenceId: 'nec',
-    nationalPrestige: 72,
-    academicPrestige: 82,
-    coachingPrestige: 70,
-    facilities: 74,
-    fanSupport: 68,
-    recentSuccess: 65,
-  },
-  'colorado-front-range': {
-    name: 'Colorado Front Range',
-    regionId: 'colorado',
-    conferenceId: 'nec',
-    nationalPrestige: 62,
-    academicPrestige: 65,
-    coachingPrestige: 60,
-    facilities: 64,
-    fanSupport: 60,
-    recentSuccess: 55,
-  },
-  'syracuse-heights': {
-    name: 'Syracuse Heights',
-    regionId: 'upstate-ny',
-    conferenceId: 'nec',
-    nationalPrestige: 78,
-    academicPrestige: 70,
-    coachingPrestige: 76,
-    facilities: 80,
-    fanSupport: 74,
-    recentSuccess: 72,
-  },
-  'penn-state-valley': {
-    name: 'Penn State Valley',
-    regionId: 'mid-atlantic',
-    conferenceId: 'nec',
-    nationalPrestige: 70,
-    academicPrestige: 75,
-    coachingPrestige: 68,
-    facilities: 72,
-    fanSupport: 68,
-    recentSuccess: 63,
-  },
-  'ohio-summit': {
-    name: 'Ohio Summit',
-    regionId: 'ohio-valley',
-    conferenceId: 'b10',
-    nationalPrestige: 65,
-    academicPrestige: 72,
-    coachingPrestige: 63,
-    facilities: 67,
-    fanSupport: 62,
-    recentSuccess: 58,
-  },
-  'michigan-bay': {
-    name: 'Michigan Bay',
-    regionId: 'great-lakes',
-    conferenceId: 'b10',
-    nationalPrestige: 68,
-    academicPrestige: 74,
-    coachingPrestige: 66,
-    facilities: 70,
-    fanSupport: 65,
-    recentSuccess: 62,
-  },
-  'penn-grove': {
-    name: 'Penn Grove',
-    regionId: 'mid-atlantic',
-    conferenceId: 'b10',
-    nationalPrestige: 62,
-    academicPrestige: 76,
-    coachingPrestige: 60,
-    facilities: 64,
-    fanSupport: 58,
-    recentSuccess: 55,
-  },
-  'illinois-central': {
-    name: 'Illinois Central',
-    regionId: 'midwest',
-    conferenceId: 'b10',
-    nationalPrestige: 58,
-    academicPrestige: 70,
-    coachingPrestige: 56,
-    facilities: 60,
-    fanSupport: 55,
-    recentSuccess: 50,
-  },
-  'california-coast': {
-    name: 'California Coast',
-    regionId: 'california',
-    conferenceId: 'pac',
-    nationalPrestige: 55,
-    academicPrestige: 68,
-    coachingPrestige: 54,
-    facilities: 58,
-    fanSupport: 52,
-    recentSuccess: 48,
-  },
-  'denver-ridge': {
-    name: 'Denver Ridge',
-    regionId: 'rocky-mountain',
-    conferenceId: 'pac',
-    nationalPrestige: 60,
-    academicPrestige: 65,
-    coachingPrestige: 58,
-    facilities: 62,
-    fanSupport: 56,
-    recentSuccess: 52,
-  },
-  'utah-canyon': {
-    name: 'Utah Canyon',
-    regionId: 'rocky-mountain',
-    conferenceId: 'pac',
-    nationalPrestige: 52,
-    academicPrestige: 62,
-    coachingPrestige: 50,
-    facilities: 54,
-    fanSupport: 48,
-    recentSuccess: 44,
-  },
-  'oregon-cascade': {
-    name: 'Oregon Cascade',
-    regionId: 'pacific-northwest',
-    conferenceId: 'pac',
-    nationalPrestige: 50,
-    academicPrestige: 64,
-    coachingPrestige: 48,
-    facilities: 52,
-    fanSupport: 46,
-    recentSuccess: 42,
-  },
+  // ── Atlantic Coast Conference ──
+  'maryland-state': ov('Maryland State', 'mid-atlantic', 'acc', 85, 72, 82, 88, 80, 78),
+  'virginia-lakes': ov('Virginia Lakes', 'mid-atlantic', 'acc', 75, 78, 74, 76, 70, 68),
+  'syracuse-heights': ov('Syracuse Heights', 'upstate-ny', 'acc', 78, 70, 76, 80, 74, 72),
+  'carolina-pines': ov('Carolina Pines', 'southeast', 'acc', 77, 74, 76, 80, 76, 72),
+  'blue-ridge': ov('Blue Ridge', 'southeast', 'acc', 70, 68, 68, 72, 66, 64),
+  'capital-city': ov('Capital City', 'mid-atlantic', 'acc', 66, 70, 64, 68, 62, 60),
+  // ── Big Ten ──
+  'harbor-city': ov('Harbor City', 'mid-atlantic', 'b10', 82, 80, 80, 84, 78, 76),
+  'penn-state-valley': ov('Penn State Valley', 'mid-atlantic', 'b10', 70, 75, 68, 72, 68, 63),
+  'michigan-bay': ov('Michigan Bay', 'great-lakes', 'b10', 68, 74, 66, 70, 65, 62),
+  'ohio-summit': ov('Ohio Summit', 'ohio-valley', 'b10', 65, 72, 63, 67, 62, 58),
+  'garden-state': ov('Garden State', 'mid-atlantic', 'b10', 60, 66, 58, 62, 58, 54),
+  'illinois-central': ov('Illinois Central', 'midwest', 'b10', 58, 70, 56, 60, 55, 50),
+  // ── Ivy League ──
+  'cayuga-falls': ov('Cayuga Falls', 'upstate-ny', 'ivy', 78, 92, 76, 74, 70, 74),
+  'liberty-hall': ov('Liberty Hall', 'mid-atlantic', 'ivy', 76, 95, 74, 72, 68, 72),
+  'quaker-green': ov('Quaker Green', 'mid-atlantic', 'ivy', 69, 93, 66, 66, 62, 64),
+  'cambridge-college': ov('Cambridge College', 'new-england', 'ivy', 66, 95, 64, 64, 60, 60),
+  'college-hill': ov('College Hill', 'new-england', 'ivy', 60, 92, 58, 58, 54, 56),
+  'north-woods': ov('North Woods', 'new-england', 'ivy', 56, 90, 54, 56, 52, 50),
+  // ── Big East ──
+  'long-island-tech': ov('Long Island Tech', 'long-island', 'bigeast', 80, 68, 78, 82, 75, 74),
+  'denver-ridge': ov('Denver Ridge', 'rocky-mountain', 'bigeast', 74, 65, 72, 76, 68, 70),
+  'georgetown-prep': ov('Georgetown Prep', 'mid-atlantic', 'bigeast', 68, 88, 66, 70, 65, 60),
+  'penn-grove': ov('Penn Grove', 'mid-atlantic', 'bigeast', 62, 76, 60, 64, 58, 55),
+  'lakefront-catholic': ov('Lakefront Catholic', 'midwest', 'bigeast', 58, 70, 56, 60, 56, 52),
+  'ocean-state': ov('Ocean State', 'new-england', 'bigeast', 54, 66, 52, 56, 52, 48),
+  // ── Patriot League ──
+  'annapolis-naval': ov('Annapolis Naval', 'mid-atlantic', 'patriot', 72, 78, 70, 74, 74, 68),
+  'new-england-college': ov('New England College', 'new-england', 'patriot', 72, 82, 70, 74, 68, 65),
+  'hudson-military': ov('Hudson Military', 'upstate-ny', 'patriot', 69, 78, 68, 72, 72, 66),
+  'chenango-valley': ov('Chenango Valley', 'upstate-ny', 'patriot', 61, 74, 60, 60, 56, 58),
+  'seven-hills': ov('Seven Hills', 'new-england', 'patriot', 58, 76, 56, 58, 54, 54),
+  'bucks-county': ov('Bucks County', 'mid-atlantic', 'patriot', 55, 72, 52, 56, 50, 52),
+  // ── ASUN ──
+  'colorado-front-range': ov('Colorado Front Range', 'colorado', 'asun', 62, 65, 60, 64, 60, 55),
+  'air-academy': ov('Air Academy', 'colorado', 'asun', 57, 74, 56, 60, 58, 54),
+  'california-coast': ov('California Coast', 'california', 'asun', 55, 68, 54, 58, 52, 48),
+  'utah-canyon': ov('Utah Canyon', 'rocky-mountain', 'asun', 52, 62, 50, 54, 48, 44),
+  'oregon-cascade': ov('Oregon Cascade', 'pacific-northwest', 'asun', 50, 64, 48, 52, 46, 42),
+  'motor-city': ov('Motor City', 'great-lakes', 'asun', 47, 60, 46, 48, 46, 44),
 };
 
-function makeTeamWithOverride(id: string): LacrosseTeam {
-  const base = makeLacrosseTeam(id);
+const CONFERENCE_META = [
+  { id: 'acc', name: 'Atlantic Coast Conference', shortName: 'ACC', prestige: 85 },
+  { id: 'b10', name: 'Big Ten', shortName: 'B1G', prestige: 80 },
+  { id: 'ivy', name: 'Ivy League', shortName: 'Ivy', prestige: 75 },
+  { id: 'bigeast', name: 'Big East', shortName: 'BE', prestige: 72 },
+  { id: 'patriot', name: 'Patriot League', shortName: 'PL', prestige: 68 },
+  { id: 'asun', name: 'ASUN', shortName: 'ASUN', prestige: 55 },
+] as const;
+
+function makeTeamWithOverride(id: string, seed: number, seasonYear: number): LacrosseTeam {
   const override = TEAM_OVERRIDES[id];
+  const prestige = override?.nationalPrestige ?? 60;
+  const roster = generateLacrosseRoster({
+    seed: seed + hashTeamId(id),
+    prestige,
+    createdSeason: seasonYear,
+  });
+  const base = makeLacrosseTeam(id, roster);
+  base.resources = { ...base.resources, scholarshipUsed: rosterScholarshipsUsed(roster) };
   if (override === undefined) {
     return base;
   }
@@ -347,15 +292,26 @@ function makeTeamWithOverride(id: string): LacrosseTeam {
   };
 }
 
+function hashTeamId(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
 export function createLacrosseSeasonSchedule(
   seasonYear: number,
   conferences: Array<{ id: string; teamIds: string[] }>,
 ): ScheduledGame[] {
+  // Real college lacrosse shape: non-conference slate first, then a single
+  // conference round-robin (league rivals meet once; rematches happen in May).
+  const nonConfWeeks = Math.max(0, Math.min(5, conferences.length - 1));
+  const nonConf = createNonConferenceSchedule(seasonYear, conferences, nonConfWeeks);
   const confSchedules = conferences.flatMap((conf) =>
-    createRoundRobinSchedule(conf.teamIds, seasonYear, { conferenceGame: true, startWeek: 1 }),
+    createRoundRobinSchedule(conf.teamIds, seasonYear, { conferenceGame: true, startWeek: nonConfWeeks + 1 }),
   );
-  const crossConf = createAutoCrossConferenceSchedule(seasonYear, conferences);
-  return [...confSchedules, ...crossConf];
+  return [...nonConf, ...confSchedules];
 }
 
 export function createNewLacrosseDynasty({
@@ -364,14 +320,14 @@ export function createNewLacrosseDynasty({
   seasonYear,
   customTeams,
 }: CreateNewLacrosseDynastyOptions): LacrosseDynastyState {
-  const teams = customTeams ? buildTeamsFromConfig(customTeams) : createInitialTeams();
+  const teams = customTeams ? buildTeamsFromConfig(customTeams, seed, seasonYear) : createInitialTeams(seed, seasonYear);
   const userTeam = teams.find((team) => team.id === userTeamId);
 
   if (userTeam === undefined) {
     throw new Error(`Unknown lacrosse dynasty userTeamId: ${userTeamId}`);
   }
 
-  const recruits = generateLacrosseRecruitingClass({ count: 80, seed });
+  const recruits = generateLacrosseRecruitingClass({ count: recruitingClassSize(teams.length), seed });
   const recruitBoard = sortRecruitBoardForTeam(userTeam, openRecruits(recruits), DEFAULT_LACROSSE_ROSTER_TARGETS);
 
   const conferences = customTeams ? buildConferencesFromConfig(customTeams, teams) : createDefaultConferences();
@@ -627,73 +583,74 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function createInitialTeams(): LacrosseTeam[] {
-  return [
-    makeTeamWithOverride('maryland-state'),
-    makeTeamWithOverride('virginia-lakes'),
-    makeTeamWithOverride('long-island-tech'),
-    makeTeamWithOverride('georgetown-prep'),
-    makeTeamWithOverride('new-england-college'),
-    makeTeamWithOverride('colorado-front-range'),
-    makeTeamWithOverride('syracuse-heights'),
-    makeTeamWithOverride('penn-state-valley'),
-    makeTeamWithOverride('ohio-summit'),
-    makeTeamWithOverride('michigan-bay'),
-    makeTeamWithOverride('penn-grove'),
-    makeTeamWithOverride('illinois-central'),
-    makeTeamWithOverride('california-coast'),
-    makeTeamWithOverride('denver-ridge'),
-    makeTeamWithOverride('utah-canyon'),
-    makeTeamWithOverride('oregon-cascade'),
-  ];
+export function recruitingClassSize(teamCount: number): number {
+  return Math.max(80, teamCount * 5);
 }
 
-// Auto-generates cross-conference games: each conference plays one game against
-// the "next" conference (circular), matched by team index within each conference.
-function createAutoCrossConferenceSchedule(
+function createInitialTeams(seed: number, seasonYear: number): LacrosseTeam[] {
+  return Object.keys(TEAM_OVERRIDES).map((id) => makeTeamWithOverride(id, seed, seasonYear));
+}
+
+// Non-conference play: one week per round, every conference paired with one
+// other conference per week (circle method), teams matched by rotating index.
+function createNonConferenceSchedule(
   seasonYear: number,
   conferences: Array<{ id: string; teamIds: string[] }>,
-  startWeek = 7,
+  rounds: number,
 ): ScheduledGame[] {
   const games: ScheduledGame[] = [];
-  let weekNum = startWeek;
-  const n = conferences.length;
+  if (conferences.length < 2 || rounds < 1) return games;
 
-  for (let i = 0; i < n; i++) {
-    const confA = conferences[i]!;
-    const confB = conferences[(i + 1) % n]!;
-    for (let k = 0; k < confA.teamIds.length; k++) {
-      const homeId = confA.teamIds[k];
-      const awayId = confB.teamIds[k % confB.teamIds.length];
-      if (homeId && awayId) {
+  const slots: Array<number | null> =
+    conferences.length % 2 === 0
+      ? conferences.map((_, i) => i)
+      : [...conferences.map((_, i) => i), null];
+  const n = slots.length;
+
+  for (let round = 0; round < Math.min(rounds, n - 1); round += 1) {
+    const week = round + 1;
+    for (let k = 0; k < n / 2; k += 1) {
+      const ai = slots[k];
+      const bi = slots[n - 1 - k];
+      if (ai == null || bi == null) continue;
+      const confA = conferences[ai]!;
+      const confB = conferences[bi]!;
+      const matchups = Math.min(confA.teamIds.length, confB.teamIds.length);
+
+      for (let m = 0; m < matchups; m += 1) {
+        const a = confA.teamIds[m];
+        const b = confB.teamIds[(m + round) % confB.teamIds.length];
+        if (!a || !b) continue;
+        const [homeTeamId, awayTeamId] = (m + round) % 2 === 0 ? [a, b] : [b, a];
         games.push({
-          id: `${seasonYear}-week-${weekNum}-${homeId}-vs-${awayId}`,
+          id: `${seasonYear}-week-${week}-${homeTeamId}-vs-${awayTeamId}`,
           seasonYear,
-          week: weekNum,
-          homeTeamId: homeId,
-          awayTeamId: awayId,
+          week,
+          homeTeamId,
+          awayTeamId,
           conferenceGame: false,
           status: 'scheduled',
         });
-        weekNum++;
       }
     }
+    slots.splice(1, 0, slots.pop()!);
   }
 
   return games;
 }
 
 function createDefaultConferences(): Conference[] {
-  const accIds = ['maryland-state', 'virginia-lakes', 'long-island-tech', 'georgetown-prep'];
-  const necIds = ['new-england-college', 'colorado-front-range', 'syracuse-heights', 'penn-state-valley'];
-  const b10Ids = ['ohio-summit', 'michigan-bay', 'penn-grove', 'illinois-central'];
-  const pacIds = ['california-coast', 'denver-ridge', 'utah-canyon', 'oregon-cascade'];
-  return [
-    { id: 'acc', name: 'Atlantic Coast Conference', shortName: 'ACC', teamIds: accIds, prestige: 80, regionIds: ['mid-atlantic', 'long-island'] },
-    { id: 'nec', name: 'Northeast Conference', shortName: 'NEC', teamIds: necIds, prestige: 70, regionIds: ['new-england', 'colorado', 'upstate-ny', 'mid-atlantic'] },
-    { id: 'b10', name: 'Midwest Lacrosse Conference', shortName: 'MLC', teamIds: b10Ids, prestige: 62, regionIds: ['ohio-valley', 'great-lakes', 'midwest', 'mid-atlantic'] },
-    { id: 'pac', name: 'Western Lacrosse Conference', shortName: 'WLC', teamIds: pacIds, prestige: 55, regionIds: ['california', 'rocky-mountain', 'pacific-northwest'] },
-  ];
+  return CONFERENCE_META.map((meta) => {
+    const members = Object.entries(TEAM_OVERRIDES).filter(([, o]) => o.conferenceId === meta.id);
+    return {
+      id: meta.id,
+      name: meta.name,
+      shortName: meta.shortName,
+      prestige: meta.prestige,
+      teamIds: members.map(([id]) => id),
+      regionIds: [...new Set(members.map(([, o]) => o.regionId))],
+    };
+  });
 }
 
 function buildConferencesFromConfig(config: CustomTeamsFile, teams: LacrosseTeam[]): Conference[] {
@@ -717,9 +674,14 @@ function buildRegionsFromConfig(config: CustomTeamsFile): Region[] {
   return merged;
 }
 
-function buildTeamsFromConfig(config: CustomTeamsFile): LacrosseTeam[] {
+function buildTeamsFromConfig(config: CustomTeamsFile, seed: number, seasonYear: number): LacrosseTeam[] {
   return config.teams.map((def) => {
-    const base = makeLacrosseTeam(def.id);
+    const teamSeed = seed + hashTeamId(def.id);
+    const roster = def.roster
+      ? buildRosterFromCustomPlayers(def.roster, { seed: teamSeed, createdSeason: seasonYear })
+      : generateLacrosseRoster({ seed: teamSeed, prestige: def.nationalPrestige, createdSeason: seasonYear });
+    const base = makeLacrosseTeam(def.id, roster);
+    base.resources = { ...base.resources, scholarshipUsed: rosterScholarshipsUsed(roster) };
     return {
       ...base,
       name: def.name,

@@ -1,5 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { generateJobOffers, shouldFireCoach } from './coach-profile';
+import { generateJobOffers, generateSeasonGoals, shouldFireCoach } from './coach-profile';
+
+describe('generateSeasonGoals', () => {
+  it('scales the win target to the actual schedule length', () => {
+    // Low-prestige program with only 5 games: ~30% of 5 → 2 wins, not a fixed 5+
+    expect(generateSeasonGoals(40, 2028, 5).winTarget).toBe(2);
+    // Elite program with 5 games: 75% → 4 wins
+    expect(generateSeasonGoals(85, 2028, 5).winTarget).toBe(4);
+    // Elite program with a 14-game slate: 75% → 11 wins (old fixed behavior preserved at full length)
+    expect(generateSeasonGoals(85, 2028, 14).winTarget).toBe(11);
+  });
+
+  it('never demands more wins than there are games', () => {
+    for (const prestige of [40, 55, 70, 90]) {
+      for (const games of [1, 3, 5, 12, 20]) {
+        const goals = generateSeasonGoals(prestige, 2028, games);
+        expect(goals.winTarget).toBeGreaterThanOrEqual(1);
+        expect(goals.winTarget).toBeLessThanOrEqual(games);
+      }
+    }
+  });
+
+  it('keeps prestige-based expectations ordered', () => {
+    const games = 12;
+    const low = generateSeasonGoals(40, 2028, games).winTarget;
+    const mid = generateSeasonGoals(60, 2028, games).winTarget;
+    const high = generateSeasonGoals(85, 2028, games).winTarget;
+    expect(low).toBeLessThan(mid);
+    expect(mid).toBeLessThan(high);
+  });
+});
 
 describe('shouldFireCoach', () => {
   it('fires an established coach once confidence drops below 20', () => {

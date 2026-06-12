@@ -46,6 +46,14 @@ describe('simulateOneWeek', () => {
     expect(state.gameLogs.size).toBe(0);
   });
 
+  it('publishes a player of the week news item once goals are scored', () => {
+    const next = simulateOneWeek(freshState(), undefined, seededRandom(5));
+    const potw = next.newsItems.find((n) => n.headline.startsWith('Player of the Week:'));
+    expect(potw).toBeDefined();
+    expect(potw!.category).toBe('award');
+    expect(potw!.headline).toMatch(/—\s\d+G, \d+A$/);
+  });
+
   it('tracks the best national rank achieved by the user team', () => {
     const next = simulateOneWeek(freshState(), undefined, seededRandom(2));
     const userRank = next.rankings.find((r) => r.teamId === next.dynasty.userTeamId)?.rank ?? null;

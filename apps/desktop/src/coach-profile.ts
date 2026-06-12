@@ -61,33 +61,43 @@ export function extendCoachContract(profile: CoachProfile, years = 3): CoachProf
   return { ...profile, contractYearsRemaining: profile.contractYearsRemaining + years };
 }
 
-export function generateSeasonGoals(prestige: number, year: number): SeasonGoals {
-  let winTarget: number;
+export const DEFAULT_GOAL_SCHEDULE_LENGTH = 12;
+
+export function generateSeasonGoals(
+  prestige: number,
+  year: number,
+  scheduledGames = DEFAULT_GOAL_SCHEDULE_LENGTH,
+): SeasonGoals {
+  let winFraction: number;
   let confChampGoal: boolean;
   let rankingGoal: number | null;
   let recruitClassGoal: number;
 
   if (prestige >= 80) {
-    winTarget = 11;
+    winFraction = 0.75;
     confChampGoal = true;
     rankingGoal = 5;
     recruitClassGoal = 8;
   } else if (prestige >= 65) {
-    winTarget = 9;
+    winFraction = 0.6;
     confChampGoal = true;
     rankingGoal = 15;
     recruitClassGoal = 6;
   } else if (prestige >= 50) {
-    winTarget = 7;
+    winFraction = 0.45;
     confChampGoal = false;
     rankingGoal = 25;
     recruitClassGoal = 5;
   } else {
-    winTarget = 5;
+    winFraction = 0.3;
     confChampGoal = false;
     rankingGoal = null;
     recruitClassGoal = 4;
   }
+
+  // Win targets scale to the games actually on the schedule
+  const games = Math.max(1, scheduledGames);
+  const winTarget = Math.min(games, Math.max(1, Math.round(games * winFraction)));
 
   const goals: SeasonGoal[] = [
     { id: 'wins', description: `Win ${winTarget}+ games`, achieved: null },

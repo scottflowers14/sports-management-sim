@@ -9,7 +9,7 @@ import {
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import type { EligibilityStatus, PlayerClass, StandingsEntry } from '@sports-management-sim/engine-core';
-import { createLacrosseSeasonSchedule, generateLacrosseRecruitingClass } from '@sports-management-sim/sport-lacrosse';
+import { createLacrosseSeasonSchedule, generateLacrosseRecruitingClass, recruitingClassSize } from '@sports-management-sim/sport-lacrosse';
 import type {
   LacrossePlayer,
   LacrossePlayerTraits,
@@ -21,6 +21,7 @@ import type {
 } from '@sports-management-sim/sport-lacrosse';
 import { computeSeasonAwards } from './awards';
 import type { SeasonAwards } from './awards';
+import type { SeasonStatsMap } from './stats';
 import { capturePreOffseasonSnapshot, computeDevelopmentReport } from './development-report';
 import type { DevelopmentReport, PreOffseasonSnapshot } from './development-report';
 
@@ -218,6 +219,7 @@ export function runOffseason(
   dynasty: LacrosseDynastyState,
   nationalChampionId?: string,
   trainingFocus: TrainingFocus = 'balanced',
+  seasonStats?: SeasonStatsMap,
 ): { newDynasty: LacrosseDynastyState; summary: OffseasonSummary } {
   const { season, recruits, userTeamId, seed, rosterTargets } = dynasty;
   const newYear = season.year + 1;
@@ -281,8 +283,8 @@ export function runOffseason(
       overall: r.ratings.overall,
     }));
 
-  // Compute season awards
-  const awards = computeSeasonAwards(season, userTeamId);
+  // Compute season awards (stat-based when season stats are available)
+  const awards = computeSeasonAwards(season, userTeamId, seasonStats);
 
   // Compute development report (compare post-offseason ratings vs pre-offseason snapshot)
   const postOffseasonUserTeam = teamsAfterOffseason.find((t) => t.id === userTeamId);
@@ -292,7 +294,10 @@ export function runOffseason(
 
   // Generate new recruiting class and board
   const newSeed = seed + newYear;
-  const newRecruits = generateLacrosseRecruitingClass({ count: 80, seed: newSeed });
+  const newRecruits = generateLacrosseRecruitingClass({
+    count: recruitingClassSize(teamsAfterOffseason.length),
+    seed: newSeed,
+  });
   const newUserTeam = teamsAfterOffseason.find((t) => t.id === userTeamId)!;
   const newRecruitBoard = sortRecruitBoardForTeam(newUserTeam, newRecruits, rosterTargets);
 

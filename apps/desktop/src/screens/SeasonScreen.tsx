@@ -1,6 +1,7 @@
 import {
   DEFENSE_LABELS,
   TEMPO_LABELS,
+  describeGamePlan,
   type DefensiveStyle,
   type GameLog,
   type LacrosseGamePlan,
@@ -8,6 +9,14 @@ import {
   type LacrosseTeamRating,
   type OffensiveTempo,
 } from '@sports-management-sim/sport-lacrosse';
+
+export interface OpponentScout {
+  week: number;
+  name: string;
+  isHome: boolean;
+  plan: LacrosseGamePlan;
+  rating: number;
+}
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { DepthChart } from '../components/DepthChart';
 import { ResultRow } from '../components/ResultRow';
@@ -34,6 +43,7 @@ export function SeasonScreen({
   gameLogs,
   gamePlan,
   trainingFocus,
+  nextOpponentScout,
   onGamePlanChange,
   onTrainingFocusChange,
   onSimWeek,
@@ -60,6 +70,7 @@ export function SeasonScreen({
   gameLogs: Map<string, GameLog>;
   gamePlan: LacrosseGamePlan;
   trainingFocus: TrainingFocus;
+  nextOpponentScout: OpponentScout | null;
   onGamePlanChange: (plan: LacrosseGamePlan) => void;
   onTrainingFocusChange: (focus: TrainingFocus) => void;
   onSimWeek: () => void;
@@ -137,6 +148,16 @@ export function SeasonScreen({
       <div className="season-sidebar">
         <article className="card gameplan-card">
           <h2>Coaching</h2>
+          {nextOpponentScout && (
+            <div className="scout-report" aria-label="Opponent scouting report">
+              <span className="section-label">Scouting Report</span>
+              <p className="scout-opponent">
+                Wk {nextOpponentScout.week} {nextOpponentScout.isHome ? 'vs' : 'at'} {nextOpponentScout.name}
+                <span className="scout-ovr"> · {nextOpponentScout.rating} OVR</span>
+              </p>
+              <p className="scout-tendencies">Tendencies: {describeGamePlan(nextOpponentScout.plan)}</p>
+            </div>
+          )}
           <label className="gameplan-row">
             <span className="gameplan-label">Offensive Tempo</span>
             <select
