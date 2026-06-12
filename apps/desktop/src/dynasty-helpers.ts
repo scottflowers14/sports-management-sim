@@ -9,7 +9,7 @@ import {
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import type { EligibilityStatus, PlayerClass, StandingsEntry } from '@sports-management-sim/engine-core';
-import { createLacrosseSeasonSchedule, generateLacrosseRecruitingClass } from '@sports-management-sim/sport-lacrosse';
+import { createLacrosseSeasonSchedule, generateLacrosseRecruitingClass, recruitingClassSize } from '@sports-management-sim/sport-lacrosse';
 import type {
   LacrossePlayer,
   LacrossePlayerTraits,
@@ -294,7 +294,10 @@ export function runOffseason(
 
   // Generate new recruiting class and board
   const newSeed = seed + newYear;
-  const newRecruits = generateLacrosseRecruitingClass({ count: 80, seed: newSeed });
+  const newRecruits = generateLacrosseRecruitingClass({
+    count: recruitingClassSize(teamsAfterOffseason.length),
+    seed: newSeed,
+  });
   const newUserTeam = teamsAfterOffseason.find((t) => t.id === userTeamId)!;
   const newRecruitBoard = sortRecruitBoardForTeam(newUserTeam, newRecruits, rosterTargets);
 

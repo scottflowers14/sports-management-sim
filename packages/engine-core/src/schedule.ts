@@ -5,6 +5,10 @@ export interface CreateRoundRobinScheduleOptions {
   conferenceGame?: boolean;
 }
 
+/**
+ * Single round-robin via the circle method: n teams play n-1 rounds with all
+ * games in a round sharing the same week (odd team counts get a weekly bye).
+ */
 export function createRoundRobinSchedule(
   teamIds: ID[],
   seasonYear: SeasonYear,
@@ -14,25 +18,32 @@ export function createRoundRobinSchedule(
   const conferenceGame = options.conferenceGame ?? false;
   const schedule: ScheduledGame[] = [];
 
-  for (let homeIndex = 0; homeIndex < teamIds.length; homeIndex += 1) {
-    for (let awayIndex = homeIndex + 1; awayIndex < teamIds.length; awayIndex += 1) {
-      const homeTeamId = teamIds[homeIndex];
-      const awayTeamId = teamIds[awayIndex];
+  const ids = teamIds.filter((id): id is ID => id !== undefined);
+  if (ids.length < 2) return schedule;
 
-      if (homeTeamId === undefined || awayTeamId === undefined) {
-        continue;
-      }
+  const slots: Array<ID | null> = ids.length % 2 === 0 ? [...ids] : [...ids, null];
+  const n = slots.length;
 
+  for (let round = 0; round < n - 1; round += 1) {
+    const week = startWeek + round;
+    for (let k = 0; k < n / 2; k += 1) {
+      const a = slots[k];
+      const b = slots[n - 1 - k];
+      if (a == null || b == null) continue;
+
+      // Alternate home/away across rounds so nobody hosts everything
+      const [homeTeamId, awayTeamId] = (round + k) % 2 === 0 ? [a, b] : [b, a];
       schedule.push({
-        id: `${seasonYear}-week-${startWeek + schedule.length}-${homeTeamId}-vs-${awayTeamId}`,
+        id: `${seasonYear}-week-${week}-${homeTeamId}-vs-${awayTeamId}`,
         seasonYear,
-        week: startWeek + schedule.length,
+        week,
         homeTeamId,
         awayTeamId,
         conferenceGame,
         status: 'scheduled',
       });
     }
+    slots.splice(1, 0, slots.pop()!);
   }
 
   return schedule;

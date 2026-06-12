@@ -60,33 +60,44 @@ export function advanceTournamentSemis(state: TournamentState, teams: LacrosseTe
 
 export function advanceTournamentFinals(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan): TournamentState {
   const updatedBrackets = state.conferenceBrackets.map((bracket) => simulateFinal(bracket, teams, planFor));
-  const champions = updatedBrackets.map((b) => b.champion!);
+  const champions = rankByRecord(updatedBrackets.map((b) => b.champion!), teams);
 
-  // With exactly 2 conferences skip national semis — go straight to the championship game.
-  if (champions.length === 2) {
+  // Fewer than four champions: straight to a championship game between the top two.
+  if (champions.length < 4) {
     const nationalGame: TournamentGame = {
       id: 'national-championship',
       homeTeamId: champions[0]!,
-      awayTeamId: champions[1]!,
+      awayTeamId: champions[1] ?? champions[0]!,
       conferenceId: null,
     };
     return { ...state, phase: 'national_final', conferenceBrackets: updatedBrackets, nationalGame };
   }
 
-  // 4+ conferences: seed1 vs seed4, seed2 vs seed3 (by bracket index).
+  // Four or more champions: the four best regular-season records make the
+  // national semifinals, seeded 1v4 and 2v3.
   const nationalSemiFinal1: TournamentGame = {
     id: 'national-semi-1',
     homeTeamId: champions[0]!,
-    awayTeamId: champions[champions.length - 1]!,
+    awayTeamId: champions[3]!,
     conferenceId: null,
   };
   const nationalSemiFinal2: TournamentGame = {
     id: 'national-semi-2',
     homeTeamId: champions[1]!,
-    awayTeamId: champions[champions.length - 2]!,
+    awayTeamId: champions[2]!,
     conferenceId: null,
   };
   return { ...state, phase: 'national_semis', conferenceBrackets: updatedBrackets, nationalSemiFinal1, nationalSemiFinal2 };
+}
+
+function rankByRecord(teamIds: string[], teams: LacrosseTeam[]): string[] {
+  const winPct = (id: string): number => {
+    const record = teams.find((t) => t.id === id)?.record;
+    if (!record) return 0;
+    const games = record.wins + record.losses;
+    return games > 0 ? record.wins / games : 0;
+  };
+  return [...teamIds].sort((a, b) => winPct(b) - winPct(a));
 }
 
 export function advanceTournamentNationalSemis(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan): TournamentState {
