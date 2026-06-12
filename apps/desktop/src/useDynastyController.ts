@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   applyScholarshipOffer,
+  classScholarshipBudgetUsed,
+  recruitPrestigeMultiplier,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import {
   DEFAULT_GAME_PLAN,
+  LACROSSE_CLASS_SCHOLARSHIP_BUDGET,
   deriveCpuGamePlan,
   offerLacrossePortalPlayer,
   updateLacrosseDepthChartSlot,
@@ -332,19 +335,36 @@ export function useDynastyController() {
     applyWeekSimResult(simulateRemainingWeeks(buildWeekSimState(), gamePlan));
   }, [applyWeekSimResult, buildWeekSimState, gamePlan]);
 
-  const offerScholarship = useCallback((recruitId: string) => {
-    setDynasty((prev) => {
-      const recruit = prev.recruits.find((r) => r.id === recruitId);
-      const userTeamLocal = prev.season.teams.find((t) => t.id === prev.userTeamId);
-      if (!recruit || !userTeamLocal) return prev;
-      const updated = applyScholarshipOffer(recruit, prev.userTeamId, 100);
-      const recruits = prev.recruits.map((r) => (r.id === recruitId ? updated : r));
-      const recruitBoard = sortRecruitBoardForTeam(userTeamLocal, recruits, prev.rosterTargets);
-      return { ...prev, recruits, recruitBoard };
-    });
+  const offerScholarship = useCallback((recruitId: string, scholarshipPercent = 100) => {
+    const recruit = dynasty.recruits.find((r) => r.id === recruitId);
+    const userTeamLocal = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+    if (!recruit || !userTeamLocal) return;
+
+    const budgetUsed = classScholarshipBudgetUsed(dynasty.recruits, dynasty.userTeamId);
+    const existingOffer = recruit.scholarshipOffers.find((o) => o.teamId === dynasty.userTeamId);
+    const additionalCost = (scholarshipPercent - (existingOffer?.scholarshipPercent ?? 0)) / 100;
+    if (budgetUsed + additionalCost > LACROSSE_CLASS_SCHOLARSHIP_BUDGET + 1e-9) {
+      setSaveStatus('Not enough scholarship budget for that offer');
+      return;
+    }
+
+    const updated = applyScholarshipOffer(
+      recruit,
+      dynasty.userTeamId,
+      scholarshipPercent,
+      recruitPrestigeMultiplier(recruit.starRating, userTeamLocal.reputation.nationalPrestige),
+    );
+    const recruits = dynasty.recruits.map((r) => (r.id === recruitId ? updated : r));
+    const recruitBoard = sortRecruitBoardForTeam(userTeamLocal, recruits, dynasty.rosterTargets);
+    setDynasty({ ...dynasty, recruits, recruitBoard });
     // Offering implies you're tracking them — pin to the board automatically.
     setShortlistIds((prev) => (prev.includes(recruitId) ? prev : [...prev, recruitId]));
-  }, []);
+  }, [dynasty]);
+
+  const scholarshipBudget = {
+    used: classScholarshipBudgetUsed(dynasty.recruits, dynasty.userTeamId),
+    total: LACROSSE_CLASS_SCHOLARSHIP_BUDGET,
+  };
 
   const toggleShortlist = useCallback((recruitId: string) => {
     setShortlistIds((prev) =>
@@ -600,6 +620,7 @@ export function useDynastyController() {
     toggleShortlist,
     recruitBoardView,
     setRecruitBoardView,
+    scholarshipBudget,
     coachProfile,
     adConfidence,
     seasonGoals,

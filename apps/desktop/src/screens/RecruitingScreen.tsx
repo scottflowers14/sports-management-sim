@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
-import type { RecruitBoardEntry } from '@sports-management-sim/engine-core';
+import { topRecruitMotivations, type RecruitBoardEntry, type RecruitMotivation } from '@sports-management-sim/engine-core';
 import type { ScoutingState } from '../scouting';
 import { getDisplayOvr, getScoutTier } from '../scouting';
 import { formatTeamName, formatTeamShort } from '../ui/format';
@@ -9,6 +9,27 @@ type LacrosseBoardEntry = RecruitBoardEntry<LacrossePosition, LacrossePlayerTrai
 
 export type RecruitBoardView = 'shortlist' | 'all';
 type BoardSort = 'rank' | 'stars' | 'ovr' | 'interest';
+
+/** 4★+ recruits are nationally ranked — their star tier is public knowledge. */
+const PUBLIC_STAR_FLOOR = 4;
+
+const MOTIVATION_LABELS: Record<RecruitMotivation, string> = {
+  proximity: 'Close to Home',
+  prestige: 'Big Stage',
+  scholarship: 'Scholarship $',
+  playingTime: 'Playing Time',
+  academics: 'Academics',
+};
+
+function starsArePublic(entry: LacrosseBoardEntry): boolean {
+  return entry.recruit.starRating >= PUBLIC_STAR_FLOOR;
+}
+
+/** Motivations revealed so far: partial scouting shows the top one, full shows two. */
+function revealedMotivations(entry: LacrosseBoardEntry, tier: 'none' | 'partial' | 'full'): RecruitMotivation[] {
+  if (tier === 'none') return [];
+  return topRecruitMotivations(entry.recruit.preferences, tier === 'full' ? 2 : 1);
+}
 
 export function RecruitingScreen({
   recruitBoard,
@@ -21,6 +42,7 @@ export function RecruitingScreen({
   recruitTab,
   shortlistIds,
   boardView,
+  scholarshipBudget,
   onOfferScholarship,
   onScoutRecruit,
   onOfferPortalPlayer,
@@ -39,7 +61,8 @@ export function RecruitingScreen({
   recruitTab: 'board' | 'portal';
   shortlistIds: string[];
   boardView: RecruitBoardView;
-  onOfferScholarship: (recruitId: string) => void;
+  scholarshipBudget: { used: number; total: number };
+  onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onOfferPortalPlayer: (entryId: string) => void;
   onRecruitPosFilterChange: (pos: LacrossePosition | 'ALL') => void;
@@ -93,20 +116,28 @@ export function RecruitingScreen({
       {recruitTab === 'board' && (
         <>
           <div className="board-subnav">
-            <div className="recruit-tabs board-view-tabs">
-              <button
-                className={`recruit-tab${boardView === 'shortlist' ? ' active' : ''}`}
-                onClick={() => onBoardViewChange('shortlist')}
+            <div className="board-subnav-left">
+              <div className="recruit-tabs board-view-tabs">
+                <button
+                  className={`recruit-tab${boardView === 'shortlist' ? ' active' : ''}`}
+                  onClick={() => onBoardViewChange('shortlist')}
+                >
+                  My Board
+                  {boardEntries.length > 0 && <span className="board-count-badge">{boardEntries.length}</span>}
+                </button>
+                <button
+                  className={`recruit-tab${boardView === 'all' ? ' active' : ''}`}
+                  onClick={() => onBoardViewChange('all')}
+                >
+                  All Recruits
+                </button>
+              </div>
+              <span
+                className={`budget-chip${scholarshipBudget.total - scholarshipBudget.used < 0.25 ? ' budget-low' : ''}`}
+                title="Scholarship equivalencies available for this class. Offers count against the budget; money offered to recruits who sign elsewhere is released."
               >
-                My Board
-                {boardEntries.length > 0 && <span className="board-count-badge">{boardEntries.length}</span>}
-              </button>
-              <button
-                className={`recruit-tab${boardView === 'all' ? ' active' : ''}`}
-                onClick={() => onBoardViewChange('all')}
-              >
-                All Recruits
-              </button>
+                Scholarships {scholarshipBudget.used.toFixed(2)} / {scholarshipBudget.total.toFixed(2)}
+              </span>
             </div>
 
             {boardView === 'all' && (
@@ -157,6 +188,7 @@ export function RecruitingScreen({
               teamMap={teamMap}
               currentWeek={currentWeek}
               shortlistSet={shortlistSet}
+              budgetRemaining={scholarshipBudget.total - scholarshipBudget.used}
               onOfferScholarship={onOfferScholarship}
               onScoutRecruit={onScoutRecruit}
               onToggleShortlist={onToggleShortlist}
@@ -171,6 +203,7 @@ export function RecruitingScreen({
               userTeamId={userTeamId}
               teamMap={teamMap}
               shortlistSet={shortlistSet}
+              budgetRemaining={scholarshipBudget.total - scholarshipBudget.used}
               onOfferScholarship={onOfferScholarship}
               onScoutRecruit={onScoutRecruit}
               onToggleShortlist={onToggleShortlist}
@@ -199,6 +232,7 @@ function ShortlistBoard({
   teamMap,
   currentWeek,
   shortlistSet,
+  budgetRemaining,
   onOfferScholarship,
   onScoutRecruit,
   onToggleShortlist,
@@ -211,7 +245,8 @@ function ShortlistBoard({
   teamMap: Map<string, string>;
   currentWeek: number;
   shortlistSet: Set<string>;
-  onOfferScholarship: (recruitId: string) => void;
+  budgetRemaining: number;
+  onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onToggleShortlist: (recruitId: string) => void;
   onBrowseAll: () => void;
@@ -262,6 +297,7 @@ function ShortlistBoard({
             teamMap={teamMap}
             currentWeek={currentWeek}
             pinned={shortlistSet.has(entry.recruit.id)}
+            budgetRemaining={budgetRemaining}
             onOfferScholarship={onOfferScholarship}
             onScoutRecruit={onScoutRecruit}
             onToggleShortlist={onToggleShortlist}
@@ -280,6 +316,7 @@ function AllRecruitsList({
   userTeamId,
   teamMap,
   shortlistSet,
+  budgetRemaining,
   onOfferScholarship,
   onScoutRecruit,
   onToggleShortlist,
@@ -291,7 +328,8 @@ function AllRecruitsList({
   userTeamId: string;
   teamMap: Map<string, string>;
   shortlistSet: Set<string>;
-  onOfferScholarship: (recruitId: string) => void;
+  budgetRemaining: number;
+  onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onToggleShortlist: (recruitId: string) => void;
 }) {
@@ -311,7 +349,7 @@ function AllRecruitsList({
     const tier = getScoutTier(recruit.id, scouting);
     switch (sort) {
       case 'stars':
-        return tier === 'none' ? -1 : recruit.starRating;
+        return tier === 'none' && !starsArePublic(entry) ? -1 : recruit.starRating;
       case 'ovr':
         return getDisplayOvr(recruit.id, recruit.ratings.overall, scouting) ?? -1;
       case 'interest':
@@ -342,6 +380,8 @@ function AllRecruitsList({
         const isCommittedElsewhere = recruit.status !== 'open' && !isCommittedToUs;
         const pinned = shortlistSet.has(recruit.id);
         const fullName = `${recruit.name.first} ${recruit.name.last}`;
+        const showStars = tier !== 'none' || starsArePublic(entry);
+        const motivations = revealedMotivations(entry, tier);
 
         return (
           <div
@@ -358,15 +398,21 @@ function AllRecruitsList({
             </button>
 
             <div className="recruit-row-main">
-              <strong>{fullName}</strong>
+              <strong>
+                {fullName}
+                {starsArePublic(entry) && <span className="top100-chip">Top 100</span>}
+              </strong>
               <span className="recruit-row-meta">
                 {recruit.position} ·{' '}
-                {tier !== 'none' ? (
+                {showStars ? (
                   <span className="row-stars">{'★'.repeat(recruit.starRating)}</span>
                 ) : (
                   <span className="hidden-stat">? stars</span>
                 )}{' '}
                 · {recruit.hometown}
+                {motivations.map((m) => (
+                  <span key={m} className="motive-chip">{MOTIVATION_LABELS[m]}</span>
+                ))}
               </span>
             </div>
 
@@ -410,11 +456,18 @@ function AllRecruitsList({
                     </button>
                   )}
                   {tier !== 'none' && !hasOffer && (
-                    <button className="offer-btn offer-btn-sm offer-btn-row" onClick={() => onOfferScholarship(recruit.id)}>
-                      Offer
-                    </button>
+                    <OfferControl
+                      recruitId={recruit.id}
+                      recruitName={fullName}
+                      budgetRemaining={budgetRemaining}
+                      onOffer={onOfferScholarship}
+                    />
                   )}
-                  {hasOffer && <span className="badge badge-offered">Offered</span>}
+                  {hasOffer && (
+                    <span className="badge badge-offered">
+                      Offered {recruit.scholarshipOffers.find((o) => o.teamId === userTeamId)?.scholarshipPercent}%
+                    </span>
+                  )}
                 </>
               )}
             </div>
@@ -437,6 +490,7 @@ function RecruitCard({
   teamMap,
   currentWeek,
   pinned,
+  budgetRemaining,
   onOfferScholarship,
   onScoutRecruit,
   onToggleShortlist,
@@ -447,7 +501,8 @@ function RecruitCard({
   teamMap: Map<string, string>;
   currentWeek: number;
   pinned: boolean;
-  onOfferScholarship: (recruitId: string) => void;
+  budgetRemaining: number;
+  onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onToggleShortlist: (recruitId: string) => void;
 }) {
@@ -455,11 +510,14 @@ function RecruitCard({
   const tier = getScoutTier(recruit.id, scouting);
   const displayOvr = getDisplayOvr(recruit.id, recruit.ratings.overall, scouting);
   const userInterest = recruit.interestByTeamId[userTeamId] ?? 0;
-  const hasOffer = recruit.scholarshipOffers.some((o) => o.teamId === userTeamId);
+  const userOffer = recruit.scholarshipOffers.find((o) => o.teamId === userTeamId);
+  const hasOffer = userOffer !== undefined;
   const isCommittedToUs =
     recruit.committedTeamId === userTeamId || recruit.signedTeamId === userTeamId;
   const isCommittedElsewhere = recruit.status !== 'open' && !isCommittedToUs;
   const fullName = `${recruit.name.first} ${recruit.name.last}`;
+  const showStars = tier !== 'none' || starsArePublic(entry);
+  const motivations = revealedMotivations(entry, tier);
 
   const competitors = recruit.scholarshipOffers
     .filter((o) => o.teamId !== userTeamId)
@@ -480,10 +538,13 @@ function RecruitCard({
     >
       <div className="recruit-header">
         <div>
-          <strong>{fullName}</strong>
+          <strong>
+            {fullName}
+            {starsArePublic(entry) && <span className="top100-chip">Top 100</span>}
+          </strong>
           <p className="recruit-sub">
             {recruit.position} ·{' '}
-            {tier !== 'none' ? (
+            {showStars ? (
               <>
                 {'★'.repeat(recruit.starRating)}{'☆'.repeat(5 - recruit.starRating)}
               </>
@@ -516,6 +577,14 @@ function RecruitCard({
           </div>
         </div>
       </div>
+
+      {motivations.length > 0 && (
+        <div className="motive-row">
+          {motivations.map((m) => (
+            <span key={m} className="motive-chip">{MOTIVATION_LABELS[m]}</span>
+          ))}
+        </div>
+      )}
 
       {tier !== 'none' && hasOffer && (
         <>
@@ -568,21 +637,71 @@ function RecruitCard({
               Full Scout (1 pt)
             </button>
             {!hasOffer && (
-              <button className="offer-btn" onClick={() => onOfferScholarship(recruit.id)}>
-                Offer
-              </button>
+              <OfferControl
+                recruitId={recruit.id}
+                recruitName={fullName}
+                budgetRemaining={budgetRemaining}
+                onOffer={onOfferScholarship}
+              />
             )}
-            {hasOffer && <span className="badge badge-offered">Offered</span>}
+            {hasOffer && <span className="badge badge-offered">Offered {userOffer.scholarshipPercent}%</span>}
           </div>
         ) : hasOffer ? (
-          <span className="badge badge-offered">Offered</span>
+          <span className="badge badge-offered">Offered {userOffer.scholarshipPercent}%</span>
         ) : (
-          <button className="offer-btn" onClick={() => onOfferScholarship(recruit.id)}>
-            Offer Scholarship
-          </button>
+          <OfferControl
+            recruitId={recruit.id}
+            recruitName={fullName}
+            budgetRemaining={budgetRemaining}
+            onOffer={onOfferScholarship}
+          />
         )}
       </div>
     </article>
+  );
+}
+
+const OFFER_PERCENT_OPTIONS = [25, 50, 75, 100] as const;
+
+function OfferControl({
+  recruitId,
+  recruitName,
+  budgetRemaining,
+  onOffer,
+}: {
+  recruitId: string;
+  recruitName: string;
+  budgetRemaining: number;
+  onOffer: (recruitId: string, scholarshipPercent: number) => void;
+}) {
+  const affordable = OFFER_PERCENT_OPTIONS.filter((pct) => pct / 100 <= budgetRemaining + 1e-9);
+  const maxAffordable = affordable[affordable.length - 1];
+  const [percent, setPercent] = useState<number>(maxAffordable ?? 100);
+  const canAfford = percent / 100 <= budgetRemaining + 1e-9;
+
+  return (
+    <div className="offer-control">
+      <select
+        aria-label={`Scholarship offer amount for ${recruitName}`}
+        className="offer-pct-select"
+        value={percent}
+        onChange={(e) => setPercent(Number(e.target.value))}
+      >
+        {OFFER_PERCENT_OPTIONS.map((pct) => (
+          <option key={pct} value={pct} disabled={pct / 100 > budgetRemaining + 1e-9}>
+            {pct}%
+          </option>
+        ))}
+      </select>
+      <button
+        className="offer-btn offer-btn-sm offer-btn-row"
+        disabled={!canAfford}
+        title={canAfford ? `Offer a ${percent}% scholarship` : 'Not enough scholarship budget'}
+        onClick={() => onOffer(recruitId, percent)}
+      >
+        Offer
+      </button>
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
 import type { Recruit } from '@sports-management-sim/engine-core';
 import type { LacrossePlayerTraits, LacrossePosition } from './models';
+import { LACROSSE_FIRST_NAMES as FIRST_NAMES, LACROSSE_LAST_NAMES as LAST_NAMES } from './names';
 
 export type LacrosseRecruit = Recruit<LacrossePosition, LacrossePlayerTraits>;
 
@@ -27,9 +28,6 @@ const POSITION_WEIGHTS: Array<{ position: LacrossePosition; weight: number }> = 
   { position: 'FOGO', weight: 8 },
   { position: 'LSM', weight: 12 },
 ];
-
-const FIRST_NAMES = ['Casey', 'Ryan', 'Dylan', 'Jack', 'Connor', 'Avery', 'Logan', 'Tyler'];
-const LAST_NAMES = ['Smith', 'Kelly', 'Murphy', 'Brown', 'Miller', 'Davis', 'Owen', 'Brennan'];
 
 export function generateLacrosseRecruitingClass({
   count,

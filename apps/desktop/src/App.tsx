@@ -58,6 +58,7 @@ export function App() {
     toggleShortlist,
     recruitBoardView,
     setRecruitBoardView,
+    scholarshipBudget,
     coachProfile,
     adConfidence,
     seasonGoals,
@@ -369,6 +370,7 @@ export function App() {
           recruitTab={recruitTab}
           shortlistIds={shortlistIds}
           boardView={recruitBoardView}
+          scholarshipBudget={scholarshipBudget}
           onOfferScholarship={offerScholarship}
           onScoutRecruit={doScoutRecruit}
           onOfferPortalPlayer={offerPortalPlayer}

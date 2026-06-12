@@ -289,6 +289,22 @@ describe('Desktop App', () => {
     expect(screen.getByText(/1 on board/i)).toBeInTheDocument();
   });
 
+  it('tracks the scholarship budget, supports partial offers, and shows public stars for ranked recruits', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
+
+    expect(screen.getByText(/Scholarships 0\.00 \/ 3\.25/i)).toBeInTheDocument();
+    // 4★+ recruits are nationally ranked: stars show without scouting.
+    expect(screen.getAllByText(/Top 100/i).length).toBeGreaterThan(0);
+
+    await userEvent.click(screen.getAllByRole('button', { name: /^Scout \(1 pt\)$/i })[0]!);
+    await userEvent.selectOptions(screen.getAllByLabelText(/Scholarship offer amount/i)[0]!, '50');
+    await userEvent.click(screen.getAllByRole('button', { name: /^Offer$/i })[0]!);
+
+    expect(screen.getByText(/Scholarships 0\.50 \/ 3\.25/i)).toBeInTheDocument();
+    expect(screen.getByText(/Offered 50%/i)).toBeInTheDocument();
+  });
+
   it('switches to standings and shows national rankings and conference sections', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Standings/i }));

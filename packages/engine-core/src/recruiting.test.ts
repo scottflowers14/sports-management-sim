@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { applyScholarshipOffer, calculateRecruitFitScore, type Recruit } from './recruiting';
+import {
+  applyScholarshipOffer,
+  calculateRecruitFitScore,
+  classScholarshipBudgetUsed,
+  recruitPrestigeMultiplier,
+  topRecruitMotivations,
+  type Recruit,
+} from './recruiting';
 import type { Team } from './models';
 
 function makeRecruit(overrides: Partial<Recruit<'GENERIC'>> = {}): Recruit<'GENERIC'> {
@@ -122,5 +129,80 @@ describe('Recruiting primitives', () => {
     const nextRecruit = applyScholarshipOffer(recruit, 'team-1', 75);
 
     expect(nextRecruit.scholarshipOffers).toEqual([{ teamId: 'team-1', scholarshipPercent: 75 }]);
+  });
+
+  it('dampens the offer interest boost through the interest multiplier', () => {
+    const fullStrength = applyScholarshipOffer(makeRecruit(), 'team-1', 100);
+    const dampened = applyScholarshipOffer(makeRecruit(), 'team-1', 100, 0.2);
+
+    expect(dampened.interestByTeamId['team-1']).toBeLessThan(fullStrength.interestByTeamId['team-1']!);
+    expect(dampened.interestByTeamId['team-1']).toBeGreaterThan(0);
+  });
+});
+
+describe('recruitPrestigeMultiplier', () => {
+  it('heavily dampens low-prestige pursuit of elite recruits', () => {
+    expect(recruitPrestigeMultiplier(5, 47)).toBeLessThanOrEqual(0.3);
+    expect(recruitPrestigeMultiplier(4, 50)).toBeLessThan(0.6);
+  });
+
+  it('rewards programs that meet or exceed a recruit expectations', () => {
+    expect(recruitPrestigeMultiplier(5, 90)).toBe(1.1);
+    expect(recruitPrestigeMultiplier(2, 60)).toBe(1.1);
+  });
+
+  it('scales smoothly for modest gaps', () => {
+    const mult = recruitPrestigeMultiplier(3, 55);
+    expect(mult).toBeGreaterThan(0.7);
+    expect(mult).toBeLessThan(1);
+  });
+});
+
+describe('classScholarshipBudgetUsed', () => {
+  it('sums offers to open recruits and recruits committed to the team', () => {
+    const recruits = [
+      makeRecruit({ id: 'r1', scholarshipOffers: [{ teamId: 'team-1', scholarshipPercent: 100 }] }),
+      makeRecruit({
+        id: 'r2',
+        status: 'committed',
+        committedTeamId: 'team-1',
+        scholarshipOffers: [{ teamId: 'team-1', scholarshipPercent: 50 }],
+      }),
+      makeRecruit({ id: 'r3', scholarshipOffers: [{ teamId: 'team-2', scholarshipPercent: 75 }] }),
+    ];
+
+    expect(classScholarshipBudgetUsed(recruits, 'team-1')).toBe(1.5);
+  });
+
+  it('releases budget when a recruit commits elsewhere', () => {
+    const recruits = [
+      makeRecruit({
+        id: 'r1',
+        status: 'committed',
+        committedTeamId: 'team-2',
+        scholarshipOffers: [
+          { teamId: 'team-1', scholarshipPercent: 100 },
+          { teamId: 'team-2', scholarshipPercent: 50 },
+        ],
+      }),
+      makeRecruit({ id: 'r2', scholarshipOffers: [{ teamId: 'team-1', scholarshipPercent: 25 }] }),
+    ];
+
+    expect(classScholarshipBudgetUsed(recruits, 'team-1')).toBe(0.25);
+  });
+});
+
+describe('topRecruitMotivations', () => {
+  it('returns the strongest motivations in order', () => {
+    const preferences = {
+      proximityImportance: 70,
+      prestigeImportance: 80,
+      scholarshipImportance: 65,
+      playingTimeImportance: 55,
+      academicImportance: 45,
+    };
+
+    expect(topRecruitMotivations(preferences, 2)).toEqual(['prestige', 'proximity']);
+    expect(topRecruitMotivations(preferences, 1)).toEqual(['prestige']);
   });
 });

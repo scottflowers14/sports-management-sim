@@ -2048,6 +2048,91 @@ li span {
   flex-wrap: wrap;
 }
 
+.board-subnav-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.budget-chip {
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgba(114, 242, 198, 0.08);
+  border: 1px solid rgba(114, 242, 198, 0.25);
+  color: #72f2c6;
+  cursor: help;
+}
+
+.budget-chip.budget-low {
+  background: rgba(255, 107, 107, 0.08);
+  border-color: rgba(255, 107, 107, 0.3);
+  color: #ff8f8f;
+}
+
+.top100-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: rgba(242, 196, 114, 0.12);
+  border: 1px solid rgba(242, 196, 114, 0.35);
+  color: #f2c472;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.motive-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.motive-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: rgba(123, 168, 255, 0.1);
+  border: 1px solid rgba(123, 168, 255, 0.28);
+  color: #7ba8ff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.motive-row .motive-chip {
+  margin-left: 0;
+}
+
+.offer-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recruit-footer-row .offer-control {
+  flex: 1;
+}
+
+.recruit-footer-row .offer-control .offer-btn {
+  flex: 1;
+}
+
+.offer-pct-select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e6edf3;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 4px 6px;
+}
+
 .board-view-tabs .recruit-tab {
   padding: 6px 14px;
   font-size: 0.82rem;
