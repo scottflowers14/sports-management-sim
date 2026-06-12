@@ -54,6 +54,11 @@ export function App() {
     setRecruitPosFilter,
     recruitTab,
     setRecruitTab,
+    shortlistIds,
+    toggleShortlist,
+    recruitBoardView,
+    setRecruitBoardView,
+    scholarshipBudget,
     coachProfile,
     adConfidence,
     seasonGoals,
@@ -363,11 +368,16 @@ export function App() {
           currentWeek={dynasty.season.currentWeek}
           recruitPosFilter={recruitPosFilter}
           recruitTab={recruitTab}
+          shortlistIds={shortlistIds}
+          boardView={recruitBoardView}
+          scholarshipBudget={scholarshipBudget}
           onOfferScholarship={offerScholarship}
           onScoutRecruit={doScoutRecruit}
           onOfferPortalPlayer={offerPortalPlayer}
           onRecruitPosFilterChange={setRecruitPosFilter}
           onRecruitTabChange={setRecruitTab}
+          onToggleShortlist={toggleShortlist}
+          onBoardViewChange={setRecruitBoardView}
         />
       )}
 

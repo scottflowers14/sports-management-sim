@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   applyScholarshipOffer,
+  classScholarshipBudgetUsed,
+  recruitPrestigeMultiplier,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import {
   DEFAULT_GAME_PLAN,
+  LACROSSE_CLASS_SCHOLARSHIP_BUDGET,
   deriveCpuGamePlan,
   offerLacrossePortalPlayer,
   updateLacrosseDepthChartSlot,
@@ -109,6 +112,10 @@ export function useDynastyController() {
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded dynasty save' : 'Choose or create a dynasty'));
   const [recruitPosFilter, setRecruitPosFilter] = useState<LacrossePosition | 'ALL'>('ALL');
   const [recruitTab, setRecruitTab] = useState<'board' | 'portal'>('board');
+  const [shortlistIds, setShortlistIds] = useState<string[]>(() => loadedSave?.shortlistIds ?? []);
+  const [recruitBoardView, setRecruitBoardView] = useState<'shortlist' | 'all'>(() =>
+    (loadedSave?.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all',
+  );
   const [coachProfile, setCoachProfile] = useState<CoachProfile | null>(() => loadedSave?.coachProfile ?? null);
   const [adConfidence, setAdConfidence] = useState<number>(() => loadedSave?.adConfidence ?? 60);
   const [seasonGoals, setSeasonGoals] = useState<SeasonGoals | null>(() => loadedSave?.seasonGoals ?? null);
@@ -137,7 +144,8 @@ export function useDynastyController() {
     gamePlan,
     trainingFocus,
     pendingJobOffers,
-  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers]);
+    shortlistIds,
+  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -157,6 +165,8 @@ export function useDynastyController() {
     setSeasonStats(emptySeasonStats());
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
+    setShortlistIds([]);
+    setRecruitBoardView('all');
     setCoachProfile(null);
     setAdConfidence(60);
     setSeasonGoals(null);
@@ -210,6 +220,7 @@ export function useDynastyController() {
       gamePlan: DEFAULT_GAME_PLAN,
       trainingFocus: 'balanced',
       pendingJobOffers: null,
+      shortlistIds: [],
     };
     saveDynastySlot({ saveId, state });
     setActiveSaveId(saveId);
@@ -241,6 +252,8 @@ export function useDynastyController() {
     setGamePlan(save.gamePlan ?? DEFAULT_GAME_PLAN);
     setTrainingFocus(save.trainingFocus ?? 'balanced');
     setPendingJobOffers(save.pendingJobOffers ?? null);
+    setShortlistIds(save.shortlistIds ?? []);
+    setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
     setView('season');
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
@@ -322,16 +335,41 @@ export function useDynastyController() {
     applyWeekSimResult(simulateRemainingWeeks(buildWeekSimState(), gamePlan));
   }, [applyWeekSimResult, buildWeekSimState, gamePlan]);
 
-  const offerScholarship = useCallback((recruitId: string) => {
-    setDynasty((prev) => {
-      const recruit = prev.recruits.find((r) => r.id === recruitId);
-      const userTeamLocal = prev.season.teams.find((t) => t.id === prev.userTeamId);
-      if (!recruit || !userTeamLocal) return prev;
-      const updated = applyScholarshipOffer(recruit, prev.userTeamId, 100);
-      const recruits = prev.recruits.map((r) => (r.id === recruitId ? updated : r));
-      const recruitBoard = sortRecruitBoardForTeam(userTeamLocal, recruits, prev.rosterTargets);
-      return { ...prev, recruits, recruitBoard };
-    });
+  const offerScholarship = useCallback((recruitId: string, scholarshipPercent = 100) => {
+    const recruit = dynasty.recruits.find((r) => r.id === recruitId);
+    const userTeamLocal = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+    if (!recruit || !userTeamLocal) return;
+
+    const budgetUsed = classScholarshipBudgetUsed(dynasty.recruits, dynasty.userTeamId);
+    const existingOffer = recruit.scholarshipOffers.find((o) => o.teamId === dynasty.userTeamId);
+    const additionalCost = (scholarshipPercent - (existingOffer?.scholarshipPercent ?? 0)) / 100;
+    if (budgetUsed + additionalCost > LACROSSE_CLASS_SCHOLARSHIP_BUDGET + 1e-9) {
+      setSaveStatus('Not enough scholarship budget for that offer');
+      return;
+    }
+
+    const updated = applyScholarshipOffer(
+      recruit,
+      dynasty.userTeamId,
+      scholarshipPercent,
+      recruitPrestigeMultiplier(recruit.starRating, userTeamLocal.reputation.nationalPrestige),
+    );
+    const recruits = dynasty.recruits.map((r) => (r.id === recruitId ? updated : r));
+    const recruitBoard = sortRecruitBoardForTeam(userTeamLocal, recruits, dynasty.rosterTargets);
+    setDynasty({ ...dynasty, recruits, recruitBoard });
+    // Offering implies you're tracking them — pin to the board automatically.
+    setShortlistIds((prev) => (prev.includes(recruitId) ? prev : [...prev, recruitId]));
+  }, [dynasty]);
+
+  const scholarshipBudget = {
+    used: classScholarshipBudgetUsed(dynasty.recruits, dynasty.userTeamId),
+    total: LACROSSE_CLASS_SCHOLARSHIP_BUDGET,
+  };
+
+  const toggleShortlist = useCallback((recruitId: string) => {
+    setShortlistIds((prev) =>
+      prev.includes(recruitId) ? prev.filter((id) => id !== recruitId) : [...prev, recruitId],
+    );
   }, []);
 
   const doScoutRecruit = useCallback((recruitId: string, trueOvr: number) => {
@@ -486,6 +524,8 @@ export function useDynastyController() {
     setGameLogs(new Map());
     setSeasonStats(emptySeasonStats());
     setScouting((s) => resetScoutingForNewClass(s));
+    setShortlistIds([]);
+    setRecruitBoardView('all');
     setView('season');
   }, []);
 
@@ -576,6 +616,11 @@ export function useDynastyController() {
     setRecruitPosFilter,
     recruitTab,
     setRecruitTab,
+    shortlistIds,
+    toggleShortlist,
+    recruitBoardView,
+    setRecruitBoardView,
+    scholarshipBudget,
     coachProfile,
     adConfidence,
     seasonGoals,

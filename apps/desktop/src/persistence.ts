@@ -38,6 +38,8 @@ export interface DynastySaveState {
   trainingFocus: TrainingFocus;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
+  /** Recruit IDs the user has pinned to their recruiting board. */
+  shortlistIds: string[];
 }
 
 export interface DynastySaveMetadata {
@@ -307,6 +309,9 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     }
     if (parsed.pendingJobOffers === undefined) {
       parsed.pendingJobOffers = null;
+    }
+    if (parsed.shortlistIds === undefined) {
+      parsed.shortlistIds = [];
     }
     return parsed as PersistedDynastySave;
   } catch {

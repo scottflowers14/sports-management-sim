@@ -70,6 +70,7 @@ export function applyScholarshipOffer<Position extends string, SportTraits>(
   recruit: Recruit<Position, SportTraits>,
   teamId: ID,
   scholarshipPercent: number,
+  interestMultiplier = 1,
 ): Recruit<Position, SportTraits> {
   const clampedScholarshipPercent = clamp(scholarshipPercent, 0, 100);
   const existingOfferIndex = recruit.scholarshipOffers.findIndex((offer) => offer.teamId === teamId);
@@ -82,7 +83,9 @@ export function applyScholarshipOffer<Position extends string, SportTraits>(
   }
 
   const currentInterest = recruit.interestByTeamId[teamId] ?? 0;
-  const interestBoost = Math.round(clampedScholarshipPercent * (recruit.preferences.scholarshipImportance / 100) * 0.35);
+  const interestBoost = Math.round(
+    clampedScholarshipPercent * (recruit.preferences.scholarshipImportance / 100) * 0.35 * interestMultiplier,
+  );
 
   return {
     ...recruit,
@@ -92,6 +95,59 @@ export function applyScholarshipOffer<Position extends string, SportTraits>(
       [teamId]: clamp(currentInterest + interestBoost, 0, 100),
     },
   };
+}
+
+/**
+ * Elite recruits expect to play for elite programs. Interest gains shrink as the gap
+ * between a recruit's expectations (set by star level) and a program's national
+ * prestige grows; programs at or above expectations get a small bonus instead.
+ */
+export function recruitPrestigeMultiplier(starRating: number, nationalPrestige: number): number {
+  const expectedPrestige = 25 + starRating * 13;
+  const gap = expectedPrestige - nationalPrestige;
+  if (gap <= 0) return 1.1;
+  return clamp(1 - gap / 60, 0.2, 1);
+}
+
+/**
+ * Scholarship-equivalency budget a team has tied up in its current recruiting class.
+ * Offers to recruits who committed or signed elsewhere no longer count: that money
+ * is released back into the pool.
+ */
+export function classScholarshipBudgetUsed<Position extends string, SportTraits>(
+  recruits: Recruit<Position, SportTraits>[],
+  teamId: ID,
+): number {
+  let used = 0;
+
+  for (const recruit of recruits) {
+    const offer = recruit.scholarshipOffers.find((candidate) => candidate.teamId === teamId);
+    if (offer === undefined) continue;
+    const lostToRival =
+      recruit.status !== 'open' && recruit.committedTeamId !== teamId && recruit.signedTeamId !== teamId;
+    if (lostToRival) continue;
+    used += offer.scholarshipPercent / 100;
+  }
+
+  return Math.round(used * 100) / 100;
+}
+
+export type RecruitMotivation = 'proximity' | 'prestige' | 'scholarship' | 'playingTime' | 'academics';
+
+/** A recruit's strongest motivations, ordered by how much they care. */
+export function topRecruitMotivations(preferences: RecruitPreferences, count = 2): RecruitMotivation[] {
+  const ranked: Array<[RecruitMotivation, number]> = [
+    ['proximity', preferences.proximityImportance],
+    ['prestige', preferences.prestigeImportance],
+    ['scholarship', preferences.scholarshipImportance],
+    ['playingTime', preferences.playingTimeImportance],
+    ['academics', preferences.academicImportance],
+  ];
+
+  return ranked
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, count)
+    .map(([motivation]) => motivation);
 }
 
 function average(values: number[]): number {

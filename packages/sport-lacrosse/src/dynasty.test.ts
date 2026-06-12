@@ -75,6 +75,22 @@ describe('offerLacrosseRecruitScholarship', () => {
     expect(advanced.recruitBoard.map((entry) => entry.recruit.id)).not.toContain(recruitId);
     expect(getLacrosseRecruitingSummary(advanced).commitments).toBe(1);
   });
+
+  it('keeps elite recruits out of reach for low-prestige programs even with a full ride', () => {
+    // Motor City is the lowest-prestige program in the universe (47).
+    const dynasty = createNewLacrosseDynasty({ seed: 2028, userTeamId: 'motor-city', seasonYear: 2028 });
+    const elite = dynasty.recruits.find((recruit) => recruit.starRating === 5);
+    expect(elite).toBeDefined();
+
+    let state = offerLacrosseRecruitScholarship(dynasty, elite!.id, 100);
+    for (let week = 1; week <= 6; week += 1) {
+      state = advanceLacrosseDynastyWeek(state);
+    }
+
+    const pursued = state.recruits.find((recruit) => recruit.id === elite!.id);
+    expect(pursued?.committedTeamId).not.toBe('motor-city');
+    expect(pursued?.signedTeamId).not.toBe('motor-city');
+  });
 });
 
 describe('advanceLacrosseDynastyWeek', () => {

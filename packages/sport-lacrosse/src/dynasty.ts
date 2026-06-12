@@ -4,6 +4,7 @@ import {
   applyScholarshipOffer,
   calculateRecruitFitScore,
   createRoundRobinSchedule,
+  recruitPrestigeMultiplier,
   resolvePortalCommitments,
   sortRecruitBoardForTeam,
   type Conference,
@@ -42,6 +43,12 @@ export interface LacrosseRecruitingSummary {
   commitments: number;
   classScore: number;
 }
+
+/**
+ * Scholarship equivalencies available for a single incoming class — roughly what a
+ * graduating class frees up from the NCAA D1 men's lacrosse cap of 12.6 per program.
+ */
+export const LACROSSE_CLASS_SCHOLARSHIP_BUDGET = 3.25;
 
 export interface CreateNewLacrosseDynastyOptions {
   seed: number;
@@ -373,7 +380,14 @@ export function offerLacrosseRecruitScholarship(
 
   const userTeam = findUserTeam(state);
   const recruits = state.recruits.map((candidate) =>
-    candidate.id === recruitId ? applyScholarshipOffer(candidate, state.userTeamId, scholarshipPercent) : candidate,
+    candidate.id === recruitId
+      ? applyScholarshipOffer(
+          candidate,
+          state.userTeamId,
+          scholarshipPercent,
+          recruitPrestigeMultiplier(candidate.starRating, userTeam.reputation.nationalPrestige),
+        )
+      : candidate,
   );
 
   return buildRecruitingState({ ...state, recruits }, userTeam);
@@ -495,16 +509,22 @@ function resolveWeeklyRecruiting(
       const team = allTeams.find((t) => t.id === offer.teamId);
       if (!team) continue;
       const current = updatedInterest[team.id] ?? 0;
+      const prestigeMultiplier = recruitPrestigeMultiplier(
+        recruit.starRating,
+        team.reputation.nationalPrestige,
+      );
+      // Bigger scholarship offers keep pulling on money-motivated recruits every week.
+      const scholarshipPull =
+        (offer.scholarshipPercent / 100) * recruit.preferences.scholarshipImportance;
       if (team.id === userTeamId && userTeam) {
         const fitScore = calculateRecruitFitScore(recruit, userTeam);
-        const gain = Math.round(
-          11 + recruit.starRating * 2 + fitScore * 0.05 + recruit.preferences.scholarshipImportance * 0.04,
-        );
+        const gain = Math.round((9 + fitScore * 0.06 + scholarshipPull * 0.08) * prestigeMultiplier);
         updatedInterest[team.id] = clamp(current + gain, 0, 100);
       } else {
         // CPU teams: prestige-weighted gain, no fitScore calculation
-        const prestigeBonus = Math.round((team.reputation.nationalPrestige / 100) * 5);
-        const gain = 6 + recruit.starRating + prestigeBonus;
+        const gain = Math.round(
+          (7 + team.reputation.nationalPrestige * 0.06 + scholarshipPull * 0.05) * prestigeMultiplier,
+        );
         updatedInterest[team.id] = clamp(current + gain, 0, 100);
       }
     }
@@ -558,7 +578,16 @@ function applyCpuWeeklyOffers(
       if (count >= canOffer) break;
       const idx = updated.findIndex((r) => r.id === entry.recruit.id);
       if (idx >= 0) {
-        updated[idx] = applyScholarshipOffer(updated[idx]!, team.id, 50);
+        const recruit = updated[idx]!;
+        // Strong programs put real money on elite targets; everyone else gets half rides.
+        const percent =
+          recruit.starRating >= 4 && team.reputation.nationalPrestige >= 72 ? 75 : 50;
+        updated[idx] = applyScholarshipOffer(
+          recruit,
+          team.id,
+          percent,
+          recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige),
+        );
         count++;
       }
     }
@@ -568,7 +597,7 @@ function applyCpuWeeklyOffers(
 }
 
 function commitmentThreshold(recruit: LacrosseRecruit, currentWeek: number): number {
-  return clamp(84 - currentWeek * 5 + recruit.starRating, 58, 84);
+  return clamp(86 - currentWeek * 4 + recruit.starRating * 3, 60, 96);
 }
 
 function openRecruits(recruits: LacrosseRecruit[]): LacrosseRecruit[] {

@@ -1,5 +1,6 @@
 import type { PlayerClass } from '@sports-management-sim/engine-core';
 import type { LacrossePlayer, LacrossePosition } from './models';
+import { LACROSSE_FIRST_NAMES as FIRST_NAMES, LACROSSE_LAST_NAMES as LAST_NAMES } from './names';
 import { createSportTraits } from './recruit-generation';
 
 export interface GenerateLacrosseRosterOptions {
@@ -21,18 +22,6 @@ const ROSTER_COMPOSITION: Array<[LacrossePosition, number]> = [
 ];
 
 const CLASS_ORDER: PlayerClass[] = ['FR', 'SO', 'JR', 'SR'];
-
-const FIRST_NAMES = [
-  'Casey', 'Ryan', 'Dylan', 'Jack', 'Connor', 'Avery', 'Logan', 'Tyler',
-  'Brendan', 'Liam', 'Owen', 'Quinn', 'Tucker', 'Brooks', 'Chase', 'Cole',
-  'Finn', 'Gavin', 'Hunter', 'Luke', 'Mason', 'Nolan', 'Reid', 'Shane',
-];
-
-const LAST_NAMES = [
-  'Smith', 'Kelly', 'Murphy', 'Brown', 'Miller', 'Davis', 'Owen', 'Brennan',
-  'Sullivan', 'Walsh', 'Gallagher', 'OConnor', 'Byrne', 'Doyle', 'Quinn', 'Burke',
-  'Carter', 'Hayes', 'Bennett', 'Cooper', 'Reilly', 'Donnelly', 'Flynn', 'Keane',
-];
 
 /**
  * Generate a full, realistic starting roster: position groups sized to need,

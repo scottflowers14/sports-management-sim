@@ -58,6 +58,7 @@ function makeSave(seedTime: number, userTeamId = 'maryland-state'): DynastySaveS
     gamePlan: DEFAULT_GAME_PLAN,
     trainingFocus: 'balanced',
     pendingJobOffers: null,
+    shortlistIds: [],
   };
 }
 

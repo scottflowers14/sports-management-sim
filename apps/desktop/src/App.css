@@ -2038,6 +2038,336 @@ li span {
   color: #e6edf3;
 }
 
+/* ── Recruiting: board shortlist + national list ─────────────────────────────── */
+
+.board-subnav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.board-subnav-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.budget-chip {
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgba(114, 242, 198, 0.08);
+  border: 1px solid rgba(114, 242, 198, 0.25);
+  color: #72f2c6;
+  cursor: help;
+}
+
+.budget-chip.budget-low {
+  background: rgba(255, 107, 107, 0.08);
+  border-color: rgba(255, 107, 107, 0.3);
+  color: #ff8f8f;
+}
+
+.top100-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: rgba(242, 196, 114, 0.12);
+  border: 1px solid rgba(242, 196, 114, 0.35);
+  color: #f2c472;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.motive-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.motive-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: rgba(123, 168, 255, 0.1);
+  border: 1px solid rgba(123, 168, 255, 0.28);
+  color: #7ba8ff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.motive-row .motive-chip {
+  margin-left: 0;
+}
+
+.offer-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recruit-footer-row .offer-control {
+  flex: 1;
+}
+
+.recruit-footer-row .offer-control .offer-btn {
+  flex: 1;
+}
+
+.offer-pct-select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e6edf3;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 4px 6px;
+}
+
+.board-view-tabs .recruit-tab {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+}
+
+.board-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: rgba(114, 242, 198, 0.18);
+  color: #72f2c6;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.board-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.board-sort-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #aab8ca;
+  font-weight: 600;
+}
+
+.board-sort-label select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e6edf3;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
+.board-hide-committed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #aab8ca;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.board-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.board-summary-chip {
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #aab8ca;
+}
+
+.board-summary-chip.chip-offers {
+  background: rgba(71, 120, 255, 0.12);
+  border-color: rgba(71, 120, 255, 0.3);
+  color: #7ba8ff;
+}
+
+.board-summary-chip.chip-commits {
+  background: rgba(114, 242, 198, 0.1);
+  border-color: rgba(114, 242, 198, 0.3);
+  color: #72f2c6;
+}
+
+.board-summary-chip.chip-signed {
+  background: rgba(242, 196, 114, 0.1);
+  border-color: rgba(242, 196, 114, 0.3);
+  color: #f2c472;
+}
+
+.board-summary-chip.chip-lost {
+  background: rgba(255, 107, 107, 0.08);
+  border-color: rgba(255, 107, 107, 0.25);
+  color: #ff8f8f;
+}
+
+.board-empty-card {
+  max-width: 480px;
+}
+
+.board-browse-btn {
+  margin-top: 14px;
+  width: auto;
+}
+
+.pin-btn {
+  border: none;
+  background: transparent;
+  color: #6b7a8f;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+  transition: color 0.15s, transform 0.1s;
+}
+
+.pin-btn:hover {
+  color: #f2c472;
+  transform: scale(1.15);
+}
+
+.pin-btn.pinned {
+  color: #f2c472;
+}
+
+.recruit-header-side {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.recruit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recruit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.recruit-row.row-pinned {
+  border-color: rgba(242, 196, 114, 0.25);
+}
+
+.recruit-row.row-committed-elsewhere {
+  opacity: 0.55;
+}
+
+.recruit-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.recruit-row-main strong {
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recruit-row-meta {
+  font-size: 0.76rem;
+  color: #aab8ca;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-stars {
+  color: #f2c472;
+}
+
+.recruit-row-ovr {
+  min-width: 42px;
+  text-align: center;
+}
+
+.recruit-row-ovr .board-score {
+  font-size: 1.1rem;
+}
+
+.recruit-row-status {
+  min-width: 110px;
+  text-align: right;
+}
+
+.row-interest {
+  font-size: 0.78rem;
+  color: #7ba8ff;
+  font-weight: 600;
+}
+
+.dim-interest {
+  color: #4a5568;
+}
+
+.recruit-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  justify-content: flex-end;
+}
+
+.scout-btn-row {
+  display: inline-block;
+  width: auto;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+}
+
+.offer-btn-row {
+  display: inline-block;
+  width: auto;
+}
+
+@media (max-width: 760px) {
+  .recruit-row {
+    flex-wrap: wrap;
+  }
+
+  .recruit-row-status,
+  .recruit-row-actions {
+    min-width: 0;
+  }
+}
+
 /* ── Recruiting: interest + commit probability ───────────────────────────────── */
 
 .recruit-interest-row {

@@ -15,6 +15,10 @@ The first implementation milestone is the core data model for players, teams, se
 Gameplay features:
 
 - Multi-season dynasty with recruiting, scouting, transfer portal, injuries, and offseason player development.
+- Two-level recruiting board: browse and sort the full national recruit pool, then pin prospects to a personal "My Board" shortlist that tracks offers, commitments, signings, and recruits lost to rivals.
+- Equivalency-sport scholarship economics: a 3.25-equivalency class budget (one graduating class's share of the D1 cap of 12.6) split across 25/50/75/100% offers, where bigger money pulls harder on money-motivated recruits and budget is released if a target signs elsewhere.
+- Prestige-gated recruiting: elite recruits expect elite programs — low-prestige schools see sharply dampened interest gains on 4–5★ targets while strong CPU programs put real money on them, so rebuilds run through 3★ gems instead of poached blue-chips.
+- Authentic scouting fog: 4–5★ "Top 100" recruits have public star ratings like real national rankings, everyone else needs scouting, and scout reports also reveal what a recruit cares about (money, prestige, proximity, playing time, academics).
 - Weekly game plans (offensive tempo and defensive style) that feed directly into the game simulation with real tradeoffs.
 - Offseason training focus that accelerates development for a chosen position group.
 - Coach career pressure: season goals, AD confidence, and firings — get fired and rebuild at a lower-prestige program from job offers.
