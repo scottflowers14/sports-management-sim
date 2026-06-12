@@ -18,7 +18,7 @@ export const LACROSSE_FIRST_NAMES = [
   'Landon', 'Liam', 'Logan', 'Luca', 'Lucas', 'Luke', 'Marcus', 'Mason',
   'Matt', 'Max', 'Michael', 'Miles', 'Nate', 'Nick', 'Nolan', 'Owen',
   'Parker', 'Patrick', 'Paul', 'Peter', 'Quinn', 'Reece', 'Reid', 'Riley',
-  'Rowan', 'Ryan', 'Sam', 'Sean', 'Seth', 'Shane', 'Spencer', 'Tanner',
+  'Rowan', 'Ryan', 'Sam', 'Scott', 'Sean', 'Seth', 'Shane', 'Spencer', 'Tanner',
   'Teddy', 'Thomas', 'Trevor', 'Tristan', 'Tucker', 'Ty', 'Tyler', 'Wade',
   'Will', 'Wyatt', 'Zach',
 ];
