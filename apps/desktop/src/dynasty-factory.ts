@@ -54,7 +54,24 @@ export function createFreshLacrosseDynasty({
 // ── Custom teams config persistence ──────────────────────────────────────────
 
 function safeStorage(): Storage | null {
-  try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; }
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const candidate = localStorage as unknown;
+    if (!isStorageLike(candidate)) return null;
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
+function isStorageLike(value: unknown): value is Storage {
+  if (typeof value !== 'object' || value === null) return false;
+  const storage = value as Partial<Storage>;
+  return (
+    typeof storage.getItem === 'function' &&
+    typeof storage.setItem === 'function' &&
+    typeof storage.removeItem === 'function'
+  );
 }
 
 export function saveCustomTeamsConfig(config: CustomTeamsFile): void {
