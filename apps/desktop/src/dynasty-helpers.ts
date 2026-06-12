@@ -23,7 +23,7 @@ import { computeSeasonAwards } from './awards';
 import type { SeasonAwards } from './awards';
 import type { SeasonStatsMap } from './stats';
 import { capturePreOffseasonSnapshot, computeDevelopmentReport } from './development-report';
-import type { DevelopmentReport, PreOffseasonSnapshot } from './development-report';
+import type { DevelopmentReport } from './development-report';
 
 export type { DevelopmentReport };
 
@@ -131,7 +131,7 @@ export function autoCommitWeekly(
   const userTeam = teams.find((t) => t.id === userTeamId);
 
   // CPU teams gradually extend offers week by week
-  let updated = applyCpuWeeklyOffers(recruits, teams, userTeamId, random);
+  const updated = applyCpuWeeklyOffers(recruits, teams, userTeamId, random);
 
   return updated.map((recruit) => {
     if (recruit.status !== 'open') return recruit;
@@ -182,7 +182,7 @@ function applyCpuWeeklyOffers(
   const CPU_WEEKLY_NEW_OFFERS = 2;
   const rosterTargets = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
 
-  let updated = [...recruits];
+  const updated = [...recruits];
 
   for (const team of teams) {
     if (team.id === userTeamId) continue;
@@ -535,7 +535,7 @@ function applyeCpuOffers(
   userTeamId: string,
 ): LacrosseRecruit[] {
   const rosterTargets = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
-  let updated = [...recruits];
+  const updated = [...recruits];
 
   for (const team of teams) {
     if (team.id === userTeamId) continue;

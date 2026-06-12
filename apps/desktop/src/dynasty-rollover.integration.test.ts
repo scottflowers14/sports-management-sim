@@ -22,10 +22,6 @@ describe('multi-season dynasty rollover', () => {
       seasonYear: 2028,
     });
 
-    const initialRosterIds = new Set(
-      dynasty.season.teams.find((t) => t.id === 'maryland-state')!.roster.map((p) => p.id),
-    );
-
     for (let cycle = 0; cycle < 3; cycle++) {
       const yearBefore = dynasty.season.year;
 

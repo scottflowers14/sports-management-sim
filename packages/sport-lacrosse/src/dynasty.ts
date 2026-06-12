@@ -482,7 +482,7 @@ function resolveWeeklyRecruiting(
   const userTeam = allTeams.find((t) => t.id === userTeamId);
 
   // Apply CPU weekly offers (teams gradually build their offer lists)
-  let updated = applyCpuWeeklyOffers(recruits, allTeams, userTeamId);
+  const updated = applyCpuWeeklyOffers(recruits, allTeams, userTeamId);
 
   return updated.map((recruit) => {
     if (recruit.status !== 'open') return recruit;
@@ -536,7 +536,7 @@ function applyCpuWeeklyOffers(
   const CPU_MAX_OFFERS = 12;
   const CPU_WEEKLY_NEW_OFFERS = 2;
 
-  let updated = [...recruits];
+  const updated = [...recruits];
 
   for (const team of allTeams) {
     if (team.id === userTeamId) continue;
@@ -569,10 +569,6 @@ function applyCpuWeeklyOffers(
 
 function commitmentThreshold(recruit: LacrosseRecruit, currentWeek: number): number {
   return clamp(84 - currentWeek * 5 + recruit.starRating, 58, 84);
-}
-
-function hasUserOffer(recruit: LacrosseRecruit, teamId: string): boolean {
-  return recruit.scholarshipOffers.some((offer) => offer.teamId === teamId);
 }
 
 function openRecruits(recruits: LacrosseRecruit[]): LacrosseRecruit[] {

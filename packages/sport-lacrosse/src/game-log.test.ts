@@ -43,13 +43,11 @@ describe('simulateLacrosseGameWithLog', () => {
   });
 
   it('OT game has exactly one OT goal event', () => {
-    let tries = 0;
     let found = false;
     for (let seed = 0; seed < 5000 && !found; seed++) {
       const random = seededRandom(seed);
       const result = simulateLacrosseGameWithLog({ homeTeam, awayTeam, random });
       if (!result.overtime) {
-        tries++;
         continue;
       }
       const otGoals = result.log.events.filter((e) => e.type === 'goal' && e.period === 'OT');

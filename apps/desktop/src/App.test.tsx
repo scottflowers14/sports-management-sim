@@ -91,6 +91,35 @@ describe('Desktop App', () => {
     expect(screen.queryByRole('button', { name: /Sim Week/i })).not.toBeInTheDocument();
   });
 
+  it('plays a smoke-test career path through save, reload, tournaments, offseason, and the next season', async () => {
+    await renderStartedApp();
+
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
+    await userEvent.click(screen.getAllByRole('button', { name: /Scout/i })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: /Offer/i })[0]!);
+    await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
+    cleanup();
+
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 2/i);
+
+    await userEvent.click(screen.getByRole('button', { name: /Sim to End of Season/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Conference Finals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim National Semifinals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim National Championship/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
+
+    expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
+    expect(screen.getByText(/Men's College Lacrosse · Season 2029/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
+  });
+
   it('shows coaching controls and persists a game plan change', async () => {
     await renderStartedApp();
 
