@@ -62,17 +62,15 @@ describe('Desktop App', () => {
     expect(loadActiveDynastySave()?.dynasty.userTeamId).toBe('virginia-lakes');
   });
 
-  it('renders the dynasty dashboard with season view after creating a dynasty', async () => {
+  it('renders the Week Hub dashboard after creating a dynasty', async () => {
     await renderStartedApp();
 
     expect(screen.getByRole('heading', { name: /Sports Management Sim/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Maryland State/i);
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week/i);
-    expect(screen.getByRole('heading', { name: /This Week/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Upcoming/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Roster/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Team rating summary/i)).toHaveTextContent(/Team OVR/i);
-    expect(screen.getByLabelText(/Team rating summary/i)).toHaveTextContent(/OFF/i);
+    expect(screen.getByRole('heading', { name: /Next Opponent/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Injury Report/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Recommended Actions/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sim Week/i })).toBeInTheDocument();
   });
 
@@ -84,6 +82,7 @@ describe('Desktop App', () => {
 
   it('simulates the rest of the season with Sim to End', async () => {
     await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
 
     await userEvent.click(screen.getByRole('button', { name: /Sim to End of Season/i }));
 
@@ -105,6 +104,7 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 2/i);
 
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim to End of Season/i }));
     await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
@@ -122,6 +122,7 @@ describe('Desktop App', () => {
 
   it('shows coaching controls and persists a game plan change', async () => {
     await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
 
     expect(screen.getByRole('heading', { name: /^Coaching$/i })).toBeInTheDocument();
 
@@ -263,6 +264,7 @@ describe('Desktop App', () => {
 
   it('shows the weekly hub and opens a player card from a player to watch', async () => {
     await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
 
     const hub = screen.getByLabelText(/Weekly hub/i);
     expect(hub).toHaveTextContent(/Coach Desk/i);

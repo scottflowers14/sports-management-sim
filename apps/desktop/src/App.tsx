@@ -17,6 +17,7 @@ import { StatsScreen } from './screens/StatsScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { OffseasonScreen } from './screens/OffseasonScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
+import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { formatTeamName } from './ui/format';
 import { useDynastyController } from './useDynastyController';
@@ -156,6 +157,13 @@ export function App() {
 
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
 
+  const keyPositions = new Set(['GK', 'FOGO']);
+  const highPriorityCount = injuries.filter((inj) => {
+    if (inj.teamId !== dynasty.userTeamId) return false;
+    const player = userTeam.roster.find((p) => p.id === inj.playerId);
+    return player && keyPositions.has(player.position);
+  }).length;
+
   const nextUserGame = dynasty.season.schedule.find(
     (g) => g.status === 'scheduled' && (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
   );
@@ -280,6 +288,15 @@ export function App() {
       </header>
 
       <nav className="tab-bar" aria-label="Main navigation">
+        <button
+          className={view === 'week-hub' ? 'tab active' : 'tab'}
+          onClick={() => setView('week-hub')}
+        >
+          Week Hub
+          {highPriorityCount > 0 && (
+            <span className="tab-badge tab-badge-alert">{highPriorityCount}</span>
+          )}
+        </button>
         {(['season', 'team', 'schedule', 'recruiting', 'standings'] as const).map((v) => (
           <button
             key={v}
@@ -321,6 +338,29 @@ export function App() {
         </button>
         {view === 'offseason' && <button className="tab active">Offseason</button>}
       </nav>
+
+      {view === 'week-hub' && (
+        <WeekHubScreen
+          currentWeek={dynasty.season.currentWeek}
+          seasonComplete={seasonComplete}
+          userTeam={userTeam}
+          userRankEntry={userRankEntry ?? null}
+          injuries={injuries.filter((inj) => inj.teamId === dynasty.userTeamId)}
+          newsItems={newsItems}
+          scouting={scouting}
+          portalEntries={dynasty.portalEntries}
+          recruitBoard={dynasty.recruitBoard}
+          weeklyHub={weeklyHub}
+          teamMap={teamMap}
+          userTeamId={dynasty.userTeamId}
+          lastSimWeek={lastSimWeek}
+          lastWeekGames={lastWeekGames}
+          gameLogs={gameLogs}
+          onSimWeek={simWeek}
+          onBoxScore={setSelectedBoxScore}
+          onNavigate={(v) => setView(v as Parameters<typeof setView>[0])}
+        />
+      )}
 
       {view === 'season' && (
         <SeasonScreen
