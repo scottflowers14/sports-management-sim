@@ -712,6 +712,27 @@ li span {
   background: rgba(114, 242, 198, 0.06);
 }
 
+.roster-table tr.roster-position-header td {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted, #8a9bb0);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 6px 12px 5px;
+  text-transform: uppercase;
+}
+
+.roster-pos-tag {
+  background: rgba(114, 242, 198, 0.12);
+  border-radius: 3px;
+  color: #72f2c6;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin-right: 8px;
+  padding: 1px 5px;
+}
+
 .schedule-view-layout {
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
 }

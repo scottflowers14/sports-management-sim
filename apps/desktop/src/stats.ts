@@ -106,6 +106,7 @@ function distributeToTeam(
   teamStats: LacrosseTeamStats,
   opponentGoals: number,
   team: LacrosseTeam,
+  random: () => number = Math.random,
 ): Array<{ playerId: string; delta: Partial<Omit<PlayerSeasonStats, 'playerId'>> }> {
   const { roster } = team;
   if (roster.length === 0) return [];
@@ -137,13 +138,16 @@ function distributeToTeam(
     }
   }
 
-  // ATT + MID: goals, assists, shots — weighted by skill+speed
+  // ATT + MID: goals, assists, shots — weighted by skill+speed with per-game noise so
+  // players have standout and quiet games rather than uniformly equal stat lines.
   const offRoster = roster.filter((p) => p.position === 'ATT' || p.position === 'MID');
   if (offRoster.length > 0) {
-    const weights = offRoster.map((p) => Math.max(1, p.ratings.skill + p.ratings.speed));
-    const goals = apportionByWeight(teamStats.goals, weights);
-    const assists = apportionByWeight(teamStats.assists, weights);
-    const shots = apportionByWeight(teamStats.shots, weights);
+    const goalWeights = offRoster.map((p) => Math.max(0.5, (p.ratings.skill + p.ratings.speed) * (0.55 + random() * 0.9)));
+    const assistWeights = offRoster.map((p) => Math.max(0.5, (p.ratings.skill + p.ratings.iq) * (0.55 + random() * 0.9)));
+    const shotWeights = offRoster.map((p) => Math.max(0.5, (p.ratings.skill + p.ratings.speed) * (0.55 + random() * 0.9)));
+    const goals = apportionByWeight(teamStats.goals, goalWeights);
+    const assists = apportionByWeight(teamStats.assists, assistWeights);
+    const shots = apportionByWeight(teamStats.shots, shotWeights);
 
     for (let k = 0; k < offRoster.length; k++) {
       const i = idx(offRoster[k]!.id);
@@ -210,11 +214,13 @@ export function updateSeasonStats(
       game.result.teamStats.home as LacrosseTeamStats,
       game.result.awayScore,
       homeTeam,
+      Math.random,
     );
     const awayDeltas = distributeToTeam(
       game.result.teamStats.away as LacrosseTeamStats,
       game.result.homeScore,
       awayTeam,
+      Math.random,
     );
 
     for (const { playerId, delta } of [...homeDeltas, ...awayDeltas]) {

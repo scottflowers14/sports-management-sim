@@ -640,13 +640,6 @@ function RecruitCard({
           </button>
         ) : tier === 'partial' ? (
           <div className="recruit-footer-row">
-            <button
-              className="scout-btn scout-btn-sm"
-              onClick={() => onScoutRecruit(recruit.id, recruit.ratings.overall)}
-              disabled={scouting.pointsAvailable <= 0}
-            >
-              Full Scout (1 pt)
-            </button>
             {!hasOffer && (
               <OfferControl
                 recruitId={recruit.id}
@@ -656,6 +649,13 @@ function RecruitCard({
               />
             )}
             {hasOffer && <span className="badge badge-offered">Offered {userOffer.scholarshipPercent}%</span>}
+            <button
+              className="scout-btn scout-btn-sm"
+              onClick={() => onScoutRecruit(recruit.id, recruit.ratings.overall)}
+              disabled={scouting.pointsAvailable <= 0}
+            >
+              Full Scout (1 pt)
+            </button>
           </div>
         ) : hasOffer ? (
           <span className="badge badge-offered">Offered {userOffer.scholarshipPercent}%</span>
@@ -708,7 +708,15 @@ function OfferControl({
         className="offer-btn offer-btn-sm offer-btn-row"
         disabled={!canAfford}
         title={canAfford ? `Offer a ${percent}% scholarship` : 'Not enough scholarship budget'}
-        onClick={() => onOffer(recruitId, percent)}
+        onClick={() => {
+          if (
+            percent === 100 &&
+            !window.confirm(`Offer ${recruitName} a full scholarship (100%)? This uses a full equivalency from your budget.`)
+          ) {
+            return;
+          }
+          onOffer(recruitId, percent);
+        }}
       >
         Offer
       </button>

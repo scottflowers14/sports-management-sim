@@ -2,6 +2,7 @@ import {
   calculateLacrosseTeamRating,
   deriveCpuGamePlan,
 } from '@sports-management-sim/sport-lacrosse';
+import type { StandingsEntry } from '@sports-management-sim/engine-core';
 import { getJobSecurityLabel, getJobSecurityColor } from './coach-profile';
 import { BoxScorePanel } from './components/BoxScorePanel';
 import { PlayerPanel } from './components/PlayerPanel';
@@ -139,7 +140,22 @@ export function App() {
     .filter((g) => g.status === 'scheduled')
     .slice(0, 5);
 
-  const sortedStandings = [...dynasty.season.standings].sort(
+  // Fill in 0-0 placeholder entries for teams that haven't played yet so the
+  // standings table is visible from day one, not just after the first game.
+  const standingsById = new Map(dynasty.season.standings.map((s) => [s.teamId, s]));
+  const fullStandings: StandingsEntry[] = dynasty.season.teams.map(
+    (team) =>
+      standingsById.get(team.id) ?? {
+        teamId: team.id,
+        conferenceId: team.conferenceId,
+        record: { wins: 0, losses: 0, conferenceWins: 0, conferenceLosses: 0, homeWins: 0, homeLosses: 0, awayWins: 0, awayLosses: 0, neutralWins: 0, neutralLosses: 0 },
+        pointsFor: 0,
+        pointsAgainst: 0,
+        strengthOfSchedule: 0,
+        rankingScore: 0,
+      },
+  );
+  const sortedStandings = [...fullStandings].sort(
     (a, b) => b.record.wins - a.record.wins || a.record.losses - b.record.losses,
   );
 
