@@ -1978,6 +1978,70 @@ li span {
   font-size: 0.7rem;
 }
 
+/* ── Player card: shared badges + clickable names ───────────────────────────── */
+.card-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.card-badge-inj {
+  background: rgba(255, 99, 99, 0.18);
+  color: #ff9d9d;
+}
+
+.card-badge-good {
+  background: rgba(114, 242, 198, 0.16);
+  color: #72f2c6;
+}
+
+.card-badge-info {
+  background: rgba(120, 170, 255, 0.16);
+  color: #9dc0ff;
+}
+
+.card-badge-warn {
+  background: rgba(255, 206, 120, 0.16);
+  color: #ffce78;
+}
+
+.card-badge-star {
+  background: rgba(214, 178, 90, 0.18);
+  color: #f0d188;
+}
+
+.recruit-name-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.recruit-name-btn:hover {
+  color: #72f2c6;
+  text-decoration: underline;
+}
+
+.recruit-panel-footer .scout-btn {
+  margin-top: 12px;
+}
+
+.recruit-panel-hint {
+  margin-top: 8px;
+  font-size: 0.74rem;
+}
+
 /* ── Recruiting: tabs + position filter ─────────────────────────────────────── */
 
 .recruit-top-bar {

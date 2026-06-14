@@ -261,6 +261,23 @@ describe('Desktop App', () => {
     expect(screen.queryAllByRole('button', { name: /Scout/i }).length).toBeGreaterThan(0);
   });
 
+  it('opens a reusable player card when a recruit name is clicked', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
+
+    // Click a recruit's name to open the shared player card panel.
+    const nameButton = screen.getAllByTitle(/^View /i)[0]!;
+    await userEvent.click(nameButton);
+
+    const panel = screen.getByLabelText(/Close player panel/i).closest('aside') as HTMLElement;
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveTextContent(/Overall/i);
+    expect(panel).toHaveTextContent(/Recruiting/i);
+
+    await userEvent.click(screen.getByLabelText(/Close player panel/i));
+    expect(screen.queryByLabelText(/Close player panel/i)).not.toBeInTheDocument();
+  });
+
   it('pins recruits to My Board, persists the shortlist, and auto-pins on offers', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));

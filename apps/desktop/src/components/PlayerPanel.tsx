@@ -3,6 +3,8 @@ import type { InjuredPlayer } from '../dynasty-helpers';
 import type { PlayerSeasonStats } from '../stats';
 import type { PlayerCareer } from '../career-stats';
 import { careerTotals } from '../career-stats';
+import { cardFromPlayer } from '../player-card-model';
+import { PlayerCardPanel } from './PlayerCard';
 
 export function PlayerPanel({
   player,
@@ -21,77 +23,30 @@ export function PlayerPanel({
   seasonYear: number;
   onClose: () => void;
 }) {
-  return (
-    <div className="player-panel-backdrop" onClick={onClose}>
-      <aside className="player-panel card" onClick={(e) => e.stopPropagation()}>
-        <button
-          className="panel-close"
-          onClick={onClose}
-          aria-label="Close player panel"
-        >×</button>
-        <div>
-          <p className="panel-name">
-            {player.name.first} {player.name.last}
-            {isInjured && <span className="inj-badge inj-badge-lg">INJ</span>}
-          </p>
-          <p className="panel-meta">{player.position} · {player.classYear} · {player.hometown}</p>
-          {isInjured && injuryData && (
-            <p className="injury-status">
-              Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-        <div className="ovr-block">
-          <div className="ovr-stat">
-            <div className="ovr-num">{player.ratings.overall}</div>
-            <div className="ovr-label">Overall</div>
-          </div>
-          <div className="ovr-stat">
-            <div className="ovr-num">{player.ratings.potential}</div>
-            <div className="ovr-label">Potential</div>
-          </div>
-        </div>
-        <div>
-          {(
-            [
-              ['Athleticism', player.ratings.athleticism],
-              ['Speed', player.ratings.speed],
-              ['Strength', player.ratings.strength],
-              ['Skill', player.ratings.skill],
-              ['IQ', player.ratings.iq],
-              ['Work Ethic', player.ratings.workEthic],
-            ] as [string, number][]
-          ).map(([label, value]) => (
-            <div key={label} className="rating-row">
-              <span>{label}</span>
-              <div className="rating-bar-wrap">
-                <div className="rating-bar-fill" style={{ width: `${value}%` }} />
-              </div>
-              <span className="rating-val">{value}</span>
-            </div>
-          ))}
-        </div>
-        {player.traits.length > 0 && (
-          <div className="trait-list">
-            {player.traits.map((trait) => (
-              <span key={trait} className="trait-chip">{trait.replace(/_/g, ' ')}</span>
-            ))}
-          </div>
-        )}
-        {playerStats && playerStats.gamesPlayed > 0 && (
-          <PlayerStatsSection stats={playerStats} position={player.position} seasonYear={seasonYear} />
-        )}
-        {(career && career.seasons.length > 0) || (playerStats && playerStats.gamesPlayed > 0) ? (
-          <CareerSection
-            career={career}
-            position={player.position}
-            seasonYear={seasonYear}
-            liveStats={playerStats && playerStats.gamesPlayed > 0 ? playerStats : undefined}
-          />
-        ) : null}
-      </aside>
-    </div>
+  const data = cardFromPlayer(player, { injured: isInjured });
+  const hasLiveStats = Boolean(playerStats && playerStats.gamesPlayed > 0);
+  const liveStats = hasLiveStats ? playerStats : undefined;
+
+  const footer = (
+    <>
+      {isInjured && injuryData && (
+        <p className="injury-status">
+          Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}
+        </p>
+      )}
+      {liveStats && <PlayerStatsSection stats={liveStats} position={player.position} seasonYear={seasonYear} />}
+      {((career && career.seasons.length > 0) || liveStats) && (
+        <CareerSection
+          career={career}
+          position={player.position}
+          seasonYear={seasonYear}
+          liveStats={liveStats}
+        />
+      )}
+    </>
   );
+
+  return <PlayerCardPanel data={data} footer={footer} onClose={onClose} />;
 }
 
 type StatColumn = { label: string; value: (s: PlayerSeasonStats) => number; unit?: string };

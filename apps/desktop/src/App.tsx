@@ -5,6 +5,7 @@ import {
 import { getJobSecurityLabel, getJobSecurityColor } from './coach-profile';
 import { BoxScorePanel } from './components/BoxScorePanel';
 import { PlayerPanel } from './components/PlayerPanel';
+import { RecruitPanel } from './components/RecruitPanel';
 import { TeamScreen } from './screens/TeamScreen';
 import { ScheduleScreen } from './screens/ScheduleScreen';
 import { SeasonScreen } from './screens/SeasonScreen';
@@ -41,6 +42,8 @@ export function App() {
     newsItems,
     selectedPlayerId,
     setSelectedPlayerId,
+    selectedRecruitId,
+    setSelectedRecruitId,
     tournament,
     dynastyHistory,
     injuries,
@@ -171,6 +174,7 @@ export function App() {
     : null;
 
   const selectedPlayer = selectedPlayerId ? userTeam.roster.find((p) => p.id === selectedPlayerId) : null;
+  const selectedRecruit = selectedRecruitId ? dynasty.recruits.find((r) => r.id === selectedRecruitId) : null;
 
   return (
     <main className="app-shell">
@@ -379,6 +383,7 @@ export function App() {
           onRecruitTabChange={setRecruitTab}
           onToggleShortlist={toggleShortlist}
           onBoardViewChange={setRecruitBoardView}
+          onSelectRecruit={setSelectedRecruitId}
         />
       )}
 
@@ -453,6 +458,17 @@ export function App() {
           career={careerStats[selectedPlayer.id]}
           seasonYear={dynasty.season.year}
           onClose={() => setSelectedPlayerId(null)}
+        />
+      )}
+
+      {selectedRecruit && (
+        <RecruitPanel
+          recruit={selectedRecruit}
+          scouting={scouting}
+          userTeamId={dynasty.userTeamId}
+          teamMap={teamMap}
+          onScout={doScoutRecruit}
+          onClose={() => setSelectedRecruitId(null)}
         />
       )}
 

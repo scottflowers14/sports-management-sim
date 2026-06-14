@@ -103,6 +103,7 @@ export function useDynastyController() {
   const [rankings, setRankings] = useState<RankingEntry[]>(loadedSave?.rankings ?? []);
   const [newsItems, setNewsItems] = useState<NewsItem[]>(loadedSave?.newsItems ?? []);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [selectedRecruitId, setSelectedRecruitId] = useState<string | null>(null);
   const [tournament, setTournament] = useState<TournamentState | null>(loadedSave?.tournament ?? null);
   const [dynastyHistory, setDynastyHistory] = useState<DynastySeasonRecord[]>(loadedSave?.dynastyHistory ?? []);
   const [injuries, setInjuries] = useState<InjuredPlayer[]>(loadedSave?.injuries ?? []);
@@ -165,6 +166,7 @@ export function useDynastyController() {
     setDynastyHistory([]);
     setInjuries([]);
     setSelectedBoxScore(null);
+    setSelectedRecruitId(null);
     setGameLogs(new Map());
     setScouting(createScoutingState(3));
     setSeasonStats(emptySeasonStats());
@@ -249,6 +251,7 @@ export function useDynastyController() {
     setDynastyHistory(save.dynastyHistory);
     setInjuries(save.injuries);
     setSelectedBoxScore(null);
+    setSelectedRecruitId(null);
     setGameLogs(new Map(Object.entries(save.gameLogs ?? {})));
     setScouting(save.scouting);
     setSeasonStats(save.seasonStats);
@@ -543,6 +546,7 @@ export function useDynastyController() {
     setInjuries([]);
     setSelectedPlayerId(null);
     setSelectedBoxScore(null);
+    setSelectedRecruitId(null);
     setGameLogs(new Map());
     setSeasonStats(emptySeasonStats());
     setScouting((s) => resetScoutingForNewClass(s));
@@ -625,6 +629,8 @@ export function useDynastyController() {
     newsItems,
     selectedPlayerId,
     setSelectedPlayerId,
+    selectedRecruitId,
+    setSelectedRecruitId,
     tournament,
     dynastyHistory,
     injuries,
