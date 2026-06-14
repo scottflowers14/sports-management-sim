@@ -455,15 +455,6 @@ function AllRecruitsList({
             <div className="recruit-row-actions">
               {!isCommittedToUs && !isCommittedElsewhere && (
                 <>
-                  {tier !== 'full' && (
-                    <button
-                      className="scout-btn scout-btn-row"
-                      onClick={() => onScoutRecruit(recruit.id, recruit.ratings.overall)}
-                      disabled={scouting.pointsAvailable <= 0}
-                    >
-                      {tier === 'partial' ? 'Full Scout (1 pt)' : 'Scout (1 pt)'}
-                    </button>
-                  )}
                   {tier !== 'none' && !hasOffer && (
                     <OfferControl
                       recruitId={recruit.id}
@@ -476,6 +467,15 @@ function AllRecruitsList({
                     <span className="badge badge-offered">
                       Offered {recruit.scholarshipOffers.find((o) => o.teamId === userTeamId)?.scholarshipPercent}%
                     </span>
+                  )}
+                  {tier !== 'full' && (
+                    <button
+                      className="scout-btn scout-btn-row"
+                      onClick={() => onScoutRecruit(recruit.id, recruit.ratings.overall)}
+                      disabled={scouting.pointsAvailable <= 0}
+                    >
+                      {tier === 'partial' ? 'Full Scout (1 pt)' : 'Scout (1 pt)'}
+                    </button>
                   )}
                 </>
               )}
@@ -711,7 +711,7 @@ function OfferControl({
         onClick={() => {
           if (
             percent === 100 &&
-            !window.confirm(`Offer ${recruitName} a full scholarship (100%)? This uses a full equivalency from your budget.`)
+            window.confirm(`Offer ${recruitName} a full scholarship (100%)? This uses a full equivalency from your budget.`) === false
           ) {
             return;
           }
