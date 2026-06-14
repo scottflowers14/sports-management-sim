@@ -5,9 +5,11 @@ import {
 import { getJobSecurityLabel, getJobSecurityColor } from './coach-profile';
 import { BoxScorePanel } from './components/BoxScorePanel';
 import { PlayerPanel } from './components/PlayerPanel';
+import { RecruitPanel } from './components/RecruitPanel';
 import { TeamScreen } from './screens/TeamScreen';
 import { ScheduleScreen } from './screens/ScheduleScreen';
 import { SeasonScreen } from './screens/SeasonScreen';
+import { buildWeeklyHub } from './weekly-hub';
 import { RecruitingScreen } from './screens/RecruitingScreen';
 import { StandingsScreen } from './screens/StandingsScreen';
 import { TournamentScreen } from './screens/TournamentScreen';
@@ -41,6 +43,8 @@ export function App() {
     newsItems,
     selectedPlayerId,
     setSelectedPlayerId,
+    selectedRecruitId,
+    setSelectedRecruitId,
     tournament,
     dynastyHistory,
     injuries,
@@ -49,6 +53,7 @@ export function App() {
     gameLogs,
     scouting,
     seasonStats,
+    careerStats,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -169,7 +174,20 @@ export function App() {
       }
     : null;
 
-  const selectedPlayer = selectedPlayerId ? userTeam.roster.find((p) => p.id === selectedPlayerId) : null;
+  const weeklyHub = buildWeeklyHub({
+    schedule: dynasty.season.schedule,
+    teams: dynasty.season.teams,
+    userTeamId: dynasty.userTeamId,
+    currentWeek: dynasty.season.currentWeek,
+    rankings,
+    seasonStats,
+  });
+
+  // Player cards are reusable across the whole league, not just the user roster.
+  const selectedPlayer = selectedPlayerId
+    ? dynasty.season.teams.flatMap((t) => t.roster).find((p) => p.id === selectedPlayerId)
+    : null;
+  const selectedRecruit = selectedRecruitId ? dynasty.recruits.find((r) => r.id === selectedRecruitId) : null;
 
   return (
     <main className="app-shell">
@@ -323,6 +341,7 @@ export function App() {
           gamePlan={gamePlan}
           trainingFocus={trainingFocus}
           nextOpponentScout={nextOpponentScout}
+          weeklyHub={weeklyHub}
           onGamePlanChange={setGamePlan}
           onTrainingFocusChange={setTrainingFocus}
           onSimWeek={simWeek}
@@ -378,6 +397,7 @@ export function App() {
           onRecruitTabChange={setRecruitTab}
           onToggleShortlist={toggleShortlist}
           onBoardViewChange={setRecruitBoardView}
+          onSelectRecruit={setSelectedRecruitId}
         />
       )}
 
@@ -449,7 +469,20 @@ export function App() {
             (inj) => inj.playerId === selectedPlayer.id && inj.teamId === dynasty.userTeamId,
           )}
           playerStats={seasonStats[selectedPlayer.id]}
+          career={careerStats[selectedPlayer.id]}
+          seasonYear={dynasty.season.year}
           onClose={() => setSelectedPlayerId(null)}
+        />
+      )}
+
+      {selectedRecruit && (
+        <RecruitPanel
+          recruit={selectedRecruit}
+          scouting={scouting}
+          userTeamId={dynasty.userTeamId}
+          teamMap={teamMap}
+          onScout={doScoutRecruit}
+          onClose={() => setSelectedRecruitId(null)}
         />
       )}
 

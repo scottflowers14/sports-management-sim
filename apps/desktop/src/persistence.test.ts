@@ -50,6 +50,7 @@ function makeSave(seedTime: number, userTeamId = 'maryland-state'): DynastySaveS
     injuries: [],
     scouting: createScoutingState(3),
     seasonStats: emptySeasonStats(),
+    careerStats: {},
     gameLogs: {},
     coachProfile: null,
     adConfidence: 60,

@@ -50,6 +50,7 @@ export function RecruitingScreen({
   onRecruitTabChange,
   onToggleShortlist,
   onBoardViewChange,
+  onSelectRecruit,
 }: {
   recruitBoard: LacrosseBoardEntry[];
   portalEntries: LacrossePortalEntry[];
@@ -69,6 +70,7 @@ export function RecruitingScreen({
   onRecruitTabChange: (tab: 'board' | 'portal') => void;
   onToggleShortlist: (recruitId: string) => void;
   onBoardViewChange: (view: RecruitBoardView) => void;
+  onSelectRecruit: (recruitId: string) => void;
 }) {
   const [boardSort, setBoardSort] = useState<BoardSort>('rank');
   const [hideCommitted, setHideCommitted] = useState(false);
@@ -192,6 +194,7 @@ export function RecruitingScreen({
               onOfferScholarship={onOfferScholarship}
               onScoutRecruit={onScoutRecruit}
               onToggleShortlist={onToggleShortlist}
+              onSelectRecruit={onSelectRecruit}
               onBrowseAll={() => onBoardViewChange('all')}
             />
           ) : (
@@ -207,6 +210,7 @@ export function RecruitingScreen({
               onOfferScholarship={onOfferScholarship}
               onScoutRecruit={onScoutRecruit}
               onToggleShortlist={onToggleShortlist}
+              onSelectRecruit={onSelectRecruit}
             />
           )}
         </>
@@ -236,6 +240,7 @@ function ShortlistBoard({
   onOfferScholarship,
   onScoutRecruit,
   onToggleShortlist,
+  onSelectRecruit,
   onBrowseAll,
 }: {
   entries: LacrosseBoardEntry[];
@@ -249,6 +254,7 @@ function ShortlistBoard({
   onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onToggleShortlist: (recruitId: string) => void;
+  onSelectRecruit: (recruitId: string) => void;
   onBrowseAll: () => void;
 }) {
   if (totalOnBoard === 0) {
@@ -301,6 +307,7 @@ function ShortlistBoard({
             onOfferScholarship={onOfferScholarship}
             onScoutRecruit={onScoutRecruit}
             onToggleShortlist={onToggleShortlist}
+            onSelectRecruit={onSelectRecruit}
           />
         ))}
       </div>
@@ -320,6 +327,7 @@ function AllRecruitsList({
   onOfferScholarship,
   onScoutRecruit,
   onToggleShortlist,
+  onSelectRecruit,
 }: {
   entries: LacrosseBoardEntry[];
   sort: BoardSort;
@@ -332,6 +340,7 @@ function AllRecruitsList({
   onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onToggleShortlist: (recruitId: string) => void;
+  onSelectRecruit: (recruitId: string) => void;
 }) {
   const visible = hideCommitted
     ? entries.filter(
@@ -398,10 +407,10 @@ function AllRecruitsList({
             </button>
 
             <div className="recruit-row-main">
-              <strong>
+              <button className="recruit-name-btn" onClick={() => onSelectRecruit(recruit.id)} title={`View ${fullName}`}>
                 {fullName}
                 {starsArePublic(entry) && <span className="top100-chip">Top 100</span>}
-              </strong>
+              </button>
               <span className="recruit-row-meta">
                 {recruit.position} ·{' '}
                 {showStars ? (
@@ -494,6 +503,7 @@ function RecruitCard({
   onOfferScholarship,
   onScoutRecruit,
   onToggleShortlist,
+  onSelectRecruit,
 }: {
   entry: LacrosseBoardEntry;
   scouting: ScoutingState;
@@ -505,6 +515,7 @@ function RecruitCard({
   onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onToggleShortlist: (recruitId: string) => void;
+  onSelectRecruit: (recruitId: string) => void;
 }) {
   const { recruit } = entry;
   const tier = getScoutTier(recruit.id, scouting);
@@ -538,10 +549,10 @@ function RecruitCard({
     >
       <div className="recruit-header">
         <div>
-          <strong>
+          <button className="recruit-name-btn" onClick={() => onSelectRecruit(recruit.id)} title={`View ${fullName}`}>
             {fullName}
             {starsArePublic(entry) && <span className="top100-chip">Top 100</span>}
-          </strong>
+          </button>
           <p className="recruit-sub">
             {recruit.position} ·{' '}
             {showStars ? (
