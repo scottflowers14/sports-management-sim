@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { loadActiveDynastySave, listDynastySaves } from './persistence';
 
@@ -36,11 +36,15 @@ async function renderStartedApp() {
 
 beforeEach(() => {
   installMockLocalStorage();
+  // jsdom returns false from window.confirm by default; always confirm so tests
+  // that exercise confirmation dialogs (new dynasty, full-ride offers) still pass.
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.restoreAllMocks();
 });
 
 describe('Desktop App', () => {
