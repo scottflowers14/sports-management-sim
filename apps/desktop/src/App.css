@@ -2042,6 +2042,169 @@ li span {
   font-size: 0.74rem;
 }
 
+/* ── Weekly Hub / Coach Desk ─────────────────────────────────────────────────── */
+.weekly-hub-card {
+  background: linear-gradient(160deg, rgba(114, 242, 198, 0.08), rgba(255, 255, 255, 0.03));
+  border-color: rgba(114, 242, 198, 0.22);
+}
+
+.weekly-hub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.weekly-hub-sub {
+  margin-top: 2px;
+}
+
+.hub-rank {
+  font-weight: 800;
+  color: #f0d188;
+  margin-right: 6px;
+}
+
+.winprob-block {
+  margin-top: 16px;
+}
+
+.winprob-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.winprob-bar {
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(255, 120, 120, 0.28);
+  overflow: hidden;
+}
+
+.winprob-fill {
+  height: 100%;
+  border-radius: 6px 0 0 6px;
+  background: linear-gradient(90deg, #4fd1a5, #72f2c6);
+}
+
+.hub-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.hub-strip-label {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab8ca;
+  margin-right: 8px;
+}
+
+.form-pills {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.form-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.form-W {
+  background: rgba(114, 242, 198, 0.18);
+  color: #72f2c6;
+}
+
+.form-L {
+  background: rgba(255, 120, 120, 0.18);
+  color: #ff9d9d;
+}
+
+.hub-edges {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.hub-edge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 34px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.hub-edge strong {
+  font-size: 0.8rem;
+}
+
+.hub-edge.positive strong {
+  color: #72f2c6;
+}
+
+.hub-edge.negative strong {
+  color: #ff9d9d;
+}
+
+.hub-key-players {
+  margin-top: 16px;
+}
+
+.hub-key-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.hub-key-player {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  text-align: left;
+}
+
+.hub-key-player:hover {
+  border-color: rgba(114, 242, 198, 0.4);
+}
+
+.hub-key-user {
+  border-color: rgba(114, 242, 198, 0.25);
+}
+
+.hub-key-name {
+  font-weight: 700;
+}
+
+.hub-key-meta {
+  font-size: 0.72rem;
+  color: #aab8ca;
+}
+
 /* ── Recruiting: tabs + position filter ─────────────────────────────────────── */
 
 .recruit-top-bar {

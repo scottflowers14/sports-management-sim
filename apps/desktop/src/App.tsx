@@ -9,6 +9,7 @@ import { RecruitPanel } from './components/RecruitPanel';
 import { TeamScreen } from './screens/TeamScreen';
 import { ScheduleScreen } from './screens/ScheduleScreen';
 import { SeasonScreen } from './screens/SeasonScreen';
+import { buildWeeklyHub } from './weekly-hub';
 import { RecruitingScreen } from './screens/RecruitingScreen';
 import { StandingsScreen } from './screens/StandingsScreen';
 import { TournamentScreen } from './screens/TournamentScreen';
@@ -173,7 +174,19 @@ export function App() {
       }
     : null;
 
-  const selectedPlayer = selectedPlayerId ? userTeam.roster.find((p) => p.id === selectedPlayerId) : null;
+  const weeklyHub = buildWeeklyHub({
+    schedule: dynasty.season.schedule,
+    teams: dynasty.season.teams,
+    userTeamId: dynasty.userTeamId,
+    currentWeek: dynasty.season.currentWeek,
+    rankings,
+    seasonStats,
+  });
+
+  // Player cards are reusable across the whole league, not just the user roster.
+  const selectedPlayer = selectedPlayerId
+    ? dynasty.season.teams.flatMap((t) => t.roster).find((p) => p.id === selectedPlayerId)
+    : null;
   const selectedRecruit = selectedRecruitId ? dynasty.recruits.find((r) => r.id === selectedRecruitId) : null;
 
   return (
@@ -328,6 +341,7 @@ export function App() {
           gamePlan={gamePlan}
           trainingFocus={trainingFocus}
           nextOpponentScout={nextOpponentScout}
+          weeklyHub={weeklyHub}
           onGamePlanChange={setGamePlan}
           onTrainingFocusChange={setTrainingFocus}
           onSimWeek={simWeek}

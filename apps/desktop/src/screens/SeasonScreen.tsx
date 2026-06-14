@@ -20,6 +20,8 @@ export interface OpponentScout {
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { DepthChart } from '../components/DepthChart';
 import { ResultRow } from '../components/ResultRow';
+import { WeeklyHub } from '../components/WeeklyHub';
+import type { WeeklyHubData } from '../weekly-hub';
 import type { TournamentState } from '../tournament';
 import type { NewsItem } from '../news-feed';
 import { TRAINING_FOCUS_LABELS, type TrainingFocus } from '../dynasty-helpers';
@@ -44,6 +46,7 @@ export function SeasonScreen({
   gamePlan,
   trainingFocus,
   nextOpponentScout,
+  weeklyHub,
   onGamePlanChange,
   onTrainingFocusChange,
   onSimWeek,
@@ -71,6 +74,7 @@ export function SeasonScreen({
   gamePlan: LacrosseGamePlan;
   trainingFocus: TrainingFocus;
   nextOpponentScout: OpponentScout | null;
+  weeklyHub: WeeklyHubData | null;
   onGamePlanChange: (plan: LacrosseGamePlan) => void;
   onTrainingFocusChange: (focus: TrainingFocus) => void;
   onSimWeek: () => void;
@@ -84,6 +88,8 @@ export function SeasonScreen({
   return (
     <div className="season-layout">
       <div className="season-main">
+        {weeklyHub && <WeeklyHub hub={weeklyHub} onSelectPlayer={onSelectPlayer} />}
+
         <article className="card">
           <h2>This Week</h2>
           {!seasonComplete ? (

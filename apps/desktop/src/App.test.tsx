@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
@@ -259,6 +259,20 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
     expect(screen.getByText(/Scouting Points/i)).toBeInTheDocument();
     expect(screen.queryAllByRole('button', { name: /Scout/i }).length).toBeGreaterThan(0);
+  });
+
+  it('shows the weekly hub and opens a player card from a player to watch', async () => {
+    await renderStartedApp();
+
+    const hub = screen.getByLabelText(/Weekly hub/i);
+    expect(hub).toHaveTextContent(/Coach Desk/i);
+    expect(screen.getByLabelText(/Win probability/i)).toBeInTheDocument();
+    expect(hub).toHaveTextContent(/Players to Watch/i);
+
+    // Click the user's player to watch to open the shared card.
+    await userEvent.click(within(hub).getAllByTitle(/^View /i)[0]!);
+    const panel = screen.getByLabelText(/Close player panel/i).closest('aside') as HTMLElement;
+    expect(panel).toHaveTextContent(/Overall/i);
   });
 
   it('opens a reusable player card when a recruit name is clicked', async () => {
