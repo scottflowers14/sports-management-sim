@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ConfirmModal } from '../components/ConfirmModal';
 import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
 import { topRecruitMotivations, type RecruitBoardEntry, type RecruitMotivation } from '@sports-management-sim/engine-core';
 import type { ScoutingState } from '../scouting';
@@ -688,39 +689,50 @@ function OfferControl({
   const affordable = OFFER_PERCENT_OPTIONS.filter((pct) => pct / 100 <= budgetRemaining + 1e-9);
   const maxAffordable = affordable[affordable.length - 1];
   const [percent, setPercent] = useState<number>(maxAffordable ?? 100);
+  const [showConfirm, setShowConfirm] = useState(false);
   const canAfford = percent / 100 <= budgetRemaining + 1e-9;
 
   return (
-    <div className="offer-control">
-      <select
-        aria-label={`Scholarship offer amount for ${recruitName}`}
-        className="offer-pct-select"
-        value={percent}
-        onChange={(e) => setPercent(Number(e.target.value))}
-      >
-        {OFFER_PERCENT_OPTIONS.map((pct) => (
-          <option key={pct} value={pct} disabled={pct / 100 > budgetRemaining + 1e-9}>
-            {pct}%
-          </option>
-        ))}
-      </select>
-      <button
-        className="offer-btn offer-btn-sm offer-btn-row"
-        disabled={!canAfford}
-        title={canAfford ? `Offer a ${percent}% scholarship` : 'Not enough scholarship budget'}
-        onClick={() => {
-          if (
-            percent === 100 &&
-            window.confirm(`Offer ${recruitName} a full scholarship (100%)? This uses a full equivalency from your budget.`) === false
-          ) {
-            return;
-          }
-          onOffer(recruitId, percent);
-        }}
-      >
-        Offer
-      </button>
-    </div>
+    <>
+      {showConfirm && (
+        <ConfirmModal
+          title="Full Scholarship Offer"
+          message={`Offer ${recruitName} a full scholarship (100%)? This uses a full equivalency from your budget.`}
+          confirmLabel="Yes, Offer 100%"
+          danger
+          onConfirm={() => { setShowConfirm(false); onOffer(recruitId, percent); }}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
+      <div className="offer-control">
+        <select
+          aria-label={`Scholarship offer amount for ${recruitName}`}
+          className="offer-pct-select"
+          value={percent}
+          onChange={(e) => setPercent(Number(e.target.value))}
+        >
+          {OFFER_PERCENT_OPTIONS.map((pct) => (
+            <option key={pct} value={pct} disabled={pct / 100 > budgetRemaining + 1e-9}>
+              {pct}%
+            </option>
+          ))}
+        </select>
+        <button
+          className="offer-btn offer-btn-sm offer-btn-row"
+          disabled={!canAfford}
+          title={canAfford ? `Offer a ${percent}% scholarship` : 'Not enough scholarship budget'}
+          onClick={() => {
+            if (percent === 100) {
+              setShowConfirm(true);
+            } else {
+              onOffer(recruitId, percent);
+            }
+          }}
+        >
+          Offer
+        </button>
+      </div>
+    </>
   );
 }
 

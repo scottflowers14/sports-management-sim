@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 import { loadActiveDynastySave, listDynastySaves } from './persistence';
 
@@ -36,15 +36,11 @@ async function renderStartedApp() {
 
 beforeEach(() => {
   installMockLocalStorage();
-  // jsdom returns false from window.confirm by default; always confirm so tests
-  // that exercise confirmation dialogs (new dynasty, full-ride offers) still pass.
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
-  vi.restoreAllMocks();
 });
 
 describe('Desktop App', () => {
@@ -310,7 +306,9 @@ describe('Desktop App', () => {
     // Pin one recruit, scout + offer a different one (offer should auto-pin).
     await userEvent.click(screen.getAllByRole('button', { name: /Add .* to board/i })[0]!);
     await userEvent.click(screen.getAllByRole('button', { name: /^Scout \(1 pt\)$/i })[1]!);
+    // Default offer is 100% — confirm via the in-app modal (not window.confirm).
     await userEvent.click(screen.getAllByRole('button', { name: /^Offer$/i })[0]!);
+    await userEvent.click(screen.getByRole('button', { name: /Yes, Offer 100%/i }));
 
     await userEvent.click(screen.getByRole('button', { name: /My Board/i }));
     expect(screen.getByText(/2 on board/i)).toBeInTheDocument();
