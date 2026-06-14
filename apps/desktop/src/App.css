@@ -1548,8 +1548,23 @@ li span {
 
 .history-summary-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 16px;
+}
+
+.history-detail-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.history-record-book td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.history-awards-table th {
+  white-space: nowrap;
 }
 
 .history-stat-card {

@@ -56,6 +56,52 @@ function addDelta(base: PlayerSeasonStats, delta: Partial<Omit<PlayerSeasonStats
   };
 }
 
+/**
+ * Split `total` whole units across `weights` using the largest-remainder
+ * (Hamilton) method: every player gets their floored proportional share, and
+ * the leftover units go to the players with the largest fractional remainders.
+ *
+ * This replaces a naive `Math.round(total * share)` loop that dumped *all*
+ * unallocated units onto the last roster slot — which made one arbitrary player
+ * (the last attacker/midfielder in roster order) lead the team, and often the
+ * nation, in scoring. The result here always sums to exactly `total` and skews
+ * the extras toward the higher-weighted (more talented) players.
+ */
+export function apportionByWeight(total: number, weights: number[]): number[] {
+  const n = weights.length;
+  const out = new Array<number>(n).fill(0);
+  if (n === 0 || total <= 0) return out;
+
+  const safeWeights = weights.map((w) => Math.max(0, w));
+  const totalW = safeWeights.reduce((s, w) => s + w, 0);
+
+  // Degenerate weights (all zero): spread as evenly as possible.
+  if (totalW <= 0) {
+    for (let i = 0; i < total; i += 1) out[i % n] = out[i % n]! + 1;
+    return out;
+  }
+
+  const remainders: Array<{ index: number; frac: number }> = [];
+  let allocated = 0;
+  for (let i = 0; i < n; i += 1) {
+    const ideal = (total * safeWeights[i]!) / totalW;
+    const floor = Math.floor(ideal);
+    out[i] = floor;
+    allocated += floor;
+    remainders.push({ index: i, frac: ideal - floor });
+  }
+
+  // Leftover is always < n; hand it out by descending fractional remainder.
+  const leftover = total - allocated;
+  remainders.sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < leftover; k += 1) {
+    const target = remainders[k % n]!.index;
+    out[target] = out[target]! + 1;
+  }
+
+  return out;
+}
+
 function distributeToTeam(
   teamStats: LacrosseTeamStats,
   opponentGoals: number,
@@ -95,25 +141,17 @@ function distributeToTeam(
   const offRoster = roster.filter((p) => p.position === 'ATT' || p.position === 'MID');
   if (offRoster.length > 0) {
     const weights = offRoster.map((p) => Math.max(1, p.ratings.skill + p.ratings.speed));
-    const totalW = weights.reduce((s, w) => s + w, 0);
-    let goalsLeft = teamStats.goals;
-    let assistsLeft = teamStats.assists;
-    let shotsLeft = teamStats.shots;
+    const goals = apportionByWeight(teamStats.goals, weights);
+    const assists = apportionByWeight(teamStats.assists, weights);
+    const shots = apportionByWeight(teamStats.shots, weights);
 
     for (let k = 0; k < offRoster.length; k++) {
       const i = idx(offRoster[k]!.id);
       if (i < 0) continue;
-      const w = weights[k]! / totalW;
-      const last = k === offRoster.length - 1;
-      const g = last ? goalsLeft : Math.round(teamStats.goals * w);
-      const a = last ? assistsLeft : Math.round(teamStats.assists * w);
-      const s = last ? shotsLeft : Math.round(teamStats.shots * w);
-      out[i]!.delta.goals = Math.max(0, g);
-      out[i]!.delta.assists = Math.max(0, a);
-      out[i]!.delta.shots = Math.max(0, s);
-      goalsLeft -= g;
-      assistsLeft -= a;
-      shotsLeft -= s;
+      out[i]!.delta.goals = goals[k]!;
+      out[i]!.delta.assists = assists[k]!;
+      // A scorer can't have fewer shots than goals; keep box scores believable.
+      out[i]!.delta.shots = Math.max(goals[k]!, shots[k]!);
     }
   }
 
@@ -121,17 +159,12 @@ function distributeToTeam(
   const defRoster = roster.filter((p) => p.position === 'DEF' || p.position === 'LSM');
   if (defRoster.length > 0) {
     const weights = defRoster.map((p) => Math.max(1, p.ratings.discipline + p.ratings.athleticism));
-    const totalW = weights.reduce((s, w) => s + w, 0);
-    let ctLeft = teamStats.causedTurnovers;
+    const causedTurnovers = apportionByWeight(teamStats.causedTurnovers, weights);
 
     for (let k = 0; k < defRoster.length; k++) {
       const i = idx(defRoster[k]!.id);
       if (i < 0) continue;
-      const w = weights[k]! / totalW;
-      const last = k === defRoster.length - 1;
-      const ct = last ? ctLeft : Math.round(teamStats.causedTurnovers * w);
-      out[i]!.delta.causedTurnovers = Math.max(0, ct);
-      ctLeft -= ct;
+      out[i]!.delta.causedTurnovers = causedTurnovers[k]!;
     }
   }
 

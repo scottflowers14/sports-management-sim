@@ -39,6 +39,7 @@ import {
 } from './tournament';
 import type { TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
+import { deriveSeasonLeader, toSeasonAwardRecords } from './history';
 import {
   createScoutingState,
   scoutRecruit as scoutRecruitFn,
@@ -423,6 +424,12 @@ export function useDynastyController() {
         .sort((a, b) => b.record.wins - a.record.wins)
         .findIndex((s) => s.teamId === dynasty.userTeamId) + 1;
 
+    const userTeamThisSeason = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+    const nationalChampionTeam = tournamentChampion
+      ? dynasty.season.teams.find((t) => t.id === tournamentChampion)
+      : undefined;
+    const teamLeader = deriveSeasonLeader(userTeamThisSeason, seasonStats);
+
     const historyRecord: DynastySeasonRecord = {
       year: dynasty.season.year,
       wins: summary.userRecord.wins,
@@ -432,6 +439,11 @@ export function useDynastyController() {
       confChampion: isConfChamp ?? false,
       nationalChampion: isNatChamp,
       signingClassSize: summary.signingClass.length,
+      ...(coachProfile ? { coachName: coachProfile.name } : {}),
+      ...(userTeamThisSeason ? { teamName: userTeamThisSeason.name } : {}),
+      ...(nationalChampionTeam ? { nationalChampionName: nationalChampionTeam.name } : {}),
+      awards: toSeasonAwardRecords(summary.awards),
+      ...(teamLeader ? { teamLeader } : {}),
     };
 
     setDynasty(newDynasty);
