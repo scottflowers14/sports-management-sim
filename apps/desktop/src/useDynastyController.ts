@@ -77,6 +77,7 @@ import {
 import type { CustomTeamsFile } from '@sports-management-sim/sport-lacrosse';
 
 type View =
+  | 'week-hub'
   | 'season'
   | 'team'
   | 'schedule'
@@ -97,7 +98,7 @@ export function useDynastyController() {
   const teamChoices = useMemo(() => getLacrosseDynastyTeamChoices(customTeams ?? undefined), [customTeams]);
   const [selectedNewTeamId, setSelectedNewTeamId] = useState(() => teamChoices[0]?.id ?? 'maryland-state');
   const [dynasty, setDynasty] = useState<LacrosseDynastyState>(() => loadedSave?.dynasty ?? createFreshLacrosseDynasty());
-  const [view, setView] = useState<View>('season');
+  const [view, setView] = useState<View>('week-hub');
   const [lastSimWeek, setLastSimWeek] = useState<number | null>(loadedSave?.lastSimWeek ?? null);
   const [offseasonSummary, setOffseasonSummary] = useState<OffseasonSummary | null>(loadedSave?.offseasonSummary ?? null);
   const [rankings, setRankings] = useState<RankingEntry[]>(loadedSave?.rankings ?? []);
@@ -156,7 +157,7 @@ export function useDynastyController() {
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
   const resetUiState = useCallback(() => {
-    setView('season');
+    setView('week-hub');
     setLastSimWeek(null);
     setOffseasonSummary(null);
     setRankings([]);
@@ -265,7 +266,7 @@ export function useDynastyController() {
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
-    setView('season');
+    setView('week-hub');
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
     saveDynastySlot({ saveId, state: save });
@@ -552,7 +553,7 @@ export function useDynastyController() {
     setScouting((s) => resetScoutingForNewClass(s));
     setShortlistIds([]);
     setRecruitBoardView('all');
-    setView('season');
+    setView('week-hub');
   }, []);
 
   const handleExportSave = useCallback((saveId: string) => {
