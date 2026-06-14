@@ -1954,6 +1954,30 @@ li span {
   margin-top: 3px;
 }
 
+.career-table {
+  margin-top: 10px;
+  font-size: 0.82rem;
+}
+
+.career-table th {
+  white-space: nowrap;
+}
+
+.career-total-row td {
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  font-weight: 800;
+  color: #72f2c6;
+}
+
+.career-live-row td {
+  color: #cdd9e5;
+}
+
+.career-note {
+  margin-top: 6px;
+  font-size: 0.7rem;
+}
+
 /* ── Recruiting: tabs + position filter ─────────────────────────────────────── */
 
 .recruit-top-bar {

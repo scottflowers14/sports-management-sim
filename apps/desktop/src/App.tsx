@@ -49,6 +49,7 @@ export function App() {
     gameLogs,
     scouting,
     seasonStats,
+    careerStats,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -449,6 +450,8 @@ export function App() {
             (inj) => inj.playerId === selectedPlayer.id && inj.teamId === dynasty.userTeamId,
           )}
           playerStats={seasonStats[selectedPlayer.id]}
+          career={careerStats[selectedPlayer.id]}
+          seasonYear={dynasty.season.year}
           onClose={() => setSelectedPlayerId(null)}
         />
       )}

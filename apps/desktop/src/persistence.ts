@@ -7,6 +7,7 @@ import type { ConferenceBracket, TournamentGame, TournamentPhase, TournamentStat
 import type { DynastySeasonRecord } from './history';
 import type { ScoutingState } from './scouting';
 import type { SeasonStatsMap } from './stats';
+import type { CareerStatsMap } from './career-stats';
 import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
 import { formatTeamName } from './ui/format';
 
@@ -27,6 +28,8 @@ export interface DynastySaveState {
   injuries: InjuredPlayer[];
   scouting: ScoutingState;
   seasonStats: SeasonStatsMap;
+  /** Career production by player id, accumulated across completed seasons. */
+  careerStats: CareerStatsMap;
   /** Keyed by game ID. Maps don't JSON-serialize so stored as a plain Record. */
   gameLogs: Record<string, GameLog>;
   coachProfile: CoachProfile | null;
@@ -312,6 +315,9 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     }
     if (parsed.shortlistIds === undefined) {
       parsed.shortlistIds = [];
+    }
+    if (parsed.careerStats === undefined) {
+      parsed.careerStats = {};
     }
     return parsed as PersistedDynastySave;
   } catch {

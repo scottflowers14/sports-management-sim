@@ -48,6 +48,8 @@ import {
 import type { ScoutingState } from './scouting';
 import { emptySeasonStats } from './stats';
 import type { SeasonStatsMap } from './stats';
+import { emptyCareerStats, recordSeasonToCareer } from './career-stats';
+import type { CareerStatsMap } from './career-stats';
 import type { BoxScoreData } from './ui/types';
 import { formatTeamName } from './ui/format';
 import {
@@ -110,6 +112,7 @@ export function useDynastyController() {
   );
   const [scouting, setScouting] = useState<ScoutingState>(() => loadedSave?.scouting ?? createScoutingState(3));
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
+  const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadedSave?.careerStats ?? emptyCareerStats());
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded dynasty save' : 'Choose or create a dynasty'));
   const [recruitPosFilter, setRecruitPosFilter] = useState<LacrossePosition | 'ALL'>('ALL');
   const [recruitTab, setRecruitTab] = useState<'board' | 'portal'>('board');
@@ -137,6 +140,7 @@ export function useDynastyController() {
     injuries,
     scouting,
     seasonStats,
+    careerStats,
     gameLogs: Object.fromEntries(gameLogs),
     coachProfile,
     adConfidence,
@@ -146,7 +150,7 @@ export function useDynastyController() {
     trainingFocus,
     pendingJobOffers,
     shortlistIds,
-  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds]);
+  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -164,6 +168,7 @@ export function useDynastyController() {
     setGameLogs(new Map());
     setScouting(createScoutingState(3));
     setSeasonStats(emptySeasonStats());
+    setCareerStats(emptyCareerStats());
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
     setShortlistIds([]);
@@ -213,6 +218,7 @@ export function useDynastyController() {
       injuries: [],
       scouting: createScoutingState(3),
       seasonStats: emptySeasonStats(),
+      careerStats: emptyCareerStats(),
       gameLogs: {},
       coachProfile: newCoach,
       adConfidence: 60,
@@ -246,6 +252,7 @@ export function useDynastyController() {
     setGameLogs(new Map(Object.entries(save.gameLogs ?? {})));
     setScouting(save.scouting);
     setSeasonStats(save.seasonStats);
+    setCareerStats(save.careerStats ?? emptyCareerStats());
     setCoachProfile(save.coachProfile ?? null);
     setAdConfidence(save.adConfidence ?? 60);
     setSeasonGoals(save.seasonGoals ?? null);
@@ -449,6 +456,9 @@ export function useDynastyController() {
     setDynasty(newDynasty);
     setOffseasonSummary(summary);
     setDynastyHistory((h) => [historyRecord, ...h]);
+    setCareerStats((prev) =>
+      recordSeasonToCareer(prev, seasonStats, dynasty.season.teams, dynasty.season.year),
+    );
 
     // Evaluate season goals and update AD confidence
     if (coachProfile && seasonGoals) {
@@ -623,6 +633,7 @@ export function useDynastyController() {
     gameLogs,
     scouting,
     seasonStats,
+    careerStats,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
