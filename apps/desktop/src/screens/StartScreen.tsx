@@ -114,7 +114,19 @@ export function StartScreen({
               {selectedTeam.conferenceId ? ` in ${selectedTeam.conferenceId.toUpperCase()}` : ''}.
             </p>
           )}
-          <button type="button" className="primary-action" onClick={onCreateDynasty}>
+          <button
+            type="button"
+            className="primary-action"
+            onClick={() => {
+              if (
+                saves.length > 0 &&
+                !window.confirm('Start a new dynasty? Your existing saves won\'t be deleted.')
+              ) {
+                return;
+              }
+              onCreateDynasty();
+            }}
+          >
             Start New Dynasty
           </button>
         </article>

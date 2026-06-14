@@ -53,6 +53,7 @@ import type { CareerStatsMap } from './career-stats';
 import type { BoxScoreData } from './ui/types';
 import { formatTeamName } from './ui/format';
 import {
+  ACTIVE_DYNASTY_SAVE_KEY,
   createDynastySaveId,
   deleteDynastySave,
   exportSaveAsJson,
@@ -286,17 +287,21 @@ export function useDynastyController() {
   }, [activeSaveId, refreshSaves]);
 
   const resetDynasty = useCallback(() => {
+    // Clear from localStorage too so the stale active key doesn't trigger autosave on revisit.
+    window.localStorage.removeItem(ACTIVE_DYNASTY_SAVE_KEY);
     setActiveSaveId(null);
     setSaveStatus('Choose or create a dynasty');
     refreshSaves();
     setScreen('start');
   }, [refreshSaves]);
 
+  // Don't autosave while on the start screen — prevents stale state from overwriting
+  // an existing save before the user has actually started or loaded a dynasty.
   useEffect(() => {
-    if (!activeSaveId) return undefined;
+    if (!activeSaveId || screen === 'start') return undefined;
     const timeout = window.setTimeout(() => persistDynasty('Autosaved'), 300);
     return () => window.clearTimeout(timeout);
-  }, [activeSaveId, persistDynasty]);
+  }, [activeSaveId, persistDynasty, screen]);
 
   const updateDepthChartSlot = useCallback((position: LacrossePosition, slotIndex: number, playerId: string) => {
     setDynasty((current) => ({

@@ -2,6 +2,17 @@ import type { LacrossePosition, LacrosseTeam, LacrosseTeamRating } from '@sports
 import { DepthChart } from '../components/DepthChart';
 import { formatTeamName } from '../ui/format';
 
+const POSITION_ORDER: LacrossePosition[] = ['ATT', 'MID', 'DEF', 'LSM', 'GK', 'FOGO'];
+
+const POSITION_LABELS: Record<LacrossePosition, string> = {
+  ATT: 'Attack',
+  MID: 'Midfield',
+  DEF: 'Defense',
+  LSM: 'Long-Stick Midfield',
+  GK: 'Goalie',
+  FOGO: 'Face-Off / Get-Off',
+};
+
 export function TeamScreen({
   team,
   injuries,
@@ -17,9 +28,13 @@ export function TeamScreen({
   onSelectPlayer: (playerId: string) => void;
   onDepthChartChange: (position: LacrossePosition, slotIndex: number, playerId: string) => void;
 }) {
-  const rosterByPosition = [...team.roster].sort(
-    (a, b) => a.position.localeCompare(b.position) || b.ratings.overall - a.ratings.overall,
-  );
+  const rosterGroups = POSITION_ORDER.map((pos) => ({
+    position: pos,
+    label: POSITION_LABELS[pos],
+    players: [...team.roster]
+      .filter((p) => p.position === pos)
+      .sort((a, b) => b.ratings.overall - a.ratings.overall),
+  })).filter((g) => g.players.length > 0);
 
   return (
     <div className="team-view-layout">
@@ -71,7 +86,6 @@ export function TeamScreen({
           <thead>
             <tr>
               <th>Player</th>
-              <th>Pos</th>
               <th>Class</th>
               <th>OVR</th>
               <th>Skill</th>
@@ -80,26 +94,33 @@ export function TeamScreen({
             </tr>
           </thead>
           <tbody>
-            {rosterByPosition.map((player) => {
-              const isInjured = injuries.has(player.id);
-              return (
-                <tr
-                  key={player.id}
-                  className={`clickable-row${isInjured ? ' player-injured' : ''}`}
-                  onClick={() => onSelectPlayer(player.id)}
-                >
-                  <td>
-                    <strong>{player.name.first} {player.name.last}</strong>
-                  </td>
-                  <td>{player.position}</td>
-                  <td>{player.classYear}</td>
-                  <td>{player.ratings.overall}</td>
-                  <td>{player.ratings.skill}</td>
-                  <td>{player.ratings.iq}</td>
-                  <td>{isInjured ? <span className="inj-badge">INJ</span> : 'Available'}</td>
-                </tr>
-              );
-            })}
+            {rosterGroups.flatMap(({ position, label, players }) => [
+              <tr key={`pos-header-${position}`} className="roster-position-header">
+                <td colSpan={6}>
+                  <span className="roster-pos-tag">{position}</span>
+                  {label}
+                </td>
+              </tr>,
+              ...players.map((player) => {
+                const isInjured = injuries.has(player.id);
+                return (
+                  <tr
+                    key={player.id}
+                    className={`clickable-row${isInjured ? ' player-injured' : ''}`}
+                    onClick={() => onSelectPlayer(player.id)}
+                  >
+                    <td>
+                      <strong>{player.name.first} {player.name.last}</strong>
+                    </td>
+                    <td>{player.classYear}</td>
+                    <td>{player.ratings.overall}</td>
+                    <td>{player.ratings.skill}</td>
+                    <td>{player.ratings.iq}</td>
+                    <td>{isInjured ? <span className="inj-badge">INJ</span> : 'Available'}</td>
+                  </tr>
+                );
+              }),
+            ])}
           </tbody>
         </table>
       </article>
