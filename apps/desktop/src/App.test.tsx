@@ -224,6 +224,7 @@ describe('Desktop App', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
     await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Yes, Start New/i }));
     const secondSave = loadActiveDynastySave();
 
     expect(secondSave?.dynasty.seed).not.toBe(firstSave?.dynasty.seed);
@@ -240,6 +241,7 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
     await userEvent.selectOptions(screen.getByLabelText(/^Team$/i), 'virginia-lakes');
     await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Yes, Start New/i }));
     const secondSaveId = loadActiveDynastySave()?.saveId;
 
     await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
