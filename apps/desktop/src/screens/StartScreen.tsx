@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { DynastySaveMetadata } from '../persistence';
 import type { DynastyTeamChoice } from '../dynasty-factory';
 
@@ -42,6 +42,7 @@ export function StartScreen({
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
   const importInputRef = useRef<HTMLInputElement>(null);
   const teamsInputRef = useRef<HTMLInputElement>(null);
+  const [confirmingNewDynasty, setConfirmingNewDynasty] = useState(false);
 
   const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -114,21 +115,40 @@ export function StartScreen({
               {selectedTeam.conferenceId ? ` in ${selectedTeam.conferenceId.toUpperCase()}` : ''}.
             </p>
           )}
-          <button
-            type="button"
-            className="primary-action"
-            onClick={() => {
-              if (
-                saves.length > 0 &&
-                !window.confirm('Start a new dynasty? Your existing saves won\'t be deleted.')
-              ) {
-                return;
-              }
-              onCreateDynasty();
-            }}
-          >
-            Start New Dynasty
-          </button>
+          {confirmingNewDynasty ? (
+            <div className="new-dynasty-confirm">
+              <p className="dim">Your existing saves won't be deleted.</p>
+              <div className="new-dynasty-confirm-btns">
+                <button
+                  type="button"
+                  className="primary-action"
+                  onClick={() => { setConfirmingNewDynasty(false); onCreateDynasty(); }}
+                >
+                  Yes, Start New
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingNewDynasty(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => {
+                if (saves.length > 0) {
+                  setConfirmingNewDynasty(true);
+                } else {
+                  onCreateDynasty();
+                }
+              }}
+            >
+              Start New Dynasty
+            </button>
+          )}
         </article>
 
         <article className="card load-dynasty-card" aria-label="Load dynasty">
