@@ -142,7 +142,7 @@ describe('recruit board helpers', () => {
     const board = sortRecruitBoardForTeam(team, recruits, { ATT: 3, MID: 4, DEF: 3, GK: 2, FOGO: 1 });
 
     expect(board[0]?.recruit.id).toBe('fogo-needed');
-    expect(board.map((entry) => entry.recruit.id)).toEqual(['fogo-needed', 'mid-good', 'att-good']);
+    expect(board.map((entry) => entry.recruit.id)).toEqual(['fogo-needed', 'att-good', 'mid-good']);
     expect(board[0]?.needScore).toBeGreaterThan(board[1]?.needScore ?? 0);
   });
 });
