@@ -52,7 +52,8 @@ export function sortRecruitBoardForTeam<Position extends string, SportTraits>(
       const rosterNeed = needsByPosition.get(recruit.position);
       const needCount = Number(rosterNeed?.need ?? 0);
       const absenceBonus = rosterNeed !== undefined && rosterNeed.current === 0 ? 50 : 0;
-      const needScore = needCount * 35 + absenceBonus;
+      const fillRatio = rosterNeed && rosterNeed.target > 0 ? needCount / rosterNeed.target : 0;
+      const needScore = Math.round(fillRatio * 100) + absenceBonus;
       const qualityScore = Math.round(recruit.ratings.overall * 0.45 + recruit.ratings.potential * 0.55);
       const interestScore = recruit.interestByTeamId[team.id] ?? 0;
       const score = Math.round(fitScore * 0.25 + needScore * 0.35 + qualityScore * 0.25 + interestScore * 0.15);
