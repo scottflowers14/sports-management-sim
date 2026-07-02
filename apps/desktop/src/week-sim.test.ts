@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
+import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import { simulateOneWeek, simulateRemainingWeeks, type WeekSimState } from './week-sim';
 
@@ -18,7 +19,9 @@ function freshState(): WeekSimState {
     rankings: [],
     injuries: [],
     newsItems: [],
-    scouting: createScoutingState(3),
+    scouting: createScoutingState(),
+    recruitingActivity: emptyRecruitingActivity(),
+    recruitTrends: {},
     seasonStats: emptySeasonStats(),
     gameLogs: new Map(),
     bestNatRank: null,
@@ -58,6 +61,37 @@ describe('simulateOneWeek', () => {
     const next = simulateOneWeek(freshState(), undefined, seededRandom(2));
     const userRank = next.rankings.find((r) => r.teamId === next.dynasty.userTeamId)?.rank ?? null;
     expect(next.bestNatRank).toBe(userRank);
+  });
+});
+
+describe('recruiting actions in the weekly sim', () => {
+  it('resolves campus visits, boosts interest, records the trend, and clears weekly activity', () => {
+    const state = freshState();
+    const target = state.dynasty.recruits.find((r) => r.status === 'open')!;
+    const before = target.interestByTeamId[state.dynasty.userTeamId] ?? 0;
+
+    const next = simulateOneWeek(
+      { ...state, recruitingActivity: { visitIds: [target.id], pitchedIds: [] } },
+      undefined,
+      seededRandom(7),
+    );
+
+    const after = next.dynasty.recruits.find((r) => r.id === target.id)!;
+    expect(after.interestByTeamId[next.dynasty.userTeamId] ?? 0).toBeGreaterThan(before);
+    expect(next.newsItems.some((n) => n.headline.startsWith('Campus visit:'))).toBe(true);
+    expect(next.recruitingActivity).toEqual({ visitIds: [], pitchedIds: [] });
+    expect(next.recruitTrends[target.id]).toBeGreaterThan(0);
+  });
+
+  it('commits recruits over the season as their decision weeks arrive', () => {
+    const done = simulateRemainingWeeks(freshState(), undefined, seededRandom(11));
+    const committed = done.dynasty.recruits.filter((r) => r.status !== 'open');
+    expect(committed.length).toBeGreaterThan(0);
+    // Anyone who committed did so to a school that actually offered them.
+    for (const recruit of committed) {
+      const destination = recruit.committedTeamId ?? recruit.signedTeamId;
+      expect(recruit.scholarshipOffers.some((o) => o.teamId === destination)).toBe(true);
+    }
   });
 });
 

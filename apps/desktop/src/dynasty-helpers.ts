@@ -1,10 +1,13 @@
 import {
   addSignedRecruitsToTeam,
   applyScholarshipOffer,
-  calculateRecruitFitScore,
+  chooseCommitTeam,
   commitRecruit,
+  recruitDecisionWeek,
+  recruitPrestigeMultiplier,
   resolvePortalCommitments,
   runTeamOffseason,
+  shouldReopenCommitment,
   signCommittedRecruit,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
@@ -46,6 +49,14 @@ const TRAINING_FOCUS_POSITIONS: Record<Exclude<TrainingFocus, 'balanced'>, reado
 
 const TRAINING_FOCUS_BONUS = 0.25;
 
+export interface SigningDayFlip {
+  name: string;
+  position: string;
+  starRating: number;
+  fromTeamName: string;
+  toTeamName: string;
+}
+
 export interface OffseasonSummary {
   seasonYear: number;
   finalStandings: StandingsEntry[];
@@ -54,6 +65,8 @@ export interface OffseasonSummary {
   graduates: { name: string; position: string; overall: number }[];
   developmentReport: DevelopmentReport | null;
   signingClass: { name: string; position: string; starRating: number; overall: number }[];
+  /** Commitments that flipped to a rival school on signing day. */
+  signingDayFlips?: SigningDayFlip[];
   awards: SeasonAwards | null;
 }
 
@@ -121,54 +134,88 @@ export function processInjuries(
   };
 }
 
+/** A recruit shuts down their recruitment early only when one school is a runaway leader. */
+const EARLY_COMMIT_INTEREST = 95;
+const EARLY_COMMIT_LEAD = 20;
+
 export function autoCommitWeekly(
   recruits: LacrosseRecruit[],
   teams: LacrosseTeam[],
   userTeamId: string,
   currentWeek: number,
   random: () => number,
+  finalWeek = 10,
 ): LacrosseRecruit[] {
-  const userTeam = teams.find((t) => t.id === userTeamId);
-
   // CPU teams gradually extend offers week by week
   const updated = applyCpuWeeklyOffers(recruits, teams, userTeamId, random);
 
   return updated.map((recruit) => {
+    // Committed-but-unsigned recruits can reopen when a rival (usually a user
+    // running flip pitches) has clearly overtaken their school.
+    if (recruit.status === 'committed' && recruit.committedTeamId !== undefined) {
+      if (shouldReopenCommitment(recruit, random)) {
+        const formerTeamId = recruit.committedTeamId;
+        const { committedTeamId: _dropped, ...reopened } = recruit;
+        return {
+          ...reopened,
+          status: 'open' as const,
+          interestByTeamId: {
+            ...recruit.interestByTeamId,
+            [formerTeamId]: Math.max(0, (recruit.interestByTeamId[formerTeamId] ?? 0) - 20),
+          },
+        };
+      }
+      return recruit;
+    }
     if (recruit.status !== 'open') return recruit;
     if (recruit.scholarshipOffers.length === 0) return recruit;
 
     const updatedInterest = { ...recruit.interestByTeamId };
 
+    // Passive weekly drift. Deliberately small for the user's program: sustained
+    // gains come from spending recruiting hours on pitches and visits.
     for (const offer of recruit.scholarshipOffers) {
       const team = teams.find((t) => t.id === offer.teamId);
       if (!team) continue;
       const current = updatedInterest[team.id] ?? 0;
-      if (team.id === userTeamId && userTeam) {
-        const fitScore = calculateRecruitFitScore(recruit, userTeam);
-        const gain = Math.round(
-          11 + recruit.starRating * 2 + fitScore * 0.05 + recruit.preferences.scholarshipImportance * 0.04,
-        );
+      const prestigeMult = recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige);
+      if (team.id === userTeamId) {
+        const scholarshipPull = (offer.scholarshipPercent / 100) * (recruit.preferences.scholarshipImportance / 100) * 3;
+        const gain = Math.round((3 + recruit.starRating * 0.5 + scholarshipPull) * prestigeMult);
         updatedInterest[team.id] = Math.min(100, current + gain);
       } else {
-        const prestigeBonus = Math.round((team.reputation.nationalPrestige / 100) * 5);
-        updatedInterest[team.id] = Math.min(100, current + 6 + recruit.starRating + prestigeBonus);
+        // CPU staffs work their boards off-screen, so their drift stays stronger.
+        const prestigeBonus = (team.reputation.nationalPrestige / 100) * 4;
+        const gain = Math.round((5 + recruit.starRating * 0.5 + prestigeBonus + random() * 3) * prestigeMult);
+        updatedInterest[team.id] = Math.min(100, current + gain);
       }
     }
 
-    // Commit to highest-interest team above the threshold
-    const threshold = clamp(84 - currentWeek * 5 + recruit.starRating, 58, 84);
-    const aboveThreshold = recruit.scholarshipOffers
+    const withInterest = { ...recruit, interestByTeamId: updatedInterest };
+
+    // Recruits announce on their own schedule; a runaway leader can end it early.
+    const ranked = recruit.scholarshipOffers
       .map((o) => ({ teamId: o.teamId, interest: updatedInterest[o.teamId] ?? 0 }))
-      .filter((t) => t.interest >= threshold)
       .sort((a, b) => b.interest - a.interest);
+    const leader = ranked[0];
+    const runnerUp = ranked[1];
+    const runawayLeader =
+      leader !== undefined &&
+      leader.interest >= EARLY_COMMIT_INTEREST &&
+      leader.interest - (runnerUp?.interest ?? 0) >= EARLY_COMMIT_LEAD;
+    const decisionWeek = recruitDecisionWeek(recruit.id, recruit.starRating, finalWeek);
 
-    const committingTo = aboveThreshold[0];
+    if (runawayLeader) {
+      return { ...withInterest, status: 'committed' as const, committedTeamId: leader.teamId };
+    }
+    if (currentWeek >= decisionWeek) {
+      const committingTo = chooseCommitTeam(withInterest, teams, random);
+      if (committingTo !== undefined) {
+        return { ...withInterest, status: 'committed' as const, committedTeamId: committingTo };
+      }
+    }
 
-    return {
-      ...recruit,
-      interestByTeamId: updatedInterest,
-      ...(committingTo ? { status: 'committed' as const, committedTeamId: committingTo.teamId } : {}),
-    };
+    return withInterest;
   });
 }
 
@@ -211,10 +258,6 @@ function applyCpuWeeklyOffers(
   return updated;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 export function runOffseason(
   dynasty: LacrosseDynastyState,
   nationalChampionId?: string,
@@ -251,8 +294,33 @@ export function runOffseason(
       : r,
   );
 
+  // Signing-day drama: a school that kept working a committed recruit and clearly
+  // overtook their pledge steals the signature at the last moment.
+  const signingDayFlips: SigningDayFlip[] = [];
+  const teamNameById = new Map(season.teams.map((t) => [t.id, t.name]));
+  const afterFlips = fullyCommitted.map((r) => {
+    if (r.status !== 'committed' || r.committedTeamId === undefined) return r;
+    const committedInterest = r.interestByTeamId[r.committedTeamId] ?? 0;
+    const rival = r.scholarshipOffers
+      .filter((o) => o.teamId !== r.committedTeamId)
+      .map((o) => ({ teamId: o.teamId, interest: r.interestByTeamId[o.teamId] ?? 0 }))
+      .sort((a, b) => b.interest - a.interest)[0];
+    if (rival === undefined || rival.interest <= committedInterest + 12) return r;
+    const involvesUser = r.committedTeamId === userTeamId || rival.teamId === userTeamId;
+    if (involvesUser) {
+      signingDayFlips.push({
+        name: `${r.name.first} ${r.name.last}`,
+        position: r.position,
+        starRating: r.starRating,
+        fromTeamName: teamNameById.get(r.committedTeamId) ?? r.committedTeamId,
+        toTeamName: teamNameById.get(rival.teamId) ?? rival.teamId,
+      });
+    }
+    return { ...r, committedTeamId: rival.teamId };
+  });
+
   // Sign all committed recruits
-  const signed = fullyCommitted.map((r) =>
+  const signed = afterFlips.map((r) =>
     r.status === 'committed' ? signCommittedRecruit(r) : r,
   );
 
@@ -318,6 +386,7 @@ export function runOffseason(
     userRecord: { wins: userTeam.record.wins, losses: userTeam.record.losses },
     graduates,
     signingClass,
+    signingDayFlips,
     awards,
     developmentReport,
   };

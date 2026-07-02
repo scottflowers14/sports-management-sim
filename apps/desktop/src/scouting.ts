@@ -1,3 +1,9 @@
+/**
+ * Weekly recruiting-hours pool and scouted knowledge. Hours are one budget spent
+ * across every recruiting verb: scouting reports, pitches, flip pitches, and
+ * campus visits all draw from the same pool, so working one recruit hard means
+ * another goes cold.
+ */
 export interface ScoutingState {
   partialIds: Record<string, number>;  // recruitId -> fuzzy OVR
   fullIds: string[];
@@ -5,7 +11,17 @@ export interface ScoutingState {
   pointsPerWeek: number;
 }
 
-export function createScoutingState(pointsPerWeek = 3): ScoutingState {
+export const RECRUITING_HOURS_PER_WEEK = 6;
+
+/** Hour costs for each recruiting action. */
+export const HOURS_COST = {
+  scout: 1,
+  pitch: 1,
+  flipPitch: 2,
+  visit: 3,
+} as const;
+
+export function createScoutingState(pointsPerWeek = RECRUITING_HOURS_PER_WEEK): ScoutingState {
   return { partialIds: {}, fullIds: [], pointsAvailable: pointsPerWeek, pointsPerWeek };
 }
 
@@ -16,13 +32,19 @@ export function advanceScoutingWeek(state: ScoutingState): ScoutingState {
   };
 }
 
+/** Spend recruiting hours; returns null when the pool can't cover the cost. */
+export function spendRecruitingHours(state: ScoutingState, cost: number): ScoutingState | null {
+  if (state.pointsAvailable < cost) return null;
+  return { ...state, pointsAvailable: state.pointsAvailable - cost };
+}
+
 export function scoutRecruit(
   state: ScoutingState,
   recruitId: string,
   trueOvr: number,
   random: () => number,
 ): ScoutingState {
-  if (state.pointsAvailable <= 0) return state;
+  if (state.pointsAvailable < HOURS_COST.scout) return state;
 
   if (recruitId in state.partialIds) {
     // Upgrade partial → full
@@ -31,7 +53,7 @@ export function scoutRecruit(
       ...state,
       partialIds: remaining,
       fullIds: [...state.fullIds, recruitId],
-      pointsAvailable: state.pointsAvailable - 1,
+      pointsAvailable: state.pointsAvailable - HOURS_COST.scout,
     };
   }
 
@@ -41,7 +63,7 @@ export function scoutRecruit(
   return {
     ...state,
     partialIds: { ...state.partialIds, [recruitId]: fuzzyOvr },
-    pointsAvailable: state.pointsAvailable - 1,
+    pointsAvailable: state.pointsAvailable - HOURS_COST.scout,
   };
 }
 

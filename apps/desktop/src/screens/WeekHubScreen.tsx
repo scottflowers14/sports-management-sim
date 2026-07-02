@@ -64,7 +64,7 @@ function computeActionItems({
         id: 'scout',
         priority: 'medium',
         icon: '🔍',
-        text: `${scouting.pointsAvailable} scouting point${scouting.pointsAvailable > 1 ? 's' : ''} available — scout ${topUnscouted.recruit.name.first} ${topUnscouted.recruit.name.last} (${topUnscouted.recruit.position})`,
+        text: `${scouting.pointsAvailable} recruiting hour${scouting.pointsAvailable > 1 ? 's' : ''} available — scout ${topUnscouted.recruit.name.first} ${topUnscouted.recruit.name.last} (${topUnscouted.recruit.position})`,
         nav: 'recruiting',
       });
     }
@@ -219,7 +219,7 @@ export function WeekHubScreen({
             )}
             <div className="hub-stat">
               <span className="hub-stat-value">{scouting.pointsAvailable}</span>
-              <span className="hub-stat-label">Scout Pts</span>
+              <span className="hub-stat-label">Recruit Hrs</span>
             </div>
           </div>
         </div>
@@ -353,7 +353,7 @@ export function WeekHubScreen({
         <article className="card hub-card">
           <h3 className="hub-card-title">Recruiting Pulse</h3>
           <div className="hub-scout-bar">
-            <span className="hub-scout-label">Scouting Points</span>
+            <span className="hub-scout-label">Recruiting Hours</span>
             <div className="hub-scout-track">
               <div
                 className="hub-scout-fill"

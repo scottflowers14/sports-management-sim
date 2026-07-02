@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
+  applyRecruitPitch,
   applyScholarshipOffer,
   classScholarshipBudgetUsed,
   recruitPrestigeMultiplier,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
+import type { RecruitMotivation } from '@sports-management-sim/engine-core';
 import {
   DEFAULT_GAME_PLAN,
   LACROSSE_CLASS_SCHOLARSHIP_BUDGET,
@@ -44,8 +46,12 @@ import {
   createScoutingState,
   scoutRecruit as scoutRecruitFn,
   resetScoutingForNewClass,
+  spendRecruitingHours,
+  HOURS_COST,
 } from './scouting';
 import type { ScoutingState } from './scouting';
+import { emptyRecruitingActivity } from './recruiting-activity';
+import type { RecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import type { SeasonStatsMap } from './stats';
 import { emptyCareerStats, recordSeasonToCareer } from './career-stats';
@@ -113,7 +119,11 @@ export function useDynastyController() {
   const [gameLogs, setGameLogs] = useState<Map<string, GameLog>>(() =>
     new Map(Object.entries(loadedSave?.gameLogs ?? {})),
   );
-  const [scouting, setScouting] = useState<ScoutingState>(() => loadedSave?.scouting ?? createScoutingState(3));
+  const [scouting, setScouting] = useState<ScoutingState>(() => loadedSave?.scouting ?? createScoutingState());
+  const [recruitingActivity, setRecruitingActivity] = useState<RecruitingActivity>(
+    () => loadedSave?.recruitingActivity ?? emptyRecruitingActivity(),
+  );
+  const [recruitTrends, setRecruitTrends] = useState<Record<string, number>>(() => loadedSave?.recruitTrends ?? {});
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
   const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadedSave?.careerStats ?? emptyCareerStats());
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded dynasty save' : 'Choose or create a dynasty'));
@@ -153,7 +163,9 @@ export function useDynastyController() {
     trainingFocus,
     pendingJobOffers,
     shortlistIds,
-  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds]);
+    recruitingActivity,
+    recruitTrends,
+  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -170,7 +182,9 @@ export function useDynastyController() {
     setSelectedBoxScore(null);
     setSelectedRecruitId(null);
     setGameLogs(new Map());
-    setScouting(createScoutingState(3));
+    setScouting(createScoutingState());
+    setRecruitingActivity(emptyRecruitingActivity());
+    setRecruitTrends({});
     setSeasonStats(emptySeasonStats());
     setCareerStats(emptyCareerStats());
     setRecruitPosFilter('ALL');
@@ -220,7 +234,7 @@ export function useDynastyController() {
       tournament: null,
       dynastyHistory: [],
       injuries: [],
-      scouting: createScoutingState(3),
+      scouting: createScoutingState(),
       seasonStats: emptySeasonStats(),
       careerStats: emptyCareerStats(),
       gameLogs: {},
@@ -232,6 +246,8 @@ export function useDynastyController() {
       trainingFocus: 'balanced',
       pendingJobOffers: null,
       shortlistIds: [],
+      recruitingActivity: emptyRecruitingActivity(),
+      recruitTrends: {},
     };
     saveDynastySlot({ saveId, state });
     setActiveSaveId(saveId);
@@ -256,6 +272,8 @@ export function useDynastyController() {
     setSelectedRecruitId(null);
     setGameLogs(new Map(Object.entries(save.gameLogs ?? {})));
     setScouting(save.scouting);
+    setRecruitingActivity(save.recruitingActivity ?? emptyRecruitingActivity());
+    setRecruitTrends(save.recruitTrends ?? {});
     setSeasonStats(save.seasonStats);
     setCareerStats(save.careerStats ?? emptyCareerStats());
     setCoachProfile(save.coachProfile ?? null);
@@ -326,11 +344,13 @@ export function useDynastyController() {
     injuries,
     newsItems,
     scouting,
+    recruitingActivity,
+    recruitTrends,
     seasonStats,
     gameLogs,
     bestNatRank,
     lastSimWeek,
-  }), [dynasty, rankings, injuries, newsItems, scouting, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+  }), [dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((result: WeekSimState) => {
     setDynasty(result.dynasty);
@@ -338,6 +358,8 @@ export function useDynastyController() {
     setInjuries(result.injuries);
     setNewsItems(result.newsItems);
     setScouting(result.scouting);
+    setRecruitingActivity(result.recruitingActivity);
+    setRecruitTrends(result.recruitTrends);
     setSeasonStats(result.seasonStats);
     setGameLogs(result.gameLogs);
     setBestNatRank(result.bestNatRank);
@@ -382,6 +404,73 @@ export function useDynastyController() {
     used: classScholarshipBudgetUsed(dynasty.recruits, dynasty.userTeamId),
     total: LACROSSE_CLASS_SCHOLARSHIP_BUDGET,
   };
+
+  const hasHomeGameThisWeek = dynasty.season.schedule.some(
+    (g) =>
+      g.week === dynasty.season.currentWeek &&
+      g.status === 'scheduled' &&
+      g.homeTeamId === dynasty.userTeamId,
+  );
+
+  const pitchRecruit = useCallback((recruitId: string, motivation: RecruitMotivation) => {
+    const recruit = dynasty.recruits.find((r) => r.id === recruitId);
+    const userTeamLocal = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+    if (!recruit || !userTeamLocal || recruit.status === 'signed') return;
+    if (recruitingActivity.pitchedIds.includes(recruitId)) {
+      setSaveStatus('Already pitched this recruit this week');
+      return;
+    }
+
+    const isFlipAttempt = recruit.status !== 'open' && recruit.committedTeamId !== dynasty.userTeamId;
+    const cost = isFlipAttempt ? HOURS_COST.flipPitch : HOURS_COST.pitch;
+    const spent = spendRecruitingHours(scouting, cost);
+    if (spent === null) {
+      setSaveStatus(`Not enough recruiting hours (${cost}h needed)`);
+      return;
+    }
+
+    const outcome = applyRecruitPitch(
+      recruit,
+      dynasty.userTeamId,
+      motivation,
+      recruitPrestigeMultiplier(recruit.starRating, userTeamLocal.reputation.nationalPrestige),
+    );
+    const recruits = dynasty.recruits.map((r) => (r.id === recruitId ? outcome.recruit : r));
+    const recruitBoard = sortRecruitBoardForTeam(userTeamLocal, recruits, dynasty.rosterTargets);
+    setDynasty({ ...dynasty, recruits, recruitBoard });
+    setScouting(spent);
+    setRecruitingActivity((prev) => ({ ...prev, pitchedIds: [...prev.pitchedIds, recruitId] }));
+
+    const name = `${recruit.name.first} ${recruit.name.last}`;
+    const statusByResult = {
+      strong: `${name} loved the pitch (+${outcome.interestChange} interest)`,
+      good: `${name} responded well (+${outcome.interestChange} interest)`,
+      lukewarm: `${name} was lukewarm (+${outcome.interestChange} interest)`,
+      flat: `The pitch fell flat with ${name} (${outcome.interestChange} interest)`,
+    } as const;
+    setSaveStatus(statusByResult[outcome.result]);
+  }, [dynasty, scouting, recruitingActivity]);
+
+  const toggleVisitInvite = useCallback((recruitId: string) => {
+    if (recruitingActivity.visitIds.includes(recruitId)) {
+      setRecruitingActivity((prev) => ({ ...prev, visitIds: prev.visitIds.filter((id) => id !== recruitId) }));
+      setScouting((s) => ({ ...s, pointsAvailable: s.pointsAvailable + HOURS_COST.visit }));
+      setSaveStatus('Visit invite withdrawn — hours refunded');
+      return;
+    }
+    if (!hasHomeGameThisWeek) {
+      setSaveStatus('No home game this week to host a visit');
+      return;
+    }
+    const spent = spendRecruitingHours(scouting, HOURS_COST.visit);
+    if (spent === null) {
+      setSaveStatus(`Not enough recruiting hours (${HOURS_COST.visit}h needed)`);
+      return;
+    }
+    setScouting(spent);
+    setRecruitingActivity((prev) => ({ ...prev, visitIds: [...prev.visitIds, recruitId] }));
+    setSaveStatus("Campus visit scheduled for this week's home game");
+  }, [recruitingActivity, scouting, hasHomeGameThisWeek]);
 
   const toggleShortlist = useCallback((recruitId: string) => {
     setShortlistIds((prev) =>
@@ -464,6 +553,10 @@ export function useDynastyController() {
 
     setDynasty(newDynasty);
     setOffseasonSummary(summary);
+    // The recruiting class turns over in the offseason; pending pitches/visits
+    // and trend arrows refer to recruits who no longer exist.
+    setRecruitingActivity(emptyRecruitingActivity());
+    setRecruitTrends({});
     setDynastyHistory((h) => [historyRecord, ...h]);
     setCareerStats((prev) =>
       recordSeasonToCareer(prev, seasonStats, dynasty.season.teams, dynasty.season.year),
@@ -556,6 +649,8 @@ export function useDynastyController() {
     setGameLogs(new Map());
     setSeasonStats(emptySeasonStats());
     setScouting((s) => resetScoutingForNewClass(s));
+    setRecruitingActivity(emptyRecruitingActivity());
+    setRecruitTrends({});
     setShortlistIds([]);
     setRecruitBoardView('all');
     setView('week-hub');
@@ -676,6 +771,11 @@ export function useDynastyController() {
     simToEnd,
     offerScholarship,
     doScoutRecruit,
+    pitchRecruit,
+    toggleVisitInvite,
+    recruitingActivity,
+    recruitTrends,
+    hasHomeGameThisWeek,
     offerPortalPlayer,
     enterTournament,
     simTournamentSemis,

@@ -3812,3 +3812,110 @@ li span {
   background: rgba(239, 68, 68, 0.28);
   border-color: rgba(239, 68, 68, 0.6);
 }
+
+/* ── Recruiting actions: pitches, visits, decisions, trends ─────────────────── */
+.motive-chip-btn {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.motive-chip-btn:hover:not(:disabled) {
+  background: rgba(123, 168, 255, 0.24);
+  border-color: rgba(123, 168, 255, 0.55);
+}
+
+.motive-chip-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pitched-chip {
+  display: inline-block;
+  margin-left: 6px;
+  color: #72f2c6;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.visit-btn {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(242, 196, 114, 0.35);
+  background: rgba(242, 196, 114, 0.08);
+  color: #f2c472;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.visit-btn:hover:not(:disabled) {
+  background: rgba(242, 196, 114, 0.18);
+}
+
+.visit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.visit-btn-scheduled {
+  background: rgba(114, 242, 198, 0.1);
+  border-color: rgba(114, 242, 198, 0.4);
+  color: #72f2c6;
+}
+
+.decision-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.decision-chip.decision-finalist {
+  background: rgba(114, 242, 198, 0.1);
+  border-color: rgba(114, 242, 198, 0.4);
+  color: #72f2c6;
+}
+
+.decision-chip.decision-outside {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #ef8a8a;
+}
+
+.trend-arrow {
+  margin-left: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.trend-arrow.trend-up {
+  color: #72f2c6;
+}
+
+.trend-arrow.trend-down {
+  color: #ef8a8a;
+}
+
+.motive-static {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.signing-flips {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}

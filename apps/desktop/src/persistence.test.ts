@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_GAME_PLAN } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
+import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import {
   ACTIVE_DYNASTY_SAVE_KEY,
@@ -11,6 +12,7 @@ import {
   dynastySaveSlotKey,
   listDynastySaves,
   loadActiveDynastySave,
+  loadDynastySaveSlot,
   deleteDynastySave,
   saveDynastySlot,
   saveDynastyState,
@@ -48,7 +50,7 @@ function makeSave(seedTime: number, userTeamId = 'maryland-state'): DynastySaveS
     tournament: null,
     dynastyHistory: [],
     injuries: [],
-    scouting: createScoutingState(3),
+    scouting: createScoutingState(),
     seasonStats: emptySeasonStats(),
     careerStats: {},
     gameLogs: {},
@@ -60,6 +62,8 @@ function makeSave(seedTime: number, userTeamId = 'maryland-state'): DynastySaveS
     trainingFocus: 'balanced',
     pendingJobOffers: null,
     shortlistIds: [],
+    recruitingActivity: emptyRecruitingActivity(),
+    recruitTrends: {},
   };
 }
 
@@ -114,5 +118,27 @@ describe('multi-save persistence', () => {
 
   it('creates stable save IDs from seed and timestamp', () => {
     expect(createDynastySaveId(123, () => 456)).toBe('save-123-456');
+  });
+
+  it('migrates saves that predate recruiting hours and weekly recruiting actions', () => {
+    const storage = makeStorage();
+    const save = makeSave(4001);
+    const legacy: Record<string, unknown> = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      ...save,
+      scouting: { partialIds: {}, fullIds: [], pointsAvailable: 2, pointsPerWeek: 3 },
+    };
+    delete legacy['recruitingActivity'];
+    delete legacy['recruitTrends'];
+    storage.setItem(dynastySaveSlotKey('save-legacy'), JSON.stringify(legacy));
+
+    const loaded = loadDynastySaveSlot('save-legacy', storage);
+
+    expect(loaded).not.toBeNull();
+    expect(loaded!.recruitingActivity).toEqual({ visitIds: [], pitchedIds: [] });
+    expect(loaded!.recruitTrends).toEqual({});
+    expect(loaded!.scouting.pointsPerWeek).toBe(6);
+    expect(loaded!.scouting.pointsAvailable).toBe(2);
   });
 });

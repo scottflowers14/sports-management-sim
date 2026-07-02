@@ -260,8 +260,25 @@ describe('Desktop App', () => {
   it('switches to the recruiting tab and shows scouting controls', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
-    expect(screen.getByText(/Scouting Points/i)).toBeInTheDocument();
+    expect(screen.getByText(/Recruiting Hours/i)).toBeInTheDocument();
     expect(screen.queryAllByRole('button', { name: /Scout/i }).length).toBeGreaterThan(0);
+  });
+
+  it('pitches a scouted recruit through their revealed motivation chips', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
+
+    // Fully scout the first recruit to reveal what they care about.
+    await userEvent.click(screen.getAllByRole('button', { name: /^Scout \(1h\)$/i })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Full Scout \(1h\)$/i })[0]!);
+
+    // Their motivations render as pitch buttons; pitching marks them worked for the week.
+    const pitchButtons = screen.getAllByTitle(/^Pitch /i);
+    expect(pitchButtons.length).toBeGreaterThan(0);
+    await userEvent.click(pitchButtons[0]!);
+
+    expect(screen.getByTitle(/^Pitched this week$/i)).toBeInTheDocument();
+    expect(screen.getAllByTitle(/Already pitched this week/i).length).toBeGreaterThan(0);
   });
 
   it('shows the weekly hub and opens a player card from a player to watch', async () => {
@@ -307,7 +324,7 @@ describe('Desktop App', () => {
 
     // Pin one recruit, scout + offer a different one (offer should auto-pin).
     await userEvent.click(screen.getAllByRole('button', { name: /Add .* to board/i })[0]!);
-    await userEvent.click(screen.getAllByRole('button', { name: /^Scout \(1 pt\)$/i })[1]!);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Scout \(1h\)$/i })[1]!);
     // Default offer is 100% — confirm via the in-app modal (not window.confirm).
     await userEvent.click(screen.getAllByRole('button', { name: /^Offer$/i })[0]!);
     await userEvent.click(screen.getByRole('button', { name: /Yes, Offer 100%/i }));
@@ -334,7 +351,7 @@ describe('Desktop App', () => {
     // 4★+ recruits are nationally ranked: stars show without scouting.
     expect(screen.getAllByText(/Top 100/i).length).toBeGreaterThan(0);
 
-    await userEvent.click(screen.getAllByRole('button', { name: /^Scout \(1 pt\)$/i })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Scout \(1h\)$/i })[0]!);
     await userEvent.selectOptions(screen.getAllByLabelText(/Scholarship offer amount/i)[0]!, '50');
     await userEvent.click(screen.getAllByRole('button', { name: /^Offer$/i })[0]!);
 
