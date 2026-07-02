@@ -44,6 +44,35 @@ export function generateLacrosseRoster({ seed, prestige, createdSeason }: Genera
   return assignScholarships(players);
 }
 
+/**
+ * Late-summer walk-on tryouts: unrated freshmen who backfill thin rosters so a
+ * program that whiffed on a recruiting class can still field a team. No
+ * scholarship money, modest talent regardless of program prestige.
+ */
+export function generateLacrosseWalkOns({
+  seed,
+  createdSeason,
+  positions,
+}: {
+  seed: number;
+  createdSeason: number;
+  positions: LacrossePosition[];
+}): LacrossePlayer[] {
+  const random = createSeededRandom(seed);
+  return positions.map((position, index) => {
+    const player = generatePlayer({
+      seed,
+      index,
+      position,
+      classYear: 'FR',
+      prestige: 24,
+      createdSeason,
+      random,
+    });
+    return { ...player, id: `walkon-${createdSeason}-${seed}-${index}` };
+  });
+}
+
 export function rosterScholarshipsUsed(roster: LacrossePlayer[]): number {
   return Math.round(roster.reduce((sum, p) => sum + p.scholarshipPercent / 100, 0) * 100) / 100;
 }

@@ -3,6 +3,7 @@ export * from './offseason';
 export * from './recruit-board';
 export * from './recruit-commitment';
 export * from './recruiting';
+export * from './recruiting-actions';
 export * from './result';
 export * from './schedule';
 export * from './season-advancement';

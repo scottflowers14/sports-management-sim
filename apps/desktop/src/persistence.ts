@@ -6,6 +6,9 @@ import type { NewsItem } from './news-feed';
 import type { ConferenceBracket, TournamentGame, TournamentPhase, TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
 import type { ScoutingState } from './scouting';
+import { RECRUITING_HOURS_PER_WEEK } from './scouting';
+import { emptyRecruitingActivity } from './recruiting-activity';
+import type { RecruitingActivity } from './recruiting-activity';
 import type { SeasonStatsMap } from './stats';
 import type { CareerStatsMap } from './career-stats';
 import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
@@ -43,6 +46,10 @@ export interface DynastySaveState {
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */
   shortlistIds: string[];
+  /** Pending pitches and visit invites for the current week. */
+  recruitingActivity: RecruitingActivity;
+  /** Change in user interest per recruit over the last simulated week. */
+  recruitTrends: Record<string, number>;
 }
 
 export interface DynastySaveMetadata {
@@ -318,6 +325,17 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     }
     if (parsed.careerStats === undefined) {
       parsed.careerStats = {};
+    }
+    if (parsed.recruitingActivity === undefined) {
+      parsed.recruitingActivity = emptyRecruitingActivity();
+    }
+    if (parsed.recruitTrends === undefined) {
+      parsed.recruitTrends = {};
+    }
+    // Older saves banked 3 scouting points a week; the unified recruiting-hours
+    // pool pays for pitches and visits too, so bring them up to the new rate.
+    if (parsed.scouting && parsed.scouting.pointsPerWeek < RECRUITING_HOURS_PER_WEEK) {
+      parsed.scouting = { ...parsed.scouting, pointsPerWeek: RECRUITING_HOURS_PER_WEEK };
     }
     return parsed as PersistedDynastySave;
   } catch {

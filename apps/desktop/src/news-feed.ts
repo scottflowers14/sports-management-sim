@@ -130,7 +130,8 @@ export function generateRecruitingNews(params: GenerateRecruitingNewsParams): Ne
     const headline = `${stars} ${recruit.position} ${recruitName} commits to ${teamName}`;
 
     items.push({
-      id: `week-${week}-${items.length}`,
+      // Distinct prefix: game/ranking news already uses `week-${week}-${i}` ids.
+      id: `commit-${week}-${items.length}`,
       week,
       category: 'recruiting',
       headline,

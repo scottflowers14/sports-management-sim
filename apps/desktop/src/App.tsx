@@ -85,6 +85,11 @@ export function App() {
     simToEnd,
     offerScholarship,
     doScoutRecruit,
+    pitchRecruit,
+    toggleVisitInvite,
+    recruitingActivity,
+    recruitTrends,
+    hasHomeGameThisWeek,
     offerPortalPlayer,
     enterTournament,
     simTournamentSemis,
@@ -438,6 +443,10 @@ export function App() {
           recruitBoard={dynasty.recruitBoard}
           portalEntries={dynasty.portalEntries}
           scouting={scouting}
+          recruitingActivity={recruitingActivity}
+          recruitTrends={recruitTrends}
+          hasHomeGameThisWeek={hasHomeGameThisWeek}
+          finalWeek={dynasty.season.schedule.reduce((max, g) => Math.max(max, g.week), 10)}
           userTeamId={dynasty.userTeamId}
           teamMap={teamMap}
           currentWeek={dynasty.season.currentWeek}
@@ -448,6 +457,8 @@ export function App() {
           scholarshipBudget={scholarshipBudget}
           onOfferScholarship={offerScholarship}
           onScoutRecruit={doScoutRecruit}
+          onPitchRecruit={pitchRecruit}
+          onToggleVisitInvite={toggleVisitInvite}
           onOfferPortalPlayer={offerPortalPlayer}
           onRecruitPosFilterChange={setRecruitPosFilter}
           onRecruitTabChange={setRecruitTab}

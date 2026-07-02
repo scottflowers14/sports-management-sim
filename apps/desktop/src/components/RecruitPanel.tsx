@@ -97,7 +97,7 @@ export function RecruitPanel({
           onClick={() => onScout(recruit.id, recruit.ratings.overall)}
           disabled={scouting.pointsAvailable <= 0}
         >
-          {tier === 'partial' ? 'Full Scout (1 pt)' : 'Scout (1 pt)'}
+          {tier === 'partial' ? 'Full Scout (1h)' : 'Scout (1h)'}
         </button>
       )}
     </div>

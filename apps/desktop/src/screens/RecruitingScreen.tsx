@@ -1,9 +1,17 @@
 import { useState } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
-import { topRecruitMotivations, type RecruitBoardEntry, type RecruitMotivation } from '@sports-management-sim/engine-core';
+import {
+  finalistTeamIds,
+  isFinalistPhase,
+  recruitDecisionWeek,
+  topRecruitMotivations,
+  type RecruitBoardEntry,
+  type RecruitMotivation,
+} from '@sports-management-sim/engine-core';
 import type { ScoutingState } from '../scouting';
-import { getDisplayOvr, getScoutTier } from '../scouting';
+import { getDisplayOvr, getScoutTier, HOURS_COST } from '../scouting';
+import type { RecruitingActivity } from '../recruiting-activity';
 import { formatTeamName, formatTeamShort } from '../ui/format';
 
 type LacrosseBoardEntry = RecruitBoardEntry<LacrossePosition, LacrossePlayerTraits>;
@@ -32,10 +40,182 @@ function revealedMotivations(entry: LacrosseBoardEntry, tier: 'none' | 'partial'
   return topRecruitMotivations(entry.recruit.preferences, tier === 'full' ? 2 : 1);
 }
 
+function TrendArrow({ delta }: { delta: number | undefined }) {
+  if (delta === undefined || delta === 0) return null;
+  return (
+    <span
+      className={`trend-arrow ${delta > 0 ? 'trend-up' : 'trend-down'}`}
+      title={`Interest ${delta > 0 ? 'up' : 'down'} ${Math.abs(delta)} last week`}
+    >
+      {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
+    </span>
+  );
+}
+
+/** Where a recruit is in their decision timeline, plus how the user stacks up. */
+function DecisionChip({
+  entry,
+  currentWeek,
+  finalWeek,
+  userTeamId,
+}: {
+  entry: LacrosseBoardEntry;
+  currentWeek: number;
+  finalWeek: number;
+  userTeamId: string;
+}) {
+  const { recruit } = entry;
+  if (recruit.status !== 'open') return null;
+  const decisionWeek = recruitDecisionWeek(recruit.id, recruit.starRating, finalWeek);
+  const finalistPhase = isFinalistPhase(currentWeek, decisionWeek) && recruit.scholarshipOffers.length >= 2;
+  const userHasOffer = recruit.scholarshipOffers.some((o) => o.teamId === userTeamId);
+
+  if (finalistPhase && userHasOffer) {
+    const isFinalist = finalistTeamIds(recruit).includes(userTeamId);
+    return (
+      <span
+        className={`decision-chip ${isFinalist ? 'decision-finalist' : 'decision-outside'}`}
+        title={
+          isFinalist
+            ? `You made the final three — decision expected Week ${decisionWeek}`
+            : `Outside the final three — decision expected Week ${decisionWeek}`
+        }
+      >
+        {isFinalist ? 'Finalist' : 'Outside top 3'} · Wk {decisionWeek}
+      </span>
+    );
+  }
+
+  return (
+    <span className="decision-chip" title="When this recruit plans to announce a commitment">
+      Decides Wk {decisionWeek}{decisionWeek > finalWeek ? ' (signing day)' : ''}
+    </span>
+  );
+}
+
+/**
+ * Revealed motivations double as actions: click a chip to pitch that angle.
+ * Pitching a recruit committed elsewhere is a flip attempt at double cost.
+ */
+function PitchChips({
+  entry,
+  tier,
+  userTeamId,
+  recruitingActivity,
+  hoursAvailable,
+  onPitchRecruit,
+}: {
+  entry: LacrosseBoardEntry;
+  tier: 'none' | 'partial' | 'full';
+  userTeamId: string;
+  recruitingActivity: RecruitingActivity;
+  hoursAvailable: number;
+  onPitchRecruit: (recruitId: string, motivation: RecruitMotivation) => void;
+}) {
+  const { recruit } = entry;
+  const motivations = revealedMotivations(entry, tier);
+  if (motivations.length === 0) return null;
+
+  const isOurs = recruit.committedTeamId === userTeamId || recruit.signedTeamId === userTeamId;
+  const isSigned = recruit.status === 'signed';
+  const isFlipAttempt = recruit.status === 'committed' && !isOurs;
+  const pitchable = !isOurs && !isSigned;
+
+  if (!pitchable) {
+    return (
+      <span className="motive-static">
+        {motivations.map((m) => (
+          <span key={m} className="motive-chip">{MOTIVATION_LABELS[m]}</span>
+        ))}
+      </span>
+    );
+  }
+
+  const cost = isFlipAttempt ? HOURS_COST.flipPitch : HOURS_COST.pitch;
+  const pitched = recruitingActivity.pitchedIds.includes(recruit.id);
+
+  return (
+    <span className="motive-static">
+      {motivations.map((m) => (
+        <button
+          key={m}
+          className="motive-chip motive-chip-btn"
+          disabled={pitched || hoursAvailable < cost}
+          title={
+            pitched
+              ? 'Already pitched this week'
+              : hoursAvailable < cost
+                ? `Not enough recruiting hours (${cost}h)`
+                : `${isFlipAttempt ? 'Flip attempt — pitch' : 'Pitch'} ${MOTIVATION_LABELS[m]} (${cost}h)`
+          }
+          onClick={() => onPitchRecruit(recruit.id, m)}
+        >
+          {MOTIVATION_LABELS[m]} · {cost}h
+        </button>
+      ))}
+      {pitched && <span className="pitched-chip" title="Pitched this week">✓</span>}
+    </span>
+  );
+}
+
+function VisitButton({
+  entry,
+  tier,
+  recruitingActivity,
+  hoursAvailable,
+  hasHomeGameThisWeek,
+  onToggleVisitInvite,
+}: {
+  entry: LacrosseBoardEntry;
+  tier: 'none' | 'partial' | 'full';
+  recruitingActivity: RecruitingActivity;
+  hoursAvailable: number;
+  hasHomeGameThisWeek: boolean;
+  onToggleVisitInvite: (recruitId: string) => void;
+}) {
+  const { recruit } = entry;
+  if (recruit.status !== 'open' || tier === 'none') return null;
+  const scheduled = recruitingActivity.visitIds.includes(recruit.id);
+
+  if (scheduled) {
+    return (
+      <button
+        className="visit-btn visit-btn-scheduled"
+        title="Visiting this week's home game — click to withdraw the invite"
+        onClick={() => onToggleVisitInvite(recruit.id)}
+      >
+        Visiting ✓
+      </button>
+    );
+  }
+
+  const disabled = !hasHomeGameThisWeek || hoursAvailable < HOURS_COST.visit;
+  return (
+    <button
+      className="visit-btn"
+      disabled={disabled}
+      title={
+        !hasHomeGameThisWeek
+          ? 'No home game this week to host a visit'
+          : hoursAvailable < HOURS_COST.visit
+            ? `Not enough recruiting hours (${HOURS_COST.visit}h)`
+            : `Invite to this week's home game (${HOURS_COST.visit}h) — a big win sells the program`
+      }
+      onClick={() => onToggleVisitInvite(recruit.id)}
+    >
+      Visit ({HOURS_COST.visit}h)
+    </button>
+  );
+}
+
 export function RecruitingScreen({
   recruitBoard,
   portalEntries,
   scouting,
+  recruitingActivity,
+  recruitTrends,
+  hasHomeGameThisWeek,
+  finalWeek,
   userTeamId,
   teamMap,
   currentWeek,
@@ -46,6 +226,8 @@ export function RecruitingScreen({
   scholarshipBudget,
   onOfferScholarship,
   onScoutRecruit,
+  onPitchRecruit,
+  onToggleVisitInvite,
   onOfferPortalPlayer,
   onRecruitPosFilterChange,
   onRecruitTabChange,
@@ -56,6 +238,10 @@ export function RecruitingScreen({
   recruitBoard: LacrosseBoardEntry[];
   portalEntries: LacrossePortalEntry[];
   scouting: ScoutingState;
+  recruitingActivity: RecruitingActivity;
+  recruitTrends: Record<string, number>;
+  hasHomeGameThisWeek: boolean;
+  finalWeek: number;
   userTeamId: string;
   teamMap: Map<string, string>;
   currentWeek: number;
@@ -66,6 +252,8 @@ export function RecruitingScreen({
   scholarshipBudget: { used: number; total: number };
   onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
+  onPitchRecruit: (recruitId: string, motivation: RecruitMotivation) => void;
+  onToggleVisitInvite: (recruitId: string) => void;
   onOfferPortalPlayer: (entryId: string) => void;
   onRecruitPosFilterChange: (pos: LacrossePosition | 'ALL') => void;
   onRecruitTabChange: (tab: 'board' | 'portal') => void;
@@ -110,8 +298,10 @@ export function RecruitingScreen({
         {recruitTab === 'board' && (
           <div className="scout-header-inline">
             <span className="scout-pts-num">{scouting.pointsAvailable}</span>
-            <span className="scout-pts-label">Scouting Points</span>
-            <span className="scout-pts-hint">(+{scouting.pointsPerWeek}/wk)</span>
+            <span className="scout-pts-label">Recruiting Hours</span>
+            <span className="scout-pts-hint">
+              (+{scouting.pointsPerWeek}/wk · scout {HOURS_COST.scout}h · pitch {HOURS_COST.pitch}h · visit {HOURS_COST.visit}h)
+            </span>
           </div>
         )}
       </div>
@@ -187,6 +377,10 @@ export function RecruitingScreen({
               entries={boardEntries.filter(matchesPosFilter)}
               totalOnBoard={boardEntries.length}
               scouting={scouting}
+              recruitingActivity={recruitingActivity}
+              recruitTrends={recruitTrends}
+              hasHomeGameThisWeek={hasHomeGameThisWeek}
+              finalWeek={finalWeek}
               userTeamId={userTeamId}
               teamMap={teamMap}
               currentWeek={currentWeek}
@@ -194,6 +388,8 @@ export function RecruitingScreen({
               budgetRemaining={scholarshipBudget.total - scholarshipBudget.used}
               onOfferScholarship={onOfferScholarship}
               onScoutRecruit={onScoutRecruit}
+              onPitchRecruit={onPitchRecruit}
+              onToggleVisitInvite={onToggleVisitInvite}
               onToggleShortlist={onToggleShortlist}
               onSelectRecruit={onSelectRecruit}
               onBrowseAll={() => onBoardViewChange('all')}
@@ -204,12 +400,19 @@ export function RecruitingScreen({
               sort={boardSort}
               hideCommitted={hideCommitted}
               scouting={scouting}
+              recruitingActivity={recruitingActivity}
+              recruitTrends={recruitTrends}
+              hasHomeGameThisWeek={hasHomeGameThisWeek}
+              finalWeek={finalWeek}
               userTeamId={userTeamId}
               teamMap={teamMap}
+              currentWeek={currentWeek}
               shortlistSet={shortlistSet}
               budgetRemaining={scholarshipBudget.total - scholarshipBudget.used}
               onOfferScholarship={onOfferScholarship}
               onScoutRecruit={onScoutRecruit}
+              onPitchRecruit={onPitchRecruit}
+              onToggleVisitInvite={onToggleVisitInvite}
               onToggleShortlist={onToggleShortlist}
               onSelectRecruit={onSelectRecruit}
             />
@@ -233,6 +436,10 @@ function ShortlistBoard({
   entries,
   totalOnBoard,
   scouting,
+  recruitingActivity,
+  recruitTrends,
+  hasHomeGameThisWeek,
+  finalWeek,
   userTeamId,
   teamMap,
   currentWeek,
@@ -240,6 +447,8 @@ function ShortlistBoard({
   budgetRemaining,
   onOfferScholarship,
   onScoutRecruit,
+  onPitchRecruit,
+  onToggleVisitInvite,
   onToggleShortlist,
   onSelectRecruit,
   onBrowseAll,
@@ -247,6 +456,10 @@ function ShortlistBoard({
   entries: LacrosseBoardEntry[];
   totalOnBoard: number;
   scouting: ScoutingState;
+  recruitingActivity: RecruitingActivity;
+  recruitTrends: Record<string, number>;
+  hasHomeGameThisWeek: boolean;
+  finalWeek: number;
   userTeamId: string;
   teamMap: Map<string, string>;
   currentWeek: number;
@@ -254,6 +467,8 @@ function ShortlistBoard({
   budgetRemaining: number;
   onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
+  onPitchRecruit: (recruitId: string, motivation: RecruitMotivation) => void;
+  onToggleVisitInvite: (recruitId: string) => void;
   onToggleShortlist: (recruitId: string) => void;
   onSelectRecruit: (recruitId: string) => void;
   onBrowseAll: () => void;
@@ -300,6 +515,10 @@ function ShortlistBoard({
             key={entry.recruit.id}
             entry={entry}
             scouting={scouting}
+            recruitingActivity={recruitingActivity}
+            recruitTrends={recruitTrends}
+            hasHomeGameThisWeek={hasHomeGameThisWeek}
+            finalWeek={finalWeek}
             userTeamId={userTeamId}
             teamMap={teamMap}
             currentWeek={currentWeek}
@@ -307,6 +526,8 @@ function ShortlistBoard({
             budgetRemaining={budgetRemaining}
             onOfferScholarship={onOfferScholarship}
             onScoutRecruit={onScoutRecruit}
+            onPitchRecruit={onPitchRecruit}
+            onToggleVisitInvite={onToggleVisitInvite}
             onToggleShortlist={onToggleShortlist}
             onSelectRecruit={onSelectRecruit}
           />
@@ -321,12 +542,19 @@ function AllRecruitsList({
   sort,
   hideCommitted,
   scouting,
+  recruitingActivity,
+  recruitTrends,
+  hasHomeGameThisWeek,
+  finalWeek,
   userTeamId,
   teamMap,
+  currentWeek,
   shortlistSet,
   budgetRemaining,
   onOfferScholarship,
   onScoutRecruit,
+  onPitchRecruit,
+  onToggleVisitInvite,
   onToggleShortlist,
   onSelectRecruit,
 }: {
@@ -334,12 +562,19 @@ function AllRecruitsList({
   sort: BoardSort;
   hideCommitted: boolean;
   scouting: ScoutingState;
+  recruitingActivity: RecruitingActivity;
+  recruitTrends: Record<string, number>;
+  hasHomeGameThisWeek: boolean;
+  finalWeek: number;
   userTeamId: string;
   teamMap: Map<string, string>;
+  currentWeek: number;
   shortlistSet: Set<string>;
   budgetRemaining: number;
   onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
+  onPitchRecruit: (recruitId: string, motivation: RecruitMotivation) => void;
+  onToggleVisitInvite: (recruitId: string) => void;
   onToggleShortlist: (recruitId: string) => void;
   onSelectRecruit: (recruitId: string) => void;
 }) {
@@ -391,7 +626,6 @@ function AllRecruitsList({
         const pinned = shortlistSet.has(recruit.id);
         const fullName = `${recruit.name.first} ${recruit.name.last}`;
         const showStars = tier !== 'none' || starsArePublic(entry);
-        const motivations = revealedMotivations(entry, tier);
 
         return (
           <div
@@ -420,9 +654,17 @@ function AllRecruitsList({
                   <span className="hidden-stat">? stars</span>
                 )}{' '}
                 · {recruit.hometown}
-                {motivations.map((m) => (
-                  <span key={m} className="motive-chip">{MOTIVATION_LABELS[m]}</span>
-                ))}
+                {(tier !== 'none' || starsArePublic(entry)) && (
+                  <DecisionChip entry={entry} currentWeek={currentWeek} finalWeek={finalWeek} userTeamId={userTeamId} />
+                )}
+                <PitchChips
+                  entry={entry}
+                  tier={tier}
+                  userTeamId={userTeamId}
+                  recruitingActivity={recruitingActivity}
+                  hoursAvailable={scouting.pointsAvailable}
+                  onPitchRecruit={onPitchRecruit}
+                />
               </span>
             </div>
 
@@ -447,7 +689,10 @@ function AllRecruitsList({
                   → {formatTeamShort(teamMap.get(recruit.committedTeamId ?? recruit.signedTeamId ?? '') ?? 'Other')}
                 </span>
               ) : hasOffer ? (
-                <span className="row-interest">Interest {userInterest}</span>
+                <span className="row-interest">
+                  Interest {userInterest}
+                  <TrendArrow delta={recruitTrends[recruit.id]} />
+                </span>
               ) : (
                 <span className="row-interest dim-interest">—</span>
               )}
@@ -469,13 +714,21 @@ function AllRecruitsList({
                       Offered {recruit.scholarshipOffers.find((o) => o.teamId === userTeamId)?.scholarshipPercent}%
                     </span>
                   )}
+                  <VisitButton
+                    entry={entry}
+                    tier={tier}
+                    recruitingActivity={recruitingActivity}
+                    hoursAvailable={scouting.pointsAvailable}
+                    hasHomeGameThisWeek={hasHomeGameThisWeek}
+                    onToggleVisitInvite={onToggleVisitInvite}
+                  />
                   {tier !== 'full' && (
                     <button
                       className="scout-btn scout-btn-row"
                       onClick={() => onScoutRecruit(recruit.id, recruit.ratings.overall)}
                       disabled={scouting.pointsAvailable <= 0}
                     >
-                      {tier === 'partial' ? 'Full Scout (1 pt)' : 'Scout (1 pt)'}
+                      {tier === 'partial' ? 'Full Scout (1h)' : 'Scout (1h)'}
                     </button>
                   )}
                 </>
@@ -496,6 +749,10 @@ function AllRecruitsList({
 function RecruitCard({
   entry,
   scouting,
+  recruitingActivity,
+  recruitTrends,
+  hasHomeGameThisWeek,
+  finalWeek,
   userTeamId,
   teamMap,
   currentWeek,
@@ -503,11 +760,17 @@ function RecruitCard({
   budgetRemaining,
   onOfferScholarship,
   onScoutRecruit,
+  onPitchRecruit,
+  onToggleVisitInvite,
   onToggleShortlist,
   onSelectRecruit,
 }: {
   entry: LacrosseBoardEntry;
   scouting: ScoutingState;
+  recruitingActivity: RecruitingActivity;
+  recruitTrends: Record<string, number>;
+  hasHomeGameThisWeek: boolean;
+  finalWeek: number;
   userTeamId: string;
   teamMap: Map<string, string>;
   currentWeek: number;
@@ -515,6 +778,8 @@ function RecruitCard({
   budgetRemaining: number;
   onOfferScholarship: (recruitId: string, scholarshipPercent: number) => void;
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
+  onPitchRecruit: (recruitId: string, motivation: RecruitMotivation) => void;
+  onToggleVisitInvite: (recruitId: string) => void;
   onToggleShortlist: (recruitId: string) => void;
   onSelectRecruit: (recruitId: string) => void;
 }) {
@@ -529,7 +794,6 @@ function RecruitCard({
   const isCommittedElsewhere = recruit.status !== 'open' && !isCommittedToUs;
   const fullName = `${recruit.name.first} ${recruit.name.last}`;
   const showStars = tier !== 'none' || starsArePublic(entry);
-  const motivations = revealedMotivations(entry, tier);
 
   const competitors = recruit.scholarshipOffers
     .filter((o) => o.teamId !== userTeamId)
@@ -541,8 +805,12 @@ function RecruitCard({
     .sort((a, b) => b.interest - a.interest)
     .slice(0, 3);
 
-  const commitThreshold = Math.min(84, Math.max(58, 84 - currentWeek * 5 + recruit.starRating));
-  const commitPct = hasOffer ? Math.min(100, Math.round((userInterest / commitThreshold) * 100)) : 0;
+  // Where the user stands in the race, CFB-style: 1st of 4, 2nd of 3, ...
+  const standing = hasOffer
+    ? recruit.scholarshipOffers
+        .map((o) => recruit.interestByTeamId[o.teamId] ?? 0)
+        .filter((interest) => interest > userInterest).length + 1
+    : null;
 
   return (
     <article
@@ -562,6 +830,12 @@ function RecruitCard({
               </>
             ) : (
               <span className="hidden-stat">? stars</span>
+            )}
+            {showStars && (
+              <>
+                {' '}
+                <DecisionChip entry={entry} currentWeek={currentWeek} finalWeek={finalWeek} userTeamId={userTeamId} />
+              </>
             )}
           </p>
         </div>
@@ -590,11 +864,16 @@ function RecruitCard({
         </div>
       </div>
 
-      {motivations.length > 0 && (
+      {revealedMotivations(entry, tier).length > 0 && (
         <div className="motive-row">
-          {motivations.map((m) => (
-            <span key={m} className="motive-chip">{MOTIVATION_LABELS[m]}</span>
-          ))}
+          <PitchChips
+            entry={entry}
+            tier={tier}
+            userTeamId={userTeamId}
+            recruitingActivity={recruitingActivity}
+            hoursAvailable={scouting.pointsAvailable}
+            onPitchRecruit={onPitchRecruit}
+          />
         </div>
       )}
 
@@ -604,10 +883,15 @@ function RecruitCard({
             <div className="interest-bar" style={{ width: `${userInterest}%` }} />
           </div>
           <div className="recruit-interest-row">
-            <span className="interest-label">Interest {userInterest}/100</span>
-            <span className={`commit-pct${commitPct >= 80 ? ' hot' : commitPct >= 50 ? ' warm' : ''}`}>
-              {commitPct}% commit
+            <span className="interest-label">
+              Interest {userInterest}/100
+              <TrendArrow delta={recruitTrends[recruit.id]} />
             </span>
+            {standing !== null && !isCommittedToUs && !isCommittedElsewhere && (
+              <span className={`commit-pct${standing === 1 ? ' hot' : standing === 2 ? ' warm' : ''}`}>
+                {ordinal(standing)} of {recruit.scholarshipOffers.length}
+              </span>
+            )}
           </div>
         </>
       )}
@@ -637,9 +921,9 @@ function RecruitCard({
             onClick={() => onScoutRecruit(recruit.id, recruit.ratings.overall)}
             disabled={scouting.pointsAvailable <= 0}
           >
-            Scout (1 pt)
+            Scout (1h)
           </button>
-        ) : tier === 'partial' ? (
+        ) : (
           <div className="recruit-footer-row">
             {!hasOffer && (
               <OfferControl
@@ -650,27 +934,35 @@ function RecruitCard({
               />
             )}
             {hasOffer && <span className="badge badge-offered">Offered {userOffer.scholarshipPercent}%</span>}
-            <button
-              className="scout-btn scout-btn-sm"
-              onClick={() => onScoutRecruit(recruit.id, recruit.ratings.overall)}
-              disabled={scouting.pointsAvailable <= 0}
-            >
-              Full Scout (1 pt)
-            </button>
+            <VisitButton
+              entry={entry}
+              tier={tier}
+              recruitingActivity={recruitingActivity}
+              hoursAvailable={scouting.pointsAvailable}
+              hasHomeGameThisWeek={hasHomeGameThisWeek}
+              onToggleVisitInvite={onToggleVisitInvite}
+            />
+            {tier === 'partial' && (
+              <button
+                className="scout-btn scout-btn-sm"
+                onClick={() => onScoutRecruit(recruit.id, recruit.ratings.overall)}
+                disabled={scouting.pointsAvailable <= 0}
+              >
+                Full Scout (1h)
+              </button>
+            )}
           </div>
-        ) : hasOffer ? (
-          <span className="badge badge-offered">Offered {userOffer.scholarshipPercent}%</span>
-        ) : (
-          <OfferControl
-            recruitId={recruit.id}
-            recruitName={fullName}
-            budgetRemaining={budgetRemaining}
-            onOffer={onOfferScholarship}
-          />
         )}
       </div>
     </article>
   );
+}
+
+function ordinal(n: number): string {
+  if (n === 1) return '1st';
+  if (n === 2) return '2nd';
+  if (n === 3) return '3rd';
+  return `${n}th`;
 }
 
 const OFFER_PERCENT_OPTIONS = [25, 50, 75, 100] as const;

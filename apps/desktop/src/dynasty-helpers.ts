@@ -1,15 +1,23 @@
 import {
   addSignedRecruitsToTeam,
   applyScholarshipOffer,
-  calculateRecruitFitScore,
+  chooseCommitTeam,
   commitRecruit,
+  recruitDecisionWeek,
+  recruitPrestigeMultiplier,
   resolvePortalCommitments,
   runTeamOffseason,
+  shouldReopenCommitment,
   signCommittedRecruit,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import type { EligibilityStatus, PlayerClass, StandingsEntry } from '@sports-management-sim/engine-core';
-import { createLacrosseSeasonSchedule, generateLacrosseRecruitingClass, recruitingClassSize } from '@sports-management-sim/sport-lacrosse';
+import {
+  createLacrosseSeasonSchedule,
+  generateLacrosseRecruitingClass,
+  generateLacrosseWalkOns,
+  recruitingClassSize,
+} from '@sports-management-sim/sport-lacrosse';
 import type {
   LacrossePlayer,
   LacrossePlayerTraits,
@@ -46,6 +54,14 @@ const TRAINING_FOCUS_POSITIONS: Record<Exclude<TrainingFocus, 'balanced'>, reado
 
 const TRAINING_FOCUS_BONUS = 0.25;
 
+export interface SigningDayFlip {
+  name: string;
+  position: string;
+  starRating: number;
+  fromTeamName: string;
+  toTeamName: string;
+}
+
 export interface OffseasonSummary {
   seasonYear: number;
   finalStandings: StandingsEntry[];
@@ -54,6 +70,8 @@ export interface OffseasonSummary {
   graduates: { name: string; position: string; overall: number }[];
   developmentReport: DevelopmentReport | null;
   signingClass: { name: string; position: string; starRating: number; overall: number }[];
+  /** Commitments that flipped to a rival school on signing day. */
+  signingDayFlips?: SigningDayFlip[];
   awards: SeasonAwards | null;
 }
 
@@ -121,55 +139,142 @@ export function processInjuries(
   };
 }
 
+/** A recruit shuts down their recruitment early only when one school is a runaway leader. */
+const EARLY_COMMIT_INTEREST = 95;
+const EARLY_COMMIT_LEAD = 20;
+
 export function autoCommitWeekly(
   recruits: LacrosseRecruit[],
   teams: LacrosseTeam[],
   userTeamId: string,
   currentWeek: number,
   random: () => number,
+  finalWeek = 10,
 ): LacrosseRecruit[] {
-  const userTeam = teams.find((t) => t.id === userTeamId);
-
   // CPU teams gradually extend offers week by week
   const updated = applyCpuWeeklyOffers(recruits, teams, userTeamId, random);
 
   return updated.map((recruit) => {
+    // Committed-but-unsigned recruits can reopen when a rival (usually a user
+    // running flip pitches) has clearly overtaken their school.
+    if (recruit.status === 'committed' && recruit.committedTeamId !== undefined) {
+      if (shouldReopenCommitment(recruit, random)) {
+        const formerTeamId = recruit.committedTeamId;
+        const { committedTeamId: _dropped, ...reopened } = recruit;
+        return {
+          ...reopened,
+          status: 'open' as const,
+          interestByTeamId: {
+            ...recruit.interestByTeamId,
+            [formerTeamId]: Math.max(0, (recruit.interestByTeamId[formerTeamId] ?? 0) - 20),
+          },
+        };
+      }
+      return recruit;
+    }
     if (recruit.status !== 'open') return recruit;
     if (recruit.scholarshipOffers.length === 0) return recruit;
 
     const updatedInterest = { ...recruit.interestByTeamId };
 
+    // Passive weekly drift. Deliberately small for the user's program: sustained
+    // gains come from spending recruiting hours on pitches and visits.
     for (const offer of recruit.scholarshipOffers) {
       const team = teams.find((t) => t.id === offer.teamId);
       if (!team) continue;
       const current = updatedInterest[team.id] ?? 0;
-      if (team.id === userTeamId && userTeam) {
-        const fitScore = calculateRecruitFitScore(recruit, userTeam);
-        const gain = Math.round(
-          11 + recruit.starRating * 2 + fitScore * 0.05 + recruit.preferences.scholarshipImportance * 0.04,
-        );
+      const prestigeMult = recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige);
+      if (team.id === userTeamId) {
+        const scholarshipPull = (offer.scholarshipPercent / 100) * (recruit.preferences.scholarshipImportance / 100) * 3;
+        const gain = Math.round((3 + recruit.starRating * 0.5 + scholarshipPull) * prestigeMult);
         updatedInterest[team.id] = Math.min(100, current + gain);
       } else {
-        const prestigeBonus = Math.round((team.reputation.nationalPrestige / 100) * 5);
-        updatedInterest[team.id] = Math.min(100, current + 6 + recruit.starRating + prestigeBonus);
+        // CPU staffs work their boards off-screen, so their drift stays stronger.
+        const prestigeBonus = (team.reputation.nationalPrestige / 100) * 4;
+        const gain = Math.round((5 + recruit.starRating * 0.5 + prestigeBonus + random() * 3) * prestigeMult);
+        updatedInterest[team.id] = Math.min(100, current + gain);
       }
     }
 
-    // Commit to highest-interest team above the threshold
-    const threshold = clamp(84 - currentWeek * 5 + recruit.starRating, 58, 84);
-    const aboveThreshold = recruit.scholarshipOffers
+    const withInterest = { ...recruit, interestByTeamId: updatedInterest };
+
+    // Recruits announce on their own schedule; a runaway leader can end it early.
+    const ranked = recruit.scholarshipOffers
       .map((o) => ({ teamId: o.teamId, interest: updatedInterest[o.teamId] ?? 0 }))
-      .filter((t) => t.interest >= threshold)
       .sort((a, b) => b.interest - a.interest);
+    const leader = ranked[0];
+    const runnerUp = ranked[1];
+    const runawayLeader =
+      leader !== undefined &&
+      leader.interest >= EARLY_COMMIT_INTEREST &&
+      leader.interest - (runnerUp?.interest ?? 0) >= EARLY_COMMIT_LEAD;
+    const decisionWeek = recruitDecisionWeek(recruit.id, recruit.starRating, finalWeek);
 
-    const committingTo = aboveThreshold[0];
+    if (runawayLeader) {
+      return { ...withInterest, status: 'committed' as const, committedTeamId: leader.teamId };
+    }
+    if (currentWeek >= decisionWeek) {
+      const committingTo = chooseCommitTeam(withInterest, teams, random);
+      if (committingTo !== undefined) {
+        return { ...withInterest, status: 'committed' as const, committedTeamId: committingTo };
+      }
+    }
 
-    return {
-      ...recruit,
-      interestByTeamId: updatedInterest,
-      ...(committingTo ? { status: 'committed' as const, committedTeamId: committingTo.teamId } : {}),
-    };
+    return withInterest;
   });
+}
+
+/**
+ * How much a CPU program puts on the table. Elite programs spend real money on
+ * blue-chips; everyone throws depth money at the back of the board.
+ */
+function cpuOfferPercent(starRating: number, nationalPrestige: number): number {
+  if (starRating >= 5) return nationalPrestige >= 70 ? 100 : nationalPrestige >= 55 ? 75 : 50;
+  if (starRating === 4) return nationalPrestige >= 70 ? 75 : 50;
+  if (starRating === 3) return 50;
+  return 25;
+}
+
+/** An offer slot is only tied up while the recruit is still winnable. */
+function cpuActiveOfferIds(recruits: LacrosseRecruit[], teamId: string): Set<string> {
+  return new Set(
+    recruits
+      .filter((r) => r.scholarshipOffers.some((o) => o.teamId === teamId))
+      .filter((r) => r.status === 'open' || r.committedTeamId === teamId || r.signedTeamId === teamId)
+      .map((r) => r.id),
+  );
+}
+
+/**
+ * Recruit to your level: a CPU board is the shared national board rescaled by
+ * how attainable each recruit is for this program, so bottom-prestige teams
+ * chase 2-3★ depth they can actually land instead of the same Top 100 as
+ * everyone else.
+ */
+function cpuBoardForTeam(
+  team: LacrosseTeam,
+  candidates: LacrosseRecruit[],
+  rosterTargets: Record<string, number>,
+): LacrosseRecruit[] {
+  return sortRecruitBoardForTeam(team, candidates, rosterTargets)
+    .map((entry) => ({
+      recruit: entry.recruit,
+      score: entry.score * recruitPrestigeMultiplier(entry.recruit.starRating, team.reputation.nationalPrestige),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.recruit);
+}
+
+const CPU_ROSTER_TARGETS = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
+const ROSTER_CAP = 45;
+
+/** Next fall's roster if every current pledge signs: leavers out, commits in. */
+function projectedRosterSize(team: LacrosseTeam, recruits: LacrosseRecruit[]): number {
+  const graduating = team.roster.filter((p) => p.classYear === 'SR' || p.classYear === 'GR').length;
+  const pledged = recruits.filter(
+    (r) => r.committedTeamId === team.id || r.signedTeamId === team.id,
+  ).length;
+  return team.roster.length - graduating + pledged;
 }
 
 function applyCpuWeeklyOffers(
@@ -180,39 +285,41 @@ function applyCpuWeeklyOffers(
 ): LacrosseRecruit[] {
   const CPU_MAX_OFFERS = 12;
   const CPU_WEEKLY_NEW_OFFERS = 2;
-  const rosterTargets = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
 
   const updated = [...recruits];
 
   for (const team of teams) {
     if (team.id === userTeamId) continue;
 
-    const alreadyOfferedIds = new Set(
+    // Offers to recruits lost to rivals release their slot, like the user's
+    // scholarship budget releasing money when a target signs elsewhere.
+    const activeOfferIds = cpuActiveOfferIds(updated, team.id);
+    if (activeOfferIds.size >= CPU_MAX_OFFERS) continue;
+    if (projectedRosterSize(team, updated) >= ROSTER_CAP) continue;
+
+    const everOfferedIds = new Set(
       updated.filter((r) => r.scholarshipOffers.some((o) => o.teamId === team.id)).map((r) => r.id),
     );
-
-    if (alreadyOfferedIds.size >= CPU_MAX_OFFERS) continue;
-
-    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - alreadyOfferedIds.size);
-    const open = updated.filter((r) => r.status === 'open' && !alreadyOfferedIds.has(r.id));
-    const board = sortRecruitBoardForTeam(team, open, rosterTargets);
+    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - activeOfferIds.size);
+    const open = updated.filter((r) => r.status === 'open' && !everOfferedIds.has(r.id));
+    const board = cpuBoardForTeam(team, open, CPU_ROSTER_TARGETS);
 
     let count = 0;
-    for (const entry of board) {
+    for (const recruit of board) {
       if (count >= canOffer) break;
-      const idx = updated.findIndex((r) => r.id === entry.recruit.id);
+      const idx = updated.findIndex((r) => r.id === recruit.id);
       if (idx >= 0) {
-        updated[idx] = applyScholarshipOffer(updated[idx]!, team.id, 50);
+        updated[idx] = applyScholarshipOffer(
+          updated[idx]!,
+          team.id,
+          cpuOfferPercent(recruit.starRating, team.reputation.nationalPrestige),
+        );
         count++;
       }
     }
   }
 
   return updated;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 export function runOffseason(
@@ -251,8 +358,33 @@ export function runOffseason(
       : r,
   );
 
+  // Signing-day drama: a school that kept working a committed recruit and clearly
+  // overtook their pledge steals the signature at the last moment.
+  const signingDayFlips: SigningDayFlip[] = [];
+  const teamNameById = new Map(season.teams.map((t) => [t.id, t.name]));
+  const afterFlips = fullyCommitted.map((r) => {
+    if (r.status !== 'committed' || r.committedTeamId === undefined) return r;
+    const committedInterest = r.interestByTeamId[r.committedTeamId] ?? 0;
+    const rival = r.scholarshipOffers
+      .filter((o) => o.teamId !== r.committedTeamId)
+      .map((o) => ({ teamId: o.teamId, interest: r.interestByTeamId[o.teamId] ?? 0 }))
+      .sort((a, b) => b.interest - a.interest)[0];
+    if (rival === undefined || rival.interest <= committedInterest + 12) return r;
+    const involvesUser = r.committedTeamId === userTeamId || rival.teamId === userTeamId;
+    if (involvesUser) {
+      signingDayFlips.push({
+        name: `${r.name.first} ${r.name.last}`,
+        position: r.position,
+        starRating: r.starRating,
+        fromTeamName: teamNameById.get(r.committedTeamId) ?? r.committedTeamId,
+        toTeamName: teamNameById.get(rival.teamId) ?? rival.teamId,
+      });
+    }
+    return { ...r, committedTeamId: rival.teamId };
+  });
+
   // Sign all committed recruits
-  const signed = fullyCommitted.map((r) =>
+  const signed = afterFlips.map((r) =>
     r.status === 'committed' ? signCommittedRecruit(r) : r,
   );
 
@@ -270,7 +402,8 @@ export function runOffseason(
           })
         : runTeamOffseason(team);
     const withClass = addSignedRecruitsToTeam(afterOffseason, signed, newYear);
-    return pruneDepthChart(withClass);
+    const withWalkOns = backfillWalkOns(withClass, rosterTargets, seed + newYear, newYear);
+    return pruneDepthChart(withWalkOns);
   });
 
   // Capture user team signing class for summary
@@ -318,6 +451,7 @@ export function runOffseason(
     userRecord: { wins: userTeam.record.wins, losses: userTeam.record.losses },
     graduates,
     signingClass,
+    signingDayFlips,
     awards,
     developmentReport,
   };
@@ -516,6 +650,63 @@ function evolvePrestige(
   });
 }
 
+/** No program fields fewer players than this — walk-on tryouts fill the gap. */
+const ROSTER_FLOOR = 30;
+
+/**
+ * Backfill thin rosters with freshman walk-ons after signing day. Positions are
+ * chosen by need: anything at zero (a roster with no goalie can't play) first,
+ * then the largest relative deficit against roster targets.
+ */
+function backfillWalkOns(
+  team: LacrosseTeam,
+  rosterTargets: Record<string, number>,
+  seed: number,
+  seasonYear: number,
+): LacrosseTeam {
+  if (team.roster.length >= ROSTER_FLOOR) return team;
+
+  const targetEntries = Object.entries(rosterTargets) as Array<[LacrossePlayer['position'], number]>;
+  const counts = new Map<string, number>();
+  for (const player of team.roster) {
+    counts.set(player.position, (counts.get(player.position) ?? 0) + 1);
+  }
+
+  const positions: LacrossePlayer['position'][] = [];
+  while (team.roster.length + positions.length < ROSTER_FLOOR) {
+    let best: LacrossePlayer['position'] | null = null;
+    let bestScore = -Infinity;
+    for (const [position, target] of targetEntries) {
+      if (target <= 0) continue;
+      const current = counts.get(position) ?? 0;
+      const score = (current === 0 ? 100 : 0) + (target - current) / target;
+      if (score > bestScore) {
+        bestScore = score;
+        best = position;
+      }
+    }
+    const chosen = best ?? 'MID';
+    positions.push(chosen);
+    counts.set(chosen, (counts.get(chosen) ?? 0) + 1);
+  }
+
+  const walkOns = generateLacrosseWalkOns({
+    seed: seed + hashString(team.id),
+    createdSeason: seasonYear,
+    positions,
+  });
+
+  return { ...team, roster: [...team.roster, ...walkOns] };
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
 function pruneDepthChart(team: LacrosseTeam): LacrosseTeam {
   const dc = (team as LacrosseTeam & { depthChart?: Record<string, string[]> }).depthChart;
   if (!dc) return team;
@@ -528,23 +719,29 @@ function pruneDepthChart(team: LacrosseTeam): LacrosseTeam {
   } as LacrosseTeam;
 }
 
-// Each CPU team extends offers to their top 15 open recruits at 50% scholarship
+// Signing-day sweep: each CPU team offers its top 15 remaining open recruits,
+// ranked by attainability and priced by prestige and star level.
 function applyeCpuOffers(
   recruits: LacrosseRecruit[],
   teams: LacrosseTeam[],
   userTeamId: string,
 ): LacrosseRecruit[] {
-  const rosterTargets = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
   const updated = [...recruits];
 
   for (const team of teams) {
     if (team.id === userTeamId) continue;
+    const room = ROSTER_CAP - projectedRosterSize(team, updated);
+    if (room <= 0) continue;
     const openRecruits = updated.filter((r) => r.status === 'open');
-    const board = sortRecruitBoardForTeam(team, openRecruits, rosterTargets);
-    for (const entry of board.slice(0, 15)) {
-      const idx = updated.findIndex((r) => r.id === entry.recruit.id);
+    const board = cpuBoardForTeam(team, openRecruits, CPU_ROSTER_TARGETS);
+    for (const recruit of board.slice(0, Math.min(15, room))) {
+      const idx = updated.findIndex((r) => r.id === recruit.id);
       if (idx >= 0) {
-        updated[idx] = applyScholarshipOffer(updated[idx]!, team.id, 50);
+        updated[idx] = applyScholarshipOffer(
+          updated[idx]!,
+          team.id,
+          cpuOfferPercent(recruit.starRating, team.reputation.nationalPrestige),
+        );
       }
     }
   }

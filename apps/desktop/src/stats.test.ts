@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { simulateRemainingWeeks, type WeekSimState } from './week-sim';
 import { createScoutingState } from './scouting';
+import { emptyRecruitingActivity } from './recruiting-activity';
 import { apportionByWeight, emptySeasonStats, type SeasonStatsMap } from './stats';
 
 function seededRandom(seed: number): () => number {
@@ -51,7 +52,9 @@ function freshState(): WeekSimState {
     rankings: [],
     injuries: [],
     newsItems: [],
-    scouting: createScoutingState(3),
+    scouting: createScoutingState(),
+    recruitingActivity: emptyRecruitingActivity(),
+    recruitTrends: {},
     seasonStats: emptySeasonStats(),
     gameLogs: new Map(),
     bestNatRank: null,

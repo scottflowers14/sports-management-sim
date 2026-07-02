@@ -8,7 +8,7 @@ Working notes for future gameplay slices. The current game already has a playabl
 2. Build a Weekly Hub / Coach Desk that makes the week-to-week loop feel intentional.
 3. Upgrade the sim from team-level stats to player-driven stat allocation.
 4. Add richer player profiles and career history.
-5. Add recruiting visits/promises.
+5. ~~Add recruiting visits~~ (done: weekly recruiting hours, motivation pitches, campus visits, decision weeks/finalists, decommits, signing-day flips) — promises still open.
 6. Add morale and transfer-risk consequences.
 
 The shortest path to “this is addictive” is: Weekly Hub + player stories + recruiting promises.

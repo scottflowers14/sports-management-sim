@@ -116,6 +116,22 @@ export function OffseasonScreen({
           ) : (
             <p className="dim">No signed recruits</p>
           )}
+          {(offseasonSummary.signingDayFlips?.length ?? 0) > 0 && (
+            <div className="signing-flips">
+              <p className="section-label">Signing Day Flips</p>
+              <ul className="player-list">
+                {offseasonSummary.signingDayFlips!.map((flip, i) => (
+                  <li key={i}>
+                    <strong>{flip.name}</strong>
+                    <span>
+                      {'★'.repeat(flip.starRating)} {flip.position} · flipped from {formatTeamName(flip.fromTeamName)} to{' '}
+                      {formatTeamName(flip.toTeamName)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </article>
 
         {availablePortal.length > 0 && (
