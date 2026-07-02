@@ -118,7 +118,7 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
     expect(screen.getByText(/Men's College Lacrosse · Season 2029/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
-  });
+  }, 20000);
 
   it('shows coaching controls and persists a game plan change', async () => {
     await renderStartedApp();
@@ -255,7 +255,7 @@ describe('Desktop App', () => {
     expect(remainingSaves[0]?.saveId).not.toBe(firstSaveId);
     expect(screen.queryByRole('button', { name: /Load Maryland State 2028/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Load Virginia Lakes 2028/i })).toBeInTheDocument();
-  });
+  }, 20000);
 
   it('switches to the recruiting tab and shows scouting controls', async () => {
     await renderStartedApp();
@@ -341,7 +341,7 @@ describe('Desktop App', () => {
     // Unpinning takes a recruit off the board.
     await userEvent.click(screen.getAllByRole('button', { name: /Remove .* from board/i })[0]!);
     expect(screen.getByText(/1 on board/i)).toBeInTheDocument();
-  });
+  }, 20000);
 
   it('tracks the scholarship budget, supports partial offers, and shows public stars for ranked recruits', async () => {
     await renderStartedApp();

@@ -19,7 +19,7 @@ describe('createNewLacrosseDynasty', () => {
     expect(dynasty.season.year).toBe(2028);
     expect(dynasty.season.phase).toBe('regular_season');
     expect(dynasty.season.teams).toHaveLength(36);
-    expect(dynasty.recruits).toHaveLength(180);
+    expect(dynasty.recruits).toHaveLength(288);
     expect(dynasty.recruitBoard.length).toBeGreaterThan(0);
     expect(dynasty.recruitBoard[0]?.recruit.id).toBeDefined();
   });

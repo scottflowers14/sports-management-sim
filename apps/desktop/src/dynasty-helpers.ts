@@ -12,7 +12,12 @@ import {
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import type { EligibilityStatus, PlayerClass, StandingsEntry } from '@sports-management-sim/engine-core';
-import { createLacrosseSeasonSchedule, generateLacrosseRecruitingClass, recruitingClassSize } from '@sports-management-sim/sport-lacrosse';
+import {
+  createLacrosseSeasonSchedule,
+  generateLacrosseRecruitingClass,
+  generateLacrosseWalkOns,
+  recruitingClassSize,
+} from '@sports-management-sim/sport-lacrosse';
 import type {
   LacrossePlayer,
   LacrossePlayerTraits,
@@ -219,6 +224,59 @@ export function autoCommitWeekly(
   });
 }
 
+/**
+ * How much a CPU program puts on the table. Elite programs spend real money on
+ * blue-chips; everyone throws depth money at the back of the board.
+ */
+function cpuOfferPercent(starRating: number, nationalPrestige: number): number {
+  if (starRating >= 5) return nationalPrestige >= 70 ? 100 : nationalPrestige >= 55 ? 75 : 50;
+  if (starRating === 4) return nationalPrestige >= 70 ? 75 : 50;
+  if (starRating === 3) return 50;
+  return 25;
+}
+
+/** An offer slot is only tied up while the recruit is still winnable. */
+function cpuActiveOfferIds(recruits: LacrosseRecruit[], teamId: string): Set<string> {
+  return new Set(
+    recruits
+      .filter((r) => r.scholarshipOffers.some((o) => o.teamId === teamId))
+      .filter((r) => r.status === 'open' || r.committedTeamId === teamId || r.signedTeamId === teamId)
+      .map((r) => r.id),
+  );
+}
+
+/**
+ * Recruit to your level: a CPU board is the shared national board rescaled by
+ * how attainable each recruit is for this program, so bottom-prestige teams
+ * chase 2-3★ depth they can actually land instead of the same Top 100 as
+ * everyone else.
+ */
+function cpuBoardForTeam(
+  team: LacrosseTeam,
+  candidates: LacrosseRecruit[],
+  rosterTargets: Record<string, number>,
+): LacrosseRecruit[] {
+  return sortRecruitBoardForTeam(team, candidates, rosterTargets)
+    .map((entry) => ({
+      recruit: entry.recruit,
+      score: entry.score * recruitPrestigeMultiplier(entry.recruit.starRating, team.reputation.nationalPrestige),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.recruit);
+}
+
+const CPU_ROSTER_TARGETS = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
+const ROSTER_CAP = 45;
+
+/** Next fall's roster if every current pledge signs: leavers out, commits in. */
+function projectedRosterSize(team: LacrosseTeam, recruits: LacrosseRecruit[]): number {
+  const graduating = team.roster.filter((p) => p.classYear === 'SR' || p.classYear === 'GR').length;
+  const pledged = recruits.filter(
+    (r) => r.committedTeamId === team.id || r.signedTeamId === team.id,
+  ).length;
+  return team.roster.length - graduating + pledged;
+}
+
 function applyCpuWeeklyOffers(
   recruits: LacrosseRecruit[],
   teams: LacrosseTeam[],
@@ -227,29 +285,35 @@ function applyCpuWeeklyOffers(
 ): LacrosseRecruit[] {
   const CPU_MAX_OFFERS = 12;
   const CPU_WEEKLY_NEW_OFFERS = 2;
-  const rosterTargets = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
 
   const updated = [...recruits];
 
   for (const team of teams) {
     if (team.id === userTeamId) continue;
 
-    const alreadyOfferedIds = new Set(
+    // Offers to recruits lost to rivals release their slot, like the user's
+    // scholarship budget releasing money when a target signs elsewhere.
+    const activeOfferIds = cpuActiveOfferIds(updated, team.id);
+    if (activeOfferIds.size >= CPU_MAX_OFFERS) continue;
+    if (projectedRosterSize(team, updated) >= ROSTER_CAP) continue;
+
+    const everOfferedIds = new Set(
       updated.filter((r) => r.scholarshipOffers.some((o) => o.teamId === team.id)).map((r) => r.id),
     );
-
-    if (alreadyOfferedIds.size >= CPU_MAX_OFFERS) continue;
-
-    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - alreadyOfferedIds.size);
-    const open = updated.filter((r) => r.status === 'open' && !alreadyOfferedIds.has(r.id));
-    const board = sortRecruitBoardForTeam(team, open, rosterTargets);
+    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - activeOfferIds.size);
+    const open = updated.filter((r) => r.status === 'open' && !everOfferedIds.has(r.id));
+    const board = cpuBoardForTeam(team, open, CPU_ROSTER_TARGETS);
 
     let count = 0;
-    for (const entry of board) {
+    for (const recruit of board) {
       if (count >= canOffer) break;
-      const idx = updated.findIndex((r) => r.id === entry.recruit.id);
+      const idx = updated.findIndex((r) => r.id === recruit.id);
       if (idx >= 0) {
-        updated[idx] = applyScholarshipOffer(updated[idx]!, team.id, 50);
+        updated[idx] = applyScholarshipOffer(
+          updated[idx]!,
+          team.id,
+          cpuOfferPercent(recruit.starRating, team.reputation.nationalPrestige),
+        );
         count++;
       }
     }
@@ -338,7 +402,8 @@ export function runOffseason(
           })
         : runTeamOffseason(team);
     const withClass = addSignedRecruitsToTeam(afterOffseason, signed, newYear);
-    return pruneDepthChart(withClass);
+    const withWalkOns = backfillWalkOns(withClass, rosterTargets, seed + newYear, newYear);
+    return pruneDepthChart(withWalkOns);
   });
 
   // Capture user team signing class for summary
@@ -585,6 +650,63 @@ function evolvePrestige(
   });
 }
 
+/** No program fields fewer players than this — walk-on tryouts fill the gap. */
+const ROSTER_FLOOR = 30;
+
+/**
+ * Backfill thin rosters with freshman walk-ons after signing day. Positions are
+ * chosen by need: anything at zero (a roster with no goalie can't play) first,
+ * then the largest relative deficit against roster targets.
+ */
+function backfillWalkOns(
+  team: LacrosseTeam,
+  rosterTargets: Record<string, number>,
+  seed: number,
+  seasonYear: number,
+): LacrosseTeam {
+  if (team.roster.length >= ROSTER_FLOOR) return team;
+
+  const targetEntries = Object.entries(rosterTargets) as Array<[LacrossePlayer['position'], number]>;
+  const counts = new Map<string, number>();
+  for (const player of team.roster) {
+    counts.set(player.position, (counts.get(player.position) ?? 0) + 1);
+  }
+
+  const positions: LacrossePlayer['position'][] = [];
+  while (team.roster.length + positions.length < ROSTER_FLOOR) {
+    let best: LacrossePlayer['position'] | null = null;
+    let bestScore = -Infinity;
+    for (const [position, target] of targetEntries) {
+      if (target <= 0) continue;
+      const current = counts.get(position) ?? 0;
+      const score = (current === 0 ? 100 : 0) + (target - current) / target;
+      if (score > bestScore) {
+        bestScore = score;
+        best = position;
+      }
+    }
+    const chosen = best ?? 'MID';
+    positions.push(chosen);
+    counts.set(chosen, (counts.get(chosen) ?? 0) + 1);
+  }
+
+  const walkOns = generateLacrosseWalkOns({
+    seed: seed + hashString(team.id),
+    createdSeason: seasonYear,
+    positions,
+  });
+
+  return { ...team, roster: [...team.roster, ...walkOns] };
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
 function pruneDepthChart(team: LacrosseTeam): LacrosseTeam {
   const dc = (team as LacrosseTeam & { depthChart?: Record<string, string[]> }).depthChart;
   if (!dc) return team;
@@ -597,23 +719,29 @@ function pruneDepthChart(team: LacrosseTeam): LacrosseTeam {
   } as LacrosseTeam;
 }
 
-// Each CPU team extends offers to their top 15 open recruits at 50% scholarship
+// Signing-day sweep: each CPU team offers its top 15 remaining open recruits,
+// ranked by attainability and priced by prestige and star level.
 function applyeCpuOffers(
   recruits: LacrosseRecruit[],
   teams: LacrosseTeam[],
   userTeamId: string,
 ): LacrosseRecruit[] {
-  const rosterTargets = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
   const updated = [...recruits];
 
   for (const team of teams) {
     if (team.id === userTeamId) continue;
+    const room = ROSTER_CAP - projectedRosterSize(team, updated);
+    if (room <= 0) continue;
     const openRecruits = updated.filter((r) => r.status === 'open');
-    const board = sortRecruitBoardForTeam(team, openRecruits, rosterTargets);
-    for (const entry of board.slice(0, 15)) {
-      const idx = updated.findIndex((r) => r.id === entry.recruit.id);
+    const board = cpuBoardForTeam(team, openRecruits, CPU_ROSTER_TARGETS);
+    for (const recruit of board.slice(0, Math.min(15, room))) {
+      const idx = updated.findIndex((r) => r.id === recruit.id);
       if (idx >= 0) {
-        updated[idx] = applyScholarshipOffer(updated[idx]!, team.id, 50);
+        updated[idx] = applyScholarshipOffer(
+          updated[idx]!,
+          team.id,
+          cpuOfferPercent(recruit.starRating, team.reputation.nationalPrestige),
+        );
       }
     }
   }
