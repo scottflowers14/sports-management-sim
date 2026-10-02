@@ -68,6 +68,8 @@ describe('Desktop App', () => {
     expect(screen.getByRole('heading', { name: /Sports Management Sim/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Maryland State/i);
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week/i);
+    // A preseason poll is out before any games are played.
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/#\d+ Nationally/);
     expect(screen.getByRole('heading', { name: /Next Opponent/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Injury Report/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Recommended Actions/i })).toBeInTheDocument();

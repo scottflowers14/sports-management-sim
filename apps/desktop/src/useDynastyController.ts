@@ -28,6 +28,7 @@ import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition,
 import { runOffseason, resolveAndApplyPortal } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { simulateOneWeek, simulateRemainingWeeks, withoutInjured } from './week-sim';
+import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { WeekSimState } from './week-sim';
 import {
@@ -254,7 +255,9 @@ export function useDynastyController() {
     );
     const newStaff = createProgramStaff(nextDynasty);
     resetUiState();
+    const preseasonPoll = computeNationalRankings(nextDynasty.season.teams, []);
     setDynasty(nextDynasty);
+    setRankings(preseasonPoll);
     setStaffState(newStaff);
     setScouting(withStaffRecruitingHours(createScoutingState(), newStaff.staff));
     setCoachProfile(newCoach);
@@ -265,7 +268,7 @@ export function useDynastyController() {
       dynasty: nextDynasty,
       lastSimWeek: null,
       offseasonSummary: null,
-      rankings: [],
+      rankings: preseasonPoll,
       newsItems: [],
       tournament: null,
       dynastyHistory: [],
@@ -797,6 +800,7 @@ export function useDynastyController() {
       );
       setSeasonGoals(goals);
       setBestNatRank(null);
+      setRankings(computeNationalRankings(nextDynasty.season.teams, []));
       return nextDynasty;
     });
     setOffseasonSummary(null);
@@ -814,7 +818,6 @@ export function useDynastyController() {
       })),
     );
     setLastSimWeek(null);
-    setRankings([]);
     setTournament(null);
     setInjuries([]);
     setSelectedPlayerId(null);

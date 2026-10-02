@@ -13,3 +13,4 @@ export * from './names';
 export * from './player-stats';
 export * from './injuries';
 export * from './staff';
+export * from './polls';
