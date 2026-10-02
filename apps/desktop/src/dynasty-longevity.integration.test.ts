@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
-import { enforceRosterLimit, resolveAndApplyPortal, ROSTER_FLOOR, ROSTER_LIMIT, runOffseason } from './dynasty-helpers';
+import { backfillWalkOns, enforceRosterLimit, resolveAndApplyPortal, ROSTER_FLOOR, ROSTER_LIMIT, runOffseason } from './dynasty-helpers';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { createScoutingState } from './scouting';
 import { emptySeasonStats } from './stats';
@@ -104,5 +104,24 @@ describe('long dynasties', () => {
     const cut = padded.roster.filter((p) => !trimmed.roster.includes(p));
     expect(cut.length).toBeGreaterThan(0);
     expect(cut.every((p) => p.isWalkOn)).toBe(true);
+  });
+
+  it('holds walk-on tryouts at a missing position even when the roster is full', () => {
+    const dynasty = createFreshLacrosseDynasty({ now: () => 9 });
+    const team = dynasty.season.teams[0]!;
+    const fieldPlayers = team.roster.filter((p) => p.position !== 'FOGO');
+    const fillers = Array.from({ length: Math.max(0, ROSTER_FLOOR + 2 - fieldPlayers.length) }, (_, i) => ({
+      ...fieldPlayers[0]!,
+      id: `filler-${i}`,
+    }));
+    const noFaceoffMan = { ...team, roster: [...fieldPlayers, ...fillers] };
+    expect(noFaceoffMan.roster.length).toBeGreaterThan(ROSTER_FLOOR);
+
+    const filled = backfillWalkOns(noFaceoffMan, dynasty.rosterTargets, 1, 2027);
+    const added = filled.roster.filter((p) => !noFaceoffMan.roster.includes(p));
+    expect(added.map((p) => p.position)).toEqual(['FOGO']);
+    expect(added[0]!.isWalkOn).toBe(true);
+    // A roster with everything it needs is left alone.
+    expect(backfillWalkOns(filled, dynasty.rosterTargets, 1, 2027)).toBe(filled);
   });
 });

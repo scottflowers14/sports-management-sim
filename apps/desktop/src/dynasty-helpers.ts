@@ -614,16 +614,16 @@ export const ROSTER_FLOOR = 38;
 /**
  * Backfill thin rosters with freshman walk-ons after signing day. Positions are
  * chosen by need: anything at zero (a roster with no goalie can't play) first,
- * then the largest relative deficit against roster targets.
+ * then the largest relative deficit against roster targets. A full roster still
+ * holds tryouts when it's below a position minimum, so a program whose only
+ * faceoff man graduated doesn't take the field without one.
  */
-function backfillWalkOns(
+export function backfillWalkOns(
   team: LacrosseTeam,
   rosterTargets: Record<string, number>,
   seed: number,
   seasonYear: number,
 ): LacrosseTeam {
-  if (team.roster.length >= ROSTER_FLOOR) return team;
-
   const targetEntries = Object.entries(rosterTargets) as Array<[LacrossePlayer['position'], number]>;
   const counts = new Map<string, number>();
   for (const player of team.roster) {
@@ -631,6 +631,12 @@ function backfillWalkOns(
   }
 
   const positions: LacrossePlayer['position'][] = [];
+  for (const [position, minimum] of Object.entries(POSITION_MINIMUMS) as Array<[LacrossePlayer['position'], number]>) {
+    while ((counts.get(position) ?? 0) < minimum) {
+      positions.push(position);
+      counts.set(position, (counts.get(position) ?? 0) + 1);
+    }
+  }
   while (team.roster.length + positions.length < ROSTER_FLOOR) {
     let best: LacrossePlayer['position'] | null = null;
     let bestScore = -Infinity;
@@ -647,6 +653,7 @@ function backfillWalkOns(
     positions.push(chosen);
     counts.set(chosen, (counts.get(chosen) ?? 0) + 1);
   }
+  if (positions.length === 0) return team;
 
   const walkOns = generateLacrosseWalkOns({
     seed: seed + hashString(team.id),
