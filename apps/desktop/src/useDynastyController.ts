@@ -674,6 +674,7 @@ export function useDynastyController() {
     const staffTurnover = runStaffOffseason(staffState.staff, {
       seed: newDynasty.seed + newDynasty.season.year,
       prestige: newUserTeam?.reputation.coachingPrestige ?? 50,
+      winPct: summary.userRecord.wins / Math.max(1, summary.userRecord.wins + summary.userRecord.losses),
     });
     setStaffState({ staff: staffTurnover.staff, staffCandidates: staffTurnover.candidates });
     setScouting((s) => withStaffRecruitingHours(s, staffTurnover.staff));
@@ -684,6 +685,15 @@ export function useDynastyController() {
       featured: true,
       headline: `${STAFF_ROLE_LABELS[member.role].title} ${member.name.first} ${member.name.last}'s contract is up. Re-sign or replace on the Staff screen.`,
     }));
+    for (const member of staffTurnover.poached) {
+      staffNews.push({
+        id: `staff-poached-${dynasty.season.year}-${member.id}`,
+        week: dynasty.season.currentWeek,
+        category: 'coaching' as const,
+        featured: true,
+        headline: `${STAFF_ROLE_LABELS[member.role].title} ${member.name.first} ${member.name.last} (${member.rating}) was hired away as a head coach. Find a replacement on the Staff screen.`,
+      });
+    }
     if (staffNews.length > 0) setNewsItems((prev) => [...staffNews, ...prev]);
 
     setDynasty(newDynasty);

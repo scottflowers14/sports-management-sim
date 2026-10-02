@@ -10,6 +10,7 @@ import {
   fillStaffVacancies,
   generateStartingStaff,
   hireStaffCandidate,
+  poachChance,
   programCoachingEdge,
   programStaffRating,
   releaseStaffMember,
@@ -167,5 +168,33 @@ describe('hiring and the offseason cycle', () => {
     const filled = fillStaffVacancies(staff, pool, staffPayroll(staff));
     expect(filled.staff.offense).toBeUndefined();
     expect(filled.hired).toEqual([]);
+  });
+
+  it('elite assistants on winning teams get poached; average ones never do', () => {
+    expect(poachChance(70, 1)).toBe(0);
+    expect(poachChance(90, 0.9)).toBeGreaterThan(poachChance(90, 0.3));
+    expect(poachChance(95, 0.9)).toBeGreaterThan(poachChance(80, 0.9));
+    expect(poachChance(99, 1)).toBeLessThanOrEqual(0.6);
+
+    const star = (role: 'offense' | 'defense', rating: number) => ({ ...offense, id: `${role}-${rating}`, role, rating, yearsLeft: 3 });
+    let lost = 0;
+    let lostAverage = 0;
+    for (let seed = 0; seed < 200; seed += 1) {
+      const result = runStaffOffseason(
+        { offense: star('offense', 92), defense: star('defense', 66) },
+        { seed, prestige: 70, winPct: 0.85 },
+      );
+      lost += result.poached.filter((m) => m.rating === 92).length;
+      lostAverage += result.poached.filter((m) => m.rating === 66).length;
+      expect(result.staff.offense === undefined).toBe(result.poached.some((m) => m.role === 'offense'));
+    }
+    expect(lostAverage).toBe(0);
+    expect(lost / 200).toBeGreaterThan(0.25);
+    expect(lost / 200).toBeLessThan(0.65);
+  });
+
+  it('skips poaching when no record is given', () => {
+    const staff = { offense: { ...offense, rating: 95, yearsLeft: 3 } };
+    expect(runStaffOffseason(staff, { seed: 1, prestige: 70 }).poached).toEqual([]);
   });
 });

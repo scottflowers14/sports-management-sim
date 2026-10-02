@@ -193,11 +193,42 @@ export function releaseStaffMember(staff: LacrosseStaff, role: StaffRole): Lacro
  */
 export function runStaffOffseason(
   staff: LacrosseStaff,
-  { seed, prestige }: { seed: number; prestige: number },
-): { staff: LacrosseStaff; departed: StaffMember[]; candidates: StaffMember[] } {
-  const { staff: next, departed } = advanceStaffContracts(staff);
+  { seed, prestige, winPct }: { seed: number; prestige: number; winPct?: number },
+): { staff: LacrosseStaff; departed: StaffMember[]; poached: StaffMember[]; candidates: StaffMember[] } {
+  const { staff: afterContracts, departed } = advanceStaffContracts(staff);
+  const { staff: next, poached } =
+    winPct === undefined ? { staff: afterContracts, poached: [] } : poachStaff(afterContracts, winPct, seededRandom(hash(`poach:${seed}`)));
   const candidates = [...departed.map(reSigningCandidate), ...generateStaffCandidates({ seed, prestige })];
-  return { staff: next, departed, candidates };
+  return { staff: next, departed, poached, candidates };
+}
+
+/** Chance an assistant at this rating, on a team with this win rate, leaves for a head coaching job. */
+export function poachChance(rating: number, winPct: number): number {
+  if (rating < POACH_MIN_RATING) return 0;
+  return clamp(((rating - POACH_MIN_RATING) / 40) * (0.4 + winPct), 0, 0.6);
+}
+
+const POACH_MIN_RATING = 75;
+
+/**
+ * Success gets noticed: elite assistants on winning teams get hired away to
+ * run their own programs, contract or not.
+ */
+function poachStaff(
+  staff: LacrosseStaff,
+  winPct: number,
+  random: () => number,
+): { staff: LacrosseStaff; poached: StaffMember[] } {
+  const next: LacrosseStaff = { ...staff };
+  const poached: StaffMember[] = [];
+  for (const role of STAFF_ROLES) {
+    const member = next[role];
+    if (member && random() < poachChance(member.rating, winPct)) {
+      poached.push(member);
+      delete next[role];
+    }
+  }
+  return { staff: next, poached };
 }
 
 /**
