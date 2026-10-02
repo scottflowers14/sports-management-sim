@@ -51,15 +51,21 @@ export function lacrosseInjuryProneness(player: LacrossePlayer): number {
  */
 export function rollLacrosseInjuries(
   team: LacrosseTeam,
-  options: { played: boolean; random: RandomSource; skipPlayerIds?: Set<string> },
+  options: {
+    played: boolean;
+    random: RandomSource;
+    skipPlayerIds?: Set<string>;
+    /** Scales every player's risk, e.g. from the week's practice intensity. */
+    riskMultiplier?: number;
+  },
 ): LacrosseInjury[] {
-  const { played, random, skipPlayerIds } = options;
+  const { played, random, skipPlayerIds, riskMultiplier = 1 } = options;
   const minutes = played ? getLacrosseParticipationMinutes(team) : new Map<string, number>();
   const injuries: LacrosseInjury[] = [];
   for (const player of team.roster) {
     if (skipPlayerIds?.has(player.id)) continue;
     const onField = minutes.get(player.id) ?? 0;
-    const risk = (PRACTICE_INJURY_RATE + GAME_INJURY_RATE * onField) * lacrosseInjuryProneness(player);
+    const risk = (PRACTICE_INJURY_RATE + GAME_INJURY_RATE * onField) * lacrosseInjuryProneness(player) * riskMultiplier;
     if (random() >= risk) continue;
     const type = pickInjuryType(random);
     const [min, max] = type.weeks;

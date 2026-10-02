@@ -28,10 +28,12 @@ function computeActionItems({
   currentWeek,
   classNeeds = [],
   vacantStaffRoles = [],
+  openPlanSlots = 0,
 }: {
   currentWeek: number;
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
+  openPlanSlots?: number;
   injuries: InjuredPlayer[];
   userTeam: LacrosseTeam;
   scouting: ScoutingState;
@@ -114,6 +116,16 @@ function computeActionItems({
     });
   }
 
+  if (!seasonComplete && openPlanSlots > 0) {
+    items.push({
+      id: 'development-plans',
+      priority: 'medium',
+      icon: '🏋️',
+      text: `${openPlanSlots} development plan slot${openPlanSlots === 1 ? '' : 's'} open. Planned players grow twice as fast at practice.`,
+      nav: 'practice',
+    });
+  }
+
   // Graduates not yet replaced, where fewer live offers are out than spots to fill.
   const short = classNeeds.filter((n) => n.open > n.offersOut);
   if (!seasonComplete && short.length > 0) {
@@ -164,6 +176,7 @@ export function WeekHubScreen({
   onNavigate,
   classNeeds,
   vacantStaffRoles,
+  openPlanSlots,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -185,6 +198,7 @@ export function WeekHubScreen({
   onNavigate: (view: string) => void;
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
+  openPlanSlots?: number;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -202,6 +216,7 @@ export function WeekHubScreen({
     currentWeek,
     ...(classNeeds ? { classNeeds } : {}),
     ...(vacantStaffRoles ? { vacantStaffRoles } : {}),
+    ...(openPlanSlots !== undefined ? { openPlanSlots } : {}),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
 

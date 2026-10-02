@@ -8,13 +8,20 @@ import {
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import {
+  autoDevelopmentPlans,
   DEFAULT_GAME_PLAN,
+  DEFAULT_PRACTICE_PLAN,
   deriveCpuGamePlan,
+  PRACTICE_INTENSITIES,
+  programStaffRating,
+  runPracticeWeek,
   programCoachingEdge,
   simulateLacrosseGameWithLog,
   type GameLog,
   type LacrosseDynastyState,
   type LacrosseGamePlan,
+  type LacrossePracticePlan,
+  type PracticeGain,
   type LacrosseStaff,
   type LacrossePlayerGameStats,
   type LacrosseTeam,
@@ -50,7 +57,18 @@ export interface WeekSimState {
   lastSimWeek: number | null;
   /** The user's hired coordinators; CPU staff quality comes from prestige. */
   userStaff?: LacrosseStaff;
+  /** The user's practice intensity and individual development plans. */
+  practicePlan?: LacrossePracticePlan;
+  /** Rating points the user's players gained at practice this season, newest first. */
+  practiceGains?: PracticeLogEntry[];
 }
+
+export interface PracticeLogEntry extends PracticeGain {
+  week: number;
+}
+
+/** Keeps a season of practice gains for the Practice screen. */
+const MAX_PRACTICE_LOG = 80;
 
 export function simulateOneWeek(
   state: WeekSimState,
@@ -77,7 +95,7 @@ export function simulateOneWeek(
   const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
     team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
-  const newSeason = advanceSeasonWeek(dynasty.season, (game, homeTeam, awayTeam) => {
+  const seasonAfterGames = advanceSeasonWeek(dynasty.season, (game, homeTeam, awayTeam) => {
     // Injured players sit: the depth chart promotes the next man up for the
     // rating, the game plan, and the box score.
     const home = withoutInjured(homeTeam, injuredIds);
@@ -95,6 +113,30 @@ export function simulateOneWeek(
     weekPlayerLines.set(game.id, [...players.home, ...players.away]);
     return result;
   });
+
+  // Every program practices after the week's games. CPU staffs run a normal
+  // week with plans on their highest-upside young players.
+  const playedTeamIds = new Set(
+    seasonAfterGames.schedule
+      .filter((g) => g.week === weekToSim && g.status === 'final')
+      .flatMap((g) => [g.homeTeamId, g.awayTeamId]),
+  );
+  const userPractice = state.practicePlan ?? DEFAULT_PRACTICE_PLAN;
+  const practiceGains: PracticeGain[] = [];
+  const newSeason = {
+    ...seasonAfterGames,
+    teams: seasonAfterGames.teams.map((team) => {
+      const isUser = team.id === dynasty.userTeamId;
+      const plan = isUser ? userPractice : { intensity: 'normal' as const, developmentPlans: autoDevelopmentPlans(team) };
+      const practiced = runPracticeWeek(team, plan, {
+        developmentRating: programStaffRating(team, 'development', staffOwner),
+        played: playedTeamIds.has(team.id),
+        skipPlayerIds: injuredIds,
+      });
+      if (isUser) practiceGains.push(...practiced.gains);
+      return practiced.team;
+    }),
+  };
 
   const updatedUserTeam = newSeason.teams.find((t) => t.id === dynasty.userTeamId)!;
 
@@ -161,12 +203,14 @@ export function simulateOneWeek(
   const newDynasty = { ...dynasty, season: newSeason, recruits: newRecruits, recruitBoard: newBoard };
 
   const newRankings = computeNationalRankings(newSeason.teams, state.rankings);
-  const playedTeamIds = new Set(
-    newSeason.schedule
-      .filter((g) => g.week === weekToSim && g.status === 'final')
-      .flatMap((g) => [g.homeTeamId, g.awayTeamId]),
+  const userInjuryRisk = PRACTICE_INTENSITIES[userPractice.intensity].injuryRisk;
+  const { injuries: newInjuries, newlyInjured, recovered } = processInjuries(
+    state.injuries,
+    newSeason.teams,
+    random,
+    playedTeamIds,
+    (teamId) => (teamId === dynasty.userTeamId ? userInjuryRisk : 1),
   );
-  const { injuries: newInjuries, newlyInjured, recovered } = processInjuries(state.injuries, newSeason.teams, random, playedTeamIds);
 
   const newlyCommitted = newRecruits.filter((r) => r.status !== 'open' && !prevCommittedIds.has(r.id));
 
@@ -247,6 +291,21 @@ export function simulateOneWeek(
       })),
   ];
 
+  const practiceNews: NewsItem[] = [];
+  if (practiceGains.length > 0) {
+    const names = practiceGains.map((gain) => {
+      const player = updatedUserTeam.roster.find((p) => p.id === gain.playerId);
+      const name = player ? `${player.position} ${player.name.first[0]}. ${player.name.last}` : 'A player';
+      return `${name} up to ${gain.to}`;
+    });
+    practiceNews.push({
+      id: `practice-${weekToSim}`,
+      week: weekToSim,
+      category: 'coaching',
+      headline: `Practice report: ${names.join(', ')}`,
+    });
+  }
+
   const newSeasonStats = updateSeasonStats(state.seasonStats, newSeason.schedule, newSeason.teams, weekToSim, weekPlayerLines);
   const playerOfWeekNews = buildPlayerOfWeekNews(weekToSim, state.seasonStats, newSeasonStats, newSeason.teams);
 
@@ -263,7 +322,7 @@ export function simulateOneWeek(
     dynasty: newDynasty,
     rankings: newRankings,
     injuries: newInjuries,
-    newsItems: [...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
+    newsItems: [...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
     scouting: advanceScoutingWeek(state.scouting),
     recruitingActivity: emptyRecruitingActivity(),
     recruitTrends,
@@ -271,6 +330,12 @@ export function simulateOneWeek(
     gameLogs: mergedLogs,
     bestNatRank,
     lastSimWeek: weekToSim,
+    ...(state.userStaff ? { userStaff: state.userStaff } : {}),
+    ...(state.practicePlan ? { practicePlan: state.practicePlan } : {}),
+    practiceGains: [
+      ...practiceGains.map((gain) => ({ ...gain, week: weekToSim })).reverse(),
+      ...(state.practiceGains ?? []),
+    ].slice(0, MAX_PRACTICE_LOG),
   };
 }
 

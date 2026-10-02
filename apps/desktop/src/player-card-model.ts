@@ -1,4 +1,4 @@
-import type { LacrossePlayer, LacrosseRecruit } from '@sports-management-sim/sport-lacrosse';
+import { POSITION_KEY_RATINGS, type DevelopableRating, type LacrossePlayer, type LacrosseRecruit } from '@sports-management-sim/sport-lacrosse';
 import type { PlayerRatings } from '@sports-management-sim/engine-core';
 
 /**
@@ -31,7 +31,35 @@ export interface PlayerCardData {
   overallFuzzy: boolean;
   potential: number | null;
   ratings: CardRatingRow[];
+  /** The lacrosse skills that matter at his position (shooting, faceoffs...). */
+  skills: CardRatingRow[];
   traits: string[];
+}
+
+export const SKILL_LABELS: Record<DevelopableRating, string> = {
+  shooting: 'Shooting',
+  passing: 'Passing',
+  dodging: 'Dodging',
+  stickSkills: 'Stick Skills',
+  offBallMovement: 'Off-Ball',
+  defense: 'Defense',
+  checking: 'Checking',
+  groundBalls: 'Ground Balls',
+  faceoffs: 'Faceoffs',
+  goalieReflexes: 'Reflexes',
+  goaliePositioning: 'Positioning',
+  goalieClearing: 'Clearing',
+  athleticism: 'Athleticism',
+  speed: 'Speed',
+  strength: 'Strength',
+  stamina: 'Stamina',
+};
+
+function skillRows(person: LacrossePlayer | LacrosseRecruit, visible: boolean): CardRatingRow[] {
+  return POSITION_KEY_RATINGS[person.position].flatMap((key) => {
+    const value = (person.sportTraits as unknown as Record<string, number | undefined>)[key];
+    return value === undefined ? [] : [{ label: SKILL_LABELS[key], value: visible ? value : null }];
+  });
 }
 
 const RATING_ROWS: Array<[string, keyof PlayerRatings]> = [
@@ -56,6 +84,7 @@ export function cardFromPlayer(player: LacrossePlayer, opts: { injured?: boolean
     overallFuzzy: false,
     potential: player.ratings.potential,
     ratings: RATING_ROWS.map(([label, key]) => ({ label, value: player.ratings[key] })),
+    skills: skillRows(player, true),
     traits: player.traits.map((t) => t.replace(/_/g, ' ')),
   };
 }
@@ -83,6 +112,7 @@ export function cardFromRecruit(
     overallFuzzy: tier === 'partial',
     potential: showRatings ? recruit.ratings.potential : null,
     ratings: RATING_ROWS.map(([label, key]) => ({ label, value: showRatings ? recruit.ratings[key] : null })),
+    skills: skillRows(recruit, showRatings),
     traits: [],
   };
 }

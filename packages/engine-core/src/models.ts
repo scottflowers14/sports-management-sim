@@ -93,6 +93,8 @@ export interface Player<Position extends string = string, SportTraits = unknown>
   ratingHistory?: PlayerSeasonRating[];
   /** Programs this player has transferred between, oldest first. */
   transfers?: PlayerTransfer[];
+  /** In-season practice progress toward the next overall point (0–99). */
+  developmentProgress?: number;
 }
 
 export interface PlayerTransfer {

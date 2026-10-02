@@ -494,6 +494,30 @@ describe('Desktop App', () => {
     await waitFor(() => expect(loadActiveDynastySave()?.staffCandidates?.length).toBe(before - 1));
   });
 
+  it('sets practice intensity and development plans on the Practice screen', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Practice$/ }));
+    const plans = screen.getByLabelText('Development plans');
+    // A new program starts with the staff's four picks.
+    expect(within(plans).getAllByRole('button', { name: 'Remove' })).toHaveLength(4);
+    await userEvent.click(within(screen.getByRole('radiogroup', { name: 'Practice intensity' })).getByRole('radio', { name: /Intense/ }));
+    await waitFor(() => expect(loadActiveDynastySave()?.practicePlan?.intensity).toBe('intense'));
+
+    await userEvent.click(within(plans).getAllByRole('button', { name: 'Remove' })[0]!);
+    expect(within(plans).getAllByRole('button', { name: 'Remove' })).toHaveLength(3);
+    const focus = within(plans).getAllByRole('combobox')[0]!;
+    const option = within(focus).getAllByRole('option')[1]!;
+    await userEvent.selectOptions(focus, option);
+    await waitFor(() =>
+      expect(loadActiveDynastySave()?.practicePlan?.developmentPlans.some((p) => p.focus !== 'balanced')).toBe(true),
+    );
+
+    const roster = screen.getByLabelText('Roster development');
+    await userEvent.click(within(roster).getAllByRole('button', { name: 'Add plan' }).find((b) => !(b as HTMLButtonElement).disabled)!);
+    expect(within(plans).getAllByRole('button', { name: 'Remove' })).toHaveLength(4);
+    expect(within(roster).getAllByRole('button', { name: 'Add plan' }).every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+
   it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {
     await renderStartedApp();
     const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;

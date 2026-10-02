@@ -741,7 +741,21 @@ li span {
 }
 
 .schedule-view-layout {
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+}
+
+/* Long program names wrap inside the card instead of pushing the Box column out. */
+.schedule-week-card {
+  min-width: 0;
+  overflow-x: auto;
+}
+.schedule-week-card .schedule-table {
+  width: 100%;
+}
+.schedule-week-card .schedule-table th,
+.schedule-week-card .schedule-table td {
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 .matchup-preview-header {
@@ -5069,4 +5083,186 @@ li span {
 
 .pbp-event.pbp-penalty {
   background: rgba(255, 196, 87, 0.08);
+}
+
+/* ── Practice screen ────────────────────────────────────────── */
+.practice-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+.practice-layout > [aria-label='Roster development'],
+.practice-layout > [aria-label='Practice log'] {
+  grid-column: 1 / -1;
+}
+@media (max-width: 1100px) {
+  .practice-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.practice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.practice-header h2 {
+  margin: 0;
+}
+.practice-season-total {
+  display: grid;
+  text-align: right;
+  font-size: 0.8rem;
+}
+.practice-season-total strong {
+  font-size: 1.8rem;
+  color: #72f2c6;
+}
+.practice-intensity {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 10px;
+}
+.practice-intensity-option {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.practice-intensity-option strong {
+  font-size: 1rem;
+}
+.practice-intensity-option.active {
+  border-color: #72f2c6;
+  background: rgba(114, 242, 198, 0.1);
+}
+.practice-intensity-stats {
+  font-size: 0.75rem;
+  color: #9cc8ff;
+}
+.practice-note {
+  font-size: 0.8rem;
+  margin: 6px 0 10px;
+}
+.practice-offseason-focus {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+.practice-fill-btn {
+  width: auto;
+}
+.practice-fill-btn:disabled,
+.practice-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.practice-plan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.practice-plan {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 2.5em auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.85rem;
+}
+.practice-plan-player,
+.practice-plan-focus {
+  display: grid;
+  gap: 3px;
+}
+.practice-plan-focus-hint {
+  font-size: 0.72rem;
+}
+.practice-name-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.practice-name-btn:hover {
+  color: #72f2c6;
+  text-decoration: underline;
+}
+.practice-progress {
+  height: 6px;
+  min-width: 70px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.practice-progress-fill {
+  height: 100%;
+  background: #72f2c6;
+}
+.practice-progress-fill.at-ceiling {
+  background: rgba(255, 255, 255, 0.25);
+}
+.practice-gain {
+  color: #72f2c6;
+  font-weight: 700;
+}
+.practice-table td {
+  vertical-align: middle;
+}
+.practice-row-planned td {
+  background: rgba(114, 242, 198, 0.05);
+}
+.practice-add-btn {
+  width: auto;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+}
+.practice-injured {
+  color: #ff9a9a;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.practice-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+.panel-section-label {
+  margin: 12px 0 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #72f2c6;
+}
+.practice-log li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+.practice-log li strong {
+  display: inline;
 }

@@ -2,6 +2,7 @@ import {
   calculateLacrosseTeamRating,
   deriveCpuGamePlan,
   STAFF_ROLE_LABELS,
+  MAX_DEVELOPMENT_PLANS,
   STAFF_ROLES,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
@@ -22,6 +23,7 @@ import { StatsScreen } from './screens/StatsScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { OffseasonScreen } from './screens/OffseasonScreen';
 import { StaffScreen } from './screens/StaffScreen';
+import { PracticeScreen } from './screens/PracticeScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
@@ -88,6 +90,12 @@ export function App() {
     staffBudget,
     hireStaff,
     releaseStaff,
+    practicePlan,
+    practiceGains,
+    setPracticeIntensity,
+    setDevelopmentPlan,
+    removeDevelopmentPlan,
+    autoFillDevelopmentPlans,
     pendingJobOffers,
     persistDynasty,
     startNewDynasty,
@@ -295,6 +303,7 @@ export function App() {
         { view: 'team', label: 'Team' },
         { view: 'schedule', label: 'Schedule' },
         { view: 'staff', label: 'Staff' },
+        { view: 'practice', label: 'Practice' },
         { view: 'recruiting', label: committedCount > 0 ? `Recruiting · ${committedCount}` : 'Recruiting' },
       ],
     },
@@ -463,6 +472,7 @@ export function App() {
           onNavigate={(v) => setView(v as Parameters<typeof setView>[0])}
           classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
           vacantStaffRoles={STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase())}
+          openPlanSlots={Math.max(0, MAX_DEVELOPMENT_PLANS - practicePlan.developmentPlans.length)}
         />
       )}
 
@@ -613,6 +623,22 @@ export function App() {
           budget={staffBudget}
           onHire={hireStaff}
           onRelease={releaseStaff}
+        />
+      )}
+
+      {view === 'practice' && userTeam && (
+        <PracticeScreen
+          team={userTeam}
+          plan={practicePlan}
+          gains={practiceGains}
+          injuredIds={new Set(injuries.map((inj) => inj.playerId))}
+          trainingFocus={trainingFocus}
+          onIntensityChange={setPracticeIntensity}
+          onSetPlan={setDevelopmentPlan}
+          onRemovePlan={removeDevelopmentPlan}
+          onAutoFill={autoFillDevelopmentPlans}
+          onTrainingFocusChange={setTrainingFocus}
+          onSelectPlayer={setSelectedPlayerId}
         />
       )}
 

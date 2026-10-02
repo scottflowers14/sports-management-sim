@@ -17,3 +17,4 @@ export * from './staff';
 export * from './polls';
 export * from './win-probability';
 export * from './transfer-portal';
+export * from './practice';

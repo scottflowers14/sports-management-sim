@@ -31,6 +31,12 @@ test('plays a season through the title game and offseason into year two', async 
   await page.getByLabel('Staff candidates').getByRole('button', { name: 'Hire', disabled: false }).first().click();
   await expect(page.getByLabel('Staff candidates').getByRole('button', { name: 'Hire' })).toHaveCount(11);
 
+  // Crank up practice; the staff's development plans are already in place.
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('radio', { name: /Intense/ }).click();
+  await expect(page.getByRole('radio', { name: /Intense/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByLabel('Development plans').getByRole('button', { name: 'Remove' })).toHaveCount(4);
+
   // One week by hand, then the recruiting assistant.
   await advance.click();
   await expect(advance).toContainText('Week 2');
