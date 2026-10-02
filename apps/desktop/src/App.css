@@ -4748,3 +4748,8 @@ li span {
 .class-need-short .class-need-count {
   color: #ff9a9a;
 }
+.assistant-more {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #72f2c6;
+}

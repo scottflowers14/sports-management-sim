@@ -297,6 +297,13 @@ describe('Desktop App', () => {
     expect(report).toHaveTextContent(/Scouting \(\d+\)/);
     expect(screen.getByRole('button', { name: /^Run Assistant$/i })).toBeDisabled();
 
+    // Long lists collapse to the first five.
+    const more = within(report).getByRole('button', { name: /^\+\d+ more scouting reports$/ });
+    const shown = () => report.querySelectorAll('.assistant-columns li').length;
+    const collapsed = shown();
+    await userEvent.click(more);
+    expect(shown()).toBeGreaterThan(collapsed);
+
     // Suggested offers go out in one click and come off the list.
     const makeAll = within(report).getByRole('button', { name: /^Make All \d+ Offers$/i });
     await userEvent.click(makeAll);

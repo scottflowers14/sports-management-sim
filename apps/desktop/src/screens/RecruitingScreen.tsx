@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
 import type { PositionNeed } from '@sports-management-sim/engine-core';
@@ -832,6 +832,25 @@ function AllRecruitsList({
   );
 }
 
+const COLLAPSED_ITEMS = 5;
+
+/** Long assistant lists show the first few, with the rest a click away. */
+function CollapsibleList({ label, children }: { label: string; children: ReactNode[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const items = children.filter(Boolean);
+  const hidden = items.length - COLLAPSED_ITEMS;
+  return (
+    <>
+      <ul>{expanded || hidden <= 0 ? items : items.slice(0, COLLAPSED_ITEMS)}</ul>
+      {hidden > 0 && (
+        <button type="button" className="link-btn assistant-more" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? 'Show fewer' : `+${hidden} more ${label}`}
+        </button>
+      )}
+    </>
+  );
+}
+
 function AssistantReport({
   report,
   onSelectRecruit,
@@ -858,7 +877,7 @@ function AssistantReport({
             {pitches.length === 0 ? (
               <p className="dim">No scouted targets to pitch yet. Pin or offer recruits and the staff pitches them once scouted.</p>
             ) : (
-              <ul>
+              <CollapsibleList label="pitches">
                 {pitches.map((a) => a.type === 'pitch' && (
                   <li key={a.recruitId}>
                     {a.name}: sold {MOTIVATION_LABELS[a.motivation]}{' '}
@@ -867,7 +886,7 @@ function AssistantReport({
                     </span>
                   </li>
                 ))}
-              </ul>
+              </CollapsibleList>
             )}
           </div>
           <div>
@@ -875,13 +894,13 @@ function AssistantReport({
             {scouts.length === 0 ? (
               <p className="dim">No hours left for scouting.</p>
             ) : (
-              <ul>
+              <CollapsibleList label="scouting reports">
                 {scouts.map((a, i) => a.type === 'scout' && (
                   <li key={`${a.recruitId}-${i}`}>
                     {a.name}: {a.tier === 'full' ? 'full report' : 'first look'}
                   </li>
                 ))}
-              </ul>
+              </CollapsibleList>
             )}
           </div>
         </div>
