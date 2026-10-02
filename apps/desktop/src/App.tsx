@@ -1,8 +1,12 @@
 import {
   calculateLacrosseTeamRating,
   deriveCpuGamePlan,
+  STAFF_ROLE_LABELS,
+  STAFF_ROLES,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
+import { classNeedsByPosition } from '@sports-management-sim/engine-core';
+
 import { getJobSecurityLabel, getJobSecurityColor } from './coach-profile';
 import { BoxScorePanel } from './components/BoxScorePanel';
 import { PlayerPanel } from './components/PlayerPanel';
@@ -27,6 +31,8 @@ import { useState } from 'react';
 import { formatTeamName } from './ui/format';
 import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
+
+const CLASS_NEED_POSITIONS = ['ATT', 'MID', 'DEF', 'LSM', 'FOGO', 'GK'] as const;
 
 export function App() {
   const {
@@ -453,6 +459,8 @@ export function App() {
           onSimWeek={simWeek}
           onBoxScore={setSelectedBoxScore}
           onNavigate={(v) => setView(v as Parameters<typeof setView>[0])}
+          classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
+          vacantStaffRoles={STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase())}
         />
       )}
 
@@ -513,6 +521,7 @@ export function App() {
 
       {view === 'recruiting' && (
         <RecruitingScreen
+          classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
           recruitBoard={dynasty.recruitBoard}
           portalEntries={dynasty.portalEntries}
           scouting={scouting}

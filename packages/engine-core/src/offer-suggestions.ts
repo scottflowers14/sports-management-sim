@@ -1,5 +1,6 @@
 import type { ID, Team } from './models';
 import type { RecruitBoardEntry } from './recruit-board';
+import { classNeedsByPosition } from './class-needs';
 import { recruitPrestigeMultiplier } from './recruiting';
 
 export interface OfferSuggestion {
@@ -49,38 +50,42 @@ export function suggestScholarshipOffers<Position extends string, SportTraits>(
   const { team, board, isKnown, maxOffers = 8 } = input;
   let budget = input.budgetRemaining;
 
-  const graduating = new Map<string, number>();
-  for (const player of team.roster) {
-    if (player.classYear === 'SR' || player.classYear === 'GR') {
-      graduating.set(player.position, (graduating.get(player.position) ?? 0) + 1);
-    }
-  }
-  const pledged = new Map<string, number>();
-  const outstanding = new Map<string, number>();
-  for (const { recruit } of board) {
-    if (recruit.committedTeamId === team.id || recruit.signedTeamId === team.id) {
-      pledged.set(recruit.position, (pledged.get(recruit.position) ?? 0) + 1);
-    } else if (recruit.status === 'open' && recruit.scholarshipOffers.some((o) => o.teamId === team.id)) {
-      outstanding.set(recruit.position, (outstanding.get(recruit.position) ?? 0) + 1);
-    }
-  }
   const openOffers = new Map<string, number>();
-  for (const [position, count] of graduating) {
-    const spots = Math.max(0, count - (pledged.get(position) ?? 0));
-    openOffers.set(position, Math.ceil(spots * OFFERS_PER_SPOT) - (outstanding.get(position) ?? 0));
+  for (const need of classNeedsByPosition(team, board.map((entry) => entry.recruit))) {
+    if (need.graduating === 0) continue;
+    openOffers.set(need.position, Math.ceil(need.open * OFFERS_PER_SPOT) - need.offersOut);
   }
+
+  const eligible = board.filter(
+    ({ recruit }) =>
+      recruit.status === 'open' &&
+      !recruit.scholarshipOffers.some((o) => o.teamId === team.id) &&
+      isKnown(recruit.id) &&
+      recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige) >= MIN_ATTAINABILITY,
+  );
+  // Every position with a hole gets its best fit first, so a class doesn't
+  // spend its money on three attackers and leave the cage empty. Extra
+  // offers come after, best fits first.
+  const firstPicks = new Map<string, (typeof eligible)[number]>();
+  for (const entry of eligible) {
+    const position = entry.recruit.position;
+    if ((openOffers.get(position) ?? 0) > 0 && !firstPicks.has(position)) firstPicks.set(position, entry);
+  }
+  const ordered = [...firstPicks.values(), ...eligible.filter((entry) => !new Set(firstPicks.values()).has(entry))];
+  let uncovered = firstPicks.size;
 
   const suggestions: OfferSuggestion[] = [];
-  for (const { recruit } of board) {
-    if (suggestions.length >= maxOffers || budget < MIN_PERCENT / 100) break;
-    if (recruit.status !== 'open') continue;
-    if (recruit.scholarshipOffers.some((o) => o.teamId === team.id)) continue;
+  for (const { recruit } of ordered) {
+    if (suggestions.length >= maxOffers || budget < MIN_PERCENT / 100 - 1e-9) break;
     if ((openOffers.get(recruit.position) ?? 0) <= 0) continue;
-    if (!isKnown(recruit.id)) continue;
-    if (recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige) < MIN_ATTAINABILITY) continue;
+    const isFirstPick = firstPicks.get(recruit.position)?.recruit.id === recruit.id;
+    if (isFirstPick) uncovered -= 1;
+    // Keep enough back to put at least a minimum offer on every uncovered position.
+    const reserve = (uncovered * MIN_PERCENT) / 100;
+    if (!isFirstPick && budget - MIN_PERCENT / 100 < reserve - 1e-9) continue;
 
     const desired = suggestedScholarshipPercent(recruit.starRating);
-    const percent = desired / 100 <= budget ? desired : MIN_PERCENT;
+    const percent = desired / 100 <= budget - reserve + 1e-9 ? desired : MIN_PERCENT;
     budget -= percent / 100;
     openOffers.set(recruit.position, (openOffers.get(recruit.position) ?? 0) - 1);
     suggestions.push({

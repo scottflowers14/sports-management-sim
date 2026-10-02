@@ -1,5 +1,5 @@
 import type { GameLog, LacrosseTeam, LacrossePortalEntry, LacrossePosition, LacrossePlayerTraits } from '@sports-management-sim/sport-lacrosse';
-import type { RecruitBoardEntry, ScheduledGame } from '@sports-management-sim/engine-core';
+import type { PositionNeed, RecruitBoardEntry, ScheduledGame } from '@sports-management-sim/engine-core';
 import type { InjuredPlayer } from '../dynasty-helpers';
 import type { RankingEntry } from '../rankings';
 import type { NewsItem } from '../news-feed';
@@ -25,7 +25,13 @@ function computeActionItems({
   portalEntries,
   userTeamId,
   seasonComplete,
+  currentWeek,
+  classNeeds = [],
+  vacantStaffRoles = [],
 }: {
+  currentWeek: number;
+  classNeeds?: PositionNeed[];
+  vacantStaffRoles?: string[];
   injuries: InjuredPlayer[];
   userTeam: LacrosseTeam;
   scouting: ScoutingState;
@@ -98,13 +104,27 @@ function computeActionItems({
     });
   }
 
-  const scholarshipsLeft = userTeam.resources.scholarshipLimit - userTeam.resources.scholarshipUsed;
-  if (scholarshipsLeft >= 3) {
+  if (vacantStaffRoles.length > 0) {
     items.push({
-      id: 'scholarships',
-      priority: 'low',
+      id: 'staff-vacancy',
+      priority: 'high',
+      icon: '📣',
+      text: `No ${vacantStaffRoles.join(' or ')} on staff. Vacant chairs coach at a 45 rating, so hire one.`,
+      nav: 'staff',
+    });
+  }
+
+  // Graduates not yet replaced, where fewer live offers are out than spots to fill.
+  const short = classNeeds.filter((n) => n.open > n.offersOut);
+  if (!seasonComplete && short.length > 0) {
+    const openSpots = short.reduce((sum, n) => sum + n.open, 0);
+    items.push({
+      id: 'class-needs',
+      priority: currentWeek >= 4 ? 'high' : 'medium',
       icon: '🎓',
-      text: `${scholarshipsLeft.toFixed(1)} scholarships available — extend offers to top recruits`,
+      text: `${openSpots} spot${openSpots > 1 ? 's' : ''} open in next year's class without enough offers out: ${short
+        .map((n) => `${n.position} ${n.open}`)
+        .join(', ')}`,
       nav: 'recruiting',
     });
   }
@@ -142,6 +162,8 @@ export function WeekHubScreen({
   onSimWeek,
   onBoxScore,
   onNavigate,
+  classNeeds,
+  vacantStaffRoles,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -161,6 +183,8 @@ export function WeekHubScreen({
   onSimWeek: () => void;
   onBoxScore: (data: BoxScoreData) => void;
   onNavigate: (view: string) => void;
+  classNeeds?: PositionNeed[];
+  vacantStaffRoles?: string[];
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -175,6 +199,9 @@ export function WeekHubScreen({
     portalEntries,
     userTeamId,
     seasonComplete,
+    currentWeek,
+    ...(classNeeds ? { classNeeds } : {}),
+    ...(vacantStaffRoles ? { vacantStaffRoles } : {}),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
 

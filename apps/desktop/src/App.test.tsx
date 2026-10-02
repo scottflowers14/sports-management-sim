@@ -475,4 +475,16 @@ describe('Desktop App', () => {
     expect(within(pool).getAllByRole('button', { name: 'Hire' }).length).toBe(before - 1);
     await waitFor(() => expect(loadActiveDynastySave()?.staffCandidates?.length).toBe(before - 1));
   });
+
+  it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {
+    await renderStartedApp();
+    const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
+    expect(actions).toHaveTextContent(/spots? open in next year's class/);
+    await userEvent.click(screen.getByRole('button', { name: /^Recruiting/ }));
+    const needs = screen.getByLabelText('Class needs');
+    expect(needs).toHaveTextContent(/\d+ graduating · 0 committed · \d+ spots open/);
+    const chip = within(needs).getAllByRole('button')[0]!;
+    await userEvent.click(chip);
+    expect(chip.className).toContain('active');
+  });
 });

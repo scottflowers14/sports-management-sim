@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
+import type { PositionNeed } from '@sports-management-sim/engine-core';
 import {
   finalistTeamIds,
   isFinalistPhase,
@@ -245,6 +246,7 @@ export function RecruitingScreen({
   onMakeOffers,
   autoOffers,
   onAutoOffersChange,
+  classNeeds,
 }: {
   recruitBoard: LacrosseBoardEntry[];
   portalEntries: LacrossePortalEntry[];
@@ -278,6 +280,7 @@ export function RecruitingScreen({
   onMakeOffers?: (offers: Array<{ recruitId: string; scholarshipPercent: number }>) => void;
   autoOffers?: boolean;
   onAutoOffersChange?: (on: boolean) => void;
+  classNeeds?: PositionNeed[];
 }) {
   const [boardSort, setBoardSort] = useState<BoardSort>('rank');
   const [hideCommitted, setHideCommitted] = useState(false);
@@ -416,6 +419,10 @@ export function RecruitingScreen({
               </div>
             )}
           </div>
+
+          {classNeeds && classNeeds.some((n) => n.graduating > 0) && (
+            <ClassNeedsBar needs={classNeeds} active={recruitPosFilter} onSelect={onRecruitPosFilterChange} />
+          )}
 
           <div className="pos-filter-bar">
             {(['ALL', 'ATT', 'MID', 'DEF', 'GK', 'FOGO', 'LSM'] as const).map((pos) => (
@@ -1309,5 +1316,55 @@ function PortalBoard({
         })}
       </div>
     </div>
+  );
+}
+
+/** Where the class stands: graduates to replace, commitments in hand, offers out. */
+function ClassNeedsBar({
+  needs,
+  active,
+  onSelect,
+}: {
+  needs: PositionNeed[];
+  active: LacrossePosition | 'ALL';
+  onSelect: (pos: LacrossePosition | 'ALL') => void;
+}) {
+  const totals = needs.reduce(
+    (t, n) => ({ graduating: t.graduating + n.graduating, committed: t.committed + n.committed, open: t.open + n.open }),
+    { graduating: 0, committed: 0, open: 0 },
+  );
+  return (
+    <section className="class-needs" aria-label="Class needs">
+      <div className="class-needs-summary">
+        <strong>Class Needs</strong>
+        <span className="dim">
+          {totals.graduating} graduating · {totals.committed} committed · {totals.open} spots open
+        </span>
+      </div>
+      <div className="class-needs-row">
+        {needs
+          .filter((n) => n.graduating > 0 || n.committed > 0)
+          .map((n) => {
+            const status = n.open === 0 ? 'filled' : n.offersOut >= n.open ? 'covered' : 'short';
+            return (
+              <button
+                key={n.position}
+                type="button"
+                className={`class-need class-need-${status}${active === n.position ? ' active' : ''}`}
+                onClick={() => onSelect(active === n.position ? 'ALL' : (n.position as LacrossePosition))}
+                title={`${n.graduating} graduating, ${n.returning} returning, ${n.committed} committed, ${n.offersOut} live offers`}
+              >
+                <span className="class-need-pos">{n.position}</span>
+                <span className="class-need-count">
+                  {n.committed}/{n.graduating}
+                </span>
+                <span className="class-need-detail">
+                  {n.open === 0 ? 'Filled' : `${n.open} open · ${n.offersOut} out`}
+                </span>
+              </button>
+            );
+          })}
+      </div>
+    </section>
   );
 }

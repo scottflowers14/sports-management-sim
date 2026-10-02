@@ -12,3 +12,4 @@ export * from './team-validation';
 export * from './transfer-portal';
 export * from './offer-suggestions';
 export * from './prestige';
+export * from './class-needs';

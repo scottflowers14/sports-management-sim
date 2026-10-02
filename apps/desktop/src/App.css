@@ -4684,3 +4684,67 @@ li span {
 .staff-candidate-badges {
   white-space: nowrap;
 }
+
+/* ── Class needs ────────────────────────────────────────────── */
+.class-needs {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+.class-needs-summary {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+.class-needs-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.class-need {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 8px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.class-need.active {
+  outline: 2px solid #72f2c6;
+}
+.class-need-pos {
+  font-weight: 700;
+}
+.class-need-count {
+  font-weight: 700;
+  justify-self: end;
+}
+.class-need-detail {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+.class-need-filled {
+  border-color: rgba(114, 242, 198, 0.45);
+}
+.class-need-filled .class-need-count {
+  color: #72f2c6;
+}
+.class-need-covered {
+  border-color: rgba(242, 200, 114, 0.45);
+}
+.class-need-covered .class-need-count {
+  color: #f2c872;
+}
+.class-need-short {
+  border-color: rgba(242, 114, 114, 0.5);
+}
+.class-need-short .class-need-count {
+  color: #ff9a9a;
+}

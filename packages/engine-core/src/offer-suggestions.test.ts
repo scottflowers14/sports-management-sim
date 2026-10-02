@@ -77,4 +77,17 @@ describe('suggestScholarshipOffers', () => {
     });
     expect(plan.map((s) => s.recruitId)).toEqual(['att-2']);
   });
+
+  // Playtest: the planner spent 3.08 of 3.25 on five-star attackers and
+  // midfielders and left the open goalie spot with no offer at all.
+  it('covers every position with a hole before doubling up, even on a tight budget', () => {
+    const recruits = [
+      ...Array.from({ length: 6 }, (_, i) => star(makeRecruit(`att-${i}`, 'ATT', 85 - i), 5)),
+      makeRecruit('gk-0', 'GK', 55),
+    ];
+    const offers = suggest(recruits, { budget: 1.0 });
+    expect(offers.some((o) => o.position === 'GK')).toBe(true);
+    const total = offers.reduce((sum, o) => sum + o.scholarshipPercent / 100, 0);
+    expect(total).toBeLessThanOrEqual(1.0 + 1e-9);
+  });
 });
