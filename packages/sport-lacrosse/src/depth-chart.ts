@@ -31,11 +31,13 @@ export function createDefaultLacrosseDepthChart(team: LacrosseDepthChartTeamShap
 
 export function getLacrosseDepthChart(team: LacrosseDepthChartTeamShape): LacrosseDepthChart {
   const defaults = createDefaultLacrosseDepthChart(team);
-  const rosterIds = new Set(team.roster.map((player) => player.id));
+  const positionById = new Map(team.roster.map((player) => [player.id, player.position]));
 
   return Object.fromEntries(
     (Object.keys(LACROSSE_STARTER_COUNTS) as LacrossePosition[]).map((position) => {
-      const configuredIds = (team.depthChart?.[position] ?? []).filter((id) => rosterIds.has(id));
+      // A stale chart (an old save, a player whose position changed) can't list
+      // someone under a position he doesn't play, or he'd get two stat lines.
+      const configuredIds = (team.depthChart?.[position] ?? []).filter((id) => positionById.get(id) === position);
       const defaultIds = defaults[position].filter((id) => !configuredIds.includes(id));
       return [position, [...configuredIds, ...defaultIds]];
     }),

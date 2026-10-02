@@ -1,5 +1,6 @@
-import type { LacrossePosition, LacrosseTeam, LacrosseTeamRating } from '@sports-management-sim/sport-lacrosse';
+import type { LacrosseGamePlan, LacrossePosition, LacrosseTeam, LacrosseTeamRating } from '@sports-management-sim/sport-lacrosse';
 import { DepthChart } from '../components/DepthChart';
+import { Lineups } from '../components/Lineups';
 import { formatTeamName } from '../ui/format';
 
 const POSITION_ORDER: LacrossePosition[] = ['ATT', 'MID', 'DEF', 'LSM', 'GK', 'FOGO'];
@@ -18,6 +19,7 @@ export function TeamScreen({
   injuries,
   injuredCount,
   rating,
+  gamePlan,
   onSelectPlayer,
   onDepthChartChange,
 }: {
@@ -25,6 +27,7 @@ export function TeamScreen({
   injuries: Set<string>;
   injuredCount: number;
   rating: LacrosseTeamRating;
+  gamePlan: LacrosseGamePlan;
   onSelectPlayer: (playerId: string) => void;
   onDepthChartChange: (position: LacrossePosition, slotIndex: number, playerId: string) => void;
 }) {
@@ -78,6 +81,15 @@ export function TeamScreen({
         <h2>Depth Chart</h2>
         <p className="dim">Set starters by position. These choices feed the live team rating and game simulation.</p>
         <DepthChart team={team} injuries={injuries} onDepthChartChange={onDepthChartChange} />
+      </article>
+
+      <article className="card team-lines-card">
+        <h2>Lines</h2>
+        <p className="dim">
+          The units the depth chart sends out. Attack and close defense play their whole end of the field; the midfield lines
+          split shifts by the rotation in your game plan, and the man-up and man-down units are picked from the best available.
+        </p>
+        <Lineups team={team} injuries={injuries} gamePlan={gamePlan} onSelectPlayer={onSelectPlayer} />
       </article>
 
       <article className="card team-roster-card">

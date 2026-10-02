@@ -4,7 +4,7 @@ import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import { simulateRemainingWeeks, type WeekSimState } from './week-sim';
-import { runOffseason } from './dynasty-helpers';
+import { resolveAndApplyPortal, ROSTER_FLOOR, ROSTER_LIMIT, runOffseason } from './dynasty-helpers';
 import type { LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
 
 function seededRandom(seed: number): () => number {
@@ -58,16 +58,18 @@ describe('CPU recruiting league health (idle user)', () => {
 
         // The attainability-weighted boards spread offers well beyond the Top 100.
         const offered = done.dynasty.recruits.filter((r) => r.scholarshipOffers.length > 0).length;
-        expect(offered).toBeGreaterThan(done.dynasty.recruits.length * 0.5);
+        expect(offered).toBeGreaterThan(150);
       }
 
-      const { newDynasty } = runOffseason(done.dynasty, undefined, 'balanced', done.seasonStats);
+      const offseason = runOffseason(done.dynasty, undefined, 'balanced', done.seasonStats);
+      // Rosters settle once the transfer portal resolves at the start of the season.
+      const { dynasty: newDynasty } = resolveAndApplyPortal(offseason.newDynasty);
 
       for (const team of newDynasty.season.teams) {
         // Walk-on backfill guarantees a playable roster even after a whiffed class...
-        expect(team.roster.length).toBeGreaterThanOrEqual(30);
+        expect(team.roster.length).toBeGreaterThanOrEqual(ROSTER_FLOOR);
         // ...and the projected-size guard keeps classes from blowing past the cap.
-        expect(team.roster.length).toBeLessThanOrEqual(47);
+        expect(team.roster.length).toBeLessThanOrEqual(ROSTER_LIMIT);
         expect(team.roster.some((p) => p.position === 'GK')).toBe(true);
         expect(team.roster.some((p) => p.position === 'FOGO')).toBe(true);
       }

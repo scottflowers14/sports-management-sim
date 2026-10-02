@@ -68,6 +68,8 @@ describe('Desktop App', () => {
     expect(screen.getByRole('heading', { name: /Sports Management Sim/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Maryland State/i);
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week/i);
+    // A preseason poll is out before any games are played.
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/#\d+ Nationally/);
     expect(screen.getByRole('heading', { name: /Next Opponent/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Injury Report/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Recommended Actions/i })).toBeInTheDocument();
@@ -109,6 +111,8 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Finals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim NCAA First Round/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim NCAA Quarterfinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Championship/i }));
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
@@ -127,12 +131,15 @@ describe('Desktop App', () => {
     expect(screen.getByRole('heading', { name: /^Coaching$/i })).toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByLabelText(/Offensive Tempo/i), 'uptempo');
+    await userEvent.selectOptions(screen.getByLabelText(/^Ride$/i), 'aggressive');
+    await userEvent.selectOptions(screen.getByLabelText(/Midfield Rotation/i), 'tight');
     await userEvent.selectOptions(screen.getByLabelText(/Training Focus/i), 'goalies');
 
     expect(screen.getByLabelText(/Offensive Tempo/i)).toHaveValue('uptempo');
     expect(await screen.findByText(/Push transition/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ten-man ride/i)).toBeInTheDocument();
     await waitFor(() => {
-      expect(loadActiveDynastySave()?.gamePlan?.tempo).toBe('uptempo');
+      expect(loadActiveDynastySave()?.gamePlan).toEqual({ tempo: 'uptempo', defense: 'balanced', ride: 'aggressive', rotation: 'tight' });
       expect(loadActiveDynastySave()?.trainingFocus).toBe('goalies');
     });
   });
@@ -145,6 +152,12 @@ describe('Desktop App', () => {
     expect(screen.getByText(/Current Team/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Depth Chart/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Full Roster/i })).toBeInTheDocument();
+    // The Lines card shows every unit the depth chart sends out.
+    const lines = screen.getByLabelText(/^Lines$/i);
+    for (const unit of ['Attack', 'Midfield 1', 'Midfield 2', 'Close Defense', 'Goalie', 'Faceoff', 'Man-Up', 'Man-Down']) {
+      expect(within(lines).getByText(unit)).toBeInTheDocument();
+    }
+    expect(within(lines).getAllByText(/% of shifts/i).length).toBeGreaterThan(1);
     expect(screen.getByLabelText(/Team rating summary/i)).toHaveTextContent(/DEPTH/i);
   });
 
@@ -281,6 +294,34 @@ describe('Desktop App', () => {
     expect(screen.getAllByTitle(/Already pitched this week/i).length).toBeGreaterThan(0);
   });
 
+  it('runs the recruiting assistant and pages the full recruit list', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
+
+    const pager = screen.getAllByRole('navigation', { name: /Recruit pages/i })[0]!;
+    expect(pager).toHaveTextContent(/^.*1–25 of \d+/);
+    await userEvent.click(within(pager).getByRole('button', { name: /Next/i }));
+    expect(screen.getAllByRole('navigation', { name: /Recruit pages/i })[0]!).toHaveTextContent(/26–50 of/);
+
+    await userEvent.click(screen.getByRole('button', { name: /^Run Assistant$/i }));
+    const report = screen.getByLabelText(/Recruiting assistant report/i);
+    expect(report).toHaveTextContent(/Scouting \(\d+\)/);
+    expect(screen.getByRole('button', { name: /^Run Assistant$/i })).toBeDisabled();
+
+    // Long lists collapse to the first five.
+    const more = within(report).getByRole('button', { name: /^\+\d+ more scouting reports$/ });
+    const shown = () => report.querySelectorAll('.assistant-columns li').length;
+    const collapsed = shown();
+    await userEvent.click(more);
+    expect(shown()).toBeGreaterThan(collapsed);
+
+    // Suggested offers go out in one click and come off the list.
+    const makeAll = within(report).getByRole('button', { name: /^Make All \d+ Offers$/i });
+    await userEvent.click(makeAll);
+    expect(within(report).queryByRole('button', { name: /^Make All/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Scholarships [1-3]\.\d\d \/ 3\.25/)).toBeInTheDocument();
+  });
+
   it('shows the weekly hub and opens a player card from a player to watch', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
@@ -363,5 +404,105 @@ describe('Desktop App', () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
     expect(screen.getByRole('heading', { name: /National Rankings/i })).toBeInTheDocument();
+  });
+
+  it('browses every program from the League menu and opens a program page', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Programs$/i }));
+    expect(screen.getByRole('heading', { name: /^Programs$/i })).toBeInTheDocument();
+    expect(screen.getByText(/36 programs/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /^Long Island Tech$/i }));
+    expect(screen.getByText(/Program Page/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Roster \(\d+\)/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /All Programs/i }));
+    expect(screen.getByText(/36 programs/i)).toBeInTheDocument();
+  });
+
+  it('opens a program page from the standings', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
+    const [first] = screen.getAllByRole('button', { name: /^Syracuse Heights$/i });
+    await userEvent.click(first!);
+    expect(screen.getByRole('heading', { name: /^Syracuse Heights$/i })).toBeInTheDocument();
+  });
+
+  it('searches league-wide players and opens a player card', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Player Search/i }));
+    expect(screen.getByText(/of \d+ players/i)).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText(/Filter by position/i), 'FOGO');
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(within(row).getByText('FOGO')).toBeInTheDocument();
+
+    await userEvent.click(rows[0]!);
+    expect(screen.getByLabelText(/Close player panel/i)).toBeInTheDocument();
+  });
+
+  it('advances the week from the top bar', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    expect(screen.getByRole('button', { name: /Advance: Week 2/i })).toBeInTheDocument();
+  });
+
+  it('reopens the offseason after a reload instead of skipping into a broken season', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim to End of Season/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Conference Finals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim NCAA First Round/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim NCAA Quarterfinals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim National Semifinals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim National Championship/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
+    // Wait for the debounced autosave, then reload the way a player would.
+    await waitFor(() => expect(loadActiveDynastySave()?.offseasonSummary).toBeTruthy());
+    cleanup();
+
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+
+    // Simming is locked until the new season starts.
+    await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+  }, 20000);
+
+  it('hires and releases assistant coaches on the Staff screen', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Staff$/ }));
+    const staffCard = screen.getByLabelText('Coaching staff');
+    expect(within(staffCard).getByText('Offensive Coordinator')).toBeInTheDocument();
+    expect(within(staffCard).queryByText('Vacant')).not.toBeInTheDocument();
+
+    await userEvent.click(within(staffCard).getAllByRole('button', { name: 'Release' })[0]!);
+    expect(within(staffCard).getByText('Vacant')).toBeInTheDocument();
+    expect(loadActiveDynastySave()).not.toBeNull();
+
+    const pool = screen.getByLabelText('Staff candidates');
+    const hireButtons = within(pool).getAllByRole('button', { name: 'Hire' }).filter((b) => !(b as HTMLButtonElement).disabled);
+    expect(hireButtons.length).toBeGreaterThan(0);
+    const before = within(pool).getAllByRole('button', { name: 'Hire' }).length;
+    await userEvent.click(hireButtons[0]!);
+    expect(within(pool).getAllByRole('button', { name: 'Hire' }).length).toBe(before - 1);
+    await waitFor(() => expect(loadActiveDynastySave()?.staffCandidates?.length).toBe(before - 1));
+  });
+
+  it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {
+    await renderStartedApp();
+    const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
+    expect(actions).toHaveTextContent(/spots? open in next year's class/);
+    await userEvent.click(screen.getByRole('button', { name: /^Recruiting/ }));
+    const needs = screen.getByLabelText('Class needs');
+    expect(needs).toHaveTextContent(/\d+ graduating · 0 committed · \d+ spots open/);
+    const chip = within(needs).getAllByRole('button')[0]!;
+    await userEvent.click(chip);
+    expect(chip.className).toContain('active');
   });
 });

@@ -19,7 +19,7 @@ describe('createNewLacrosseDynasty', () => {
     expect(dynasty.season.year).toBe(2028);
     expect(dynasty.season.phase).toBe('regular_season');
     expect(dynasty.season.teams).toHaveLength(36);
-    expect(dynasty.recruits).toHaveLength(288);
+    expect(dynasty.recruits).toHaveLength(36 * 12);
     expect(dynasty.recruitBoard.length).toBeGreaterThan(0);
     expect(dynasty.recruitBoard[0]?.recruit.id).toBeDefined();
   });
@@ -155,5 +155,20 @@ describe('createLacrosseSeasonSchedule structure', () => {
       const confMates = conferences.find((c) => c.teamIds.includes(team.id))!.teamIds.filter((id) => id !== team.id);
       expect(confOpponents.sort()).toEqual(confMates.sort());
     }
+  });
+});
+
+describe('CPU recruiting over a season', () => {
+  it('keeps CPU programs offering after their early targets commit elsewhere', () => {
+    let dynasty = createNewLacrosseDynasty({ seed: 42, userTeamId: 'maryland-state', seasonYear: 2027 });
+    for (let week = 0; week < 10; week += 1) dynasty = advanceLacrosseDynastyWeek(dynasty);
+    const cpuTeams = dynasty.season.teams.filter((t) => t.id !== dynasty.userTeamId);
+    const liveOffersByTeam = cpuTeams.map(
+      (t) => dynasty.recruits.filter((r) => r.status === 'open' && r.scholarshipOffers.some((o) => o.teamId === t.id)).length,
+    );
+    const commitsByTeam = cpuTeams.map((t) => dynasty.recruits.filter((r) => r.committedTeamId === t.id).length);
+    // Every board still has live offers out, and most programs have landed someone.
+    expect(Math.min(...liveOffersByTeam)).toBeGreaterThan(0);
+    expect(commitsByTeam.filter((n) => n === 0).length).toBeLessThan(cpuTeams.length / 2);
   });
 });

@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { ConfirmModal } from '../components/ConfirmModal';
-import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
+import { useState, type ReactNode } from 'react';
+import { OfferControl } from '../components/OfferControl';
+import { PortalBoard } from './PortalBoard';
+import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import type { PositionNeed } from '@sports-management-sim/engine-core';
 import {
   finalistTeamIds,
   isFinalistPhase,
@@ -12,6 +14,7 @@ import {
 import type { ScoutingState } from '../scouting';
 import { getDisplayOvr, getScoutTier, HOURS_COST } from '../scouting';
 import type { RecruitingActivity } from '../recruiting-activity';
+import type { AssistantReport as AssistantReportData } from '../recruiting-assistant';
 import { formatTeamName, formatTeamShort } from '../ui/format';
 
 type LacrosseBoardEntry = RecruitBoardEntry<LacrossePosition, LacrossePlayerTraits>;
@@ -21,6 +24,9 @@ type BoardSort = 'rank' | 'stars' | 'ovr' | 'interest';
 
 /** 4★+ recruits are nationally ranked — their star tier is public knowledge. */
 const PUBLIC_STAR_FLOOR = 4;
+
+/** All Recruits shows this many rows per page; the full board runs to hundreds. */
+export const RECRUITS_PAGE_SIZE = 25;
 
 const MOTIVATION_LABELS: Record<RecruitMotivation, string> = {
   proximity: 'Close to Home',
@@ -229,11 +235,23 @@ export function RecruitingScreen({
   onPitchRecruit,
   onToggleVisitInvite,
   onOfferPortalPlayer,
+  onWithdrawPortalOffer,
+  portalTeams,
+  portalScholarshipRoom,
+  seasonYear,
   onRecruitPosFilterChange,
   onRecruitTabChange,
   onToggleShortlist,
   onBoardViewChange,
   onSelectRecruit,
+  assistantReport,
+  autoAssistant,
+  onRunAssistant,
+  onAutoAssistantChange,
+  onMakeOffers,
+  autoOffers,
+  onAutoOffersChange,
+  classNeeds,
 }: {
   recruitBoard: LacrosseBoardEntry[];
   portalEntries: LacrossePortalEntry[];
@@ -254,12 +272,24 @@ export function RecruitingScreen({
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onPitchRecruit: (recruitId: string, motivation: RecruitMotivation) => void;
   onToggleVisitInvite: (recruitId: string) => void;
-  onOfferPortalPlayer: (entryId: string) => void;
+  onOfferPortalPlayer: (entryId: string, scholarshipPercent: number) => void;
+  onWithdrawPortalOffer: (entryId: string) => void;
+  portalTeams: LacrosseTeam[];
+  portalScholarshipRoom: number;
+  seasonYear: number;
   onRecruitPosFilterChange: (pos: LacrossePosition | 'ALL') => void;
   onRecruitTabChange: (tab: 'board' | 'portal') => void;
   onToggleShortlist: (recruitId: string) => void;
   onBoardViewChange: (view: RecruitBoardView) => void;
   onSelectRecruit: (recruitId: string) => void;
+  assistantReport?: AssistantReportData | null;
+  autoAssistant?: boolean;
+  onRunAssistant?: () => void;
+  onAutoAssistantChange?: (on: boolean) => void;
+  onMakeOffers?: (offers: Array<{ recruitId: string; scholarshipPercent: number }>) => void;
+  autoOffers?: boolean;
+  onAutoOffersChange?: (on: boolean) => void;
+  classNeeds?: PositionNeed[];
 }) {
   const [boardSort, setBoardSort] = useState<BoardSort>('rank');
   const [hideCommitted, setHideCommitted] = useState(false);
@@ -302,9 +332,48 @@ export function RecruitingScreen({
             <span className="scout-pts-hint">
               (+{scouting.pointsPerWeek}/wk · scout {HOURS_COST.scout}h · pitch {HOURS_COST.pitch}h · visit {HOURS_COST.visit}h)
             </span>
+            {onRunAssistant && (
+              <div className="assistant-controls">
+                <button
+                  className="offer-btn assistant-btn"
+                  onClick={onRunAssistant}
+                  disabled={scouting.pointsAvailable < 1}
+                  title="Your recruiting coordinator pitches the recruits you've offered or pinned, then scouts the best fits. It never offers scholarships or books visits."
+                >
+                  Run Assistant
+                </button>
+                <label className="assistant-auto">
+                  <input
+                    type="checkbox"
+                    checked={autoAssistant ?? false}
+                    onChange={(e) => onAutoAssistantChange?.(e.target.checked)}
+                  />
+                  Auto each week
+                </label>
+                {onAutoOffersChange && (
+                  <label
+                    className="assistant-auto"
+                    title="Let the assistant make its suggested scholarship offers instead of waiting for you"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={autoOffers ?? false}
+                      onChange={(e) => onAutoOffersChange(e.target.checked)}
+                    />
+                    Assistant makes offers
+                  </label>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {recruitTab === 'board' && assistantReport && <AssistantReport
+          report={assistantReport}
+          onSelectRecruit={onSelectRecruit}
+          onMakeOffers={onMakeOffers ?? ((offers) => offers.forEach((o) => onOfferScholarship(o.recruitId, o.scholarshipPercent)))}
+        />}
 
       {recruitTab === 'board' && (
         <>
@@ -360,6 +429,10 @@ export function RecruitingScreen({
             )}
           </div>
 
+          {classNeeds && classNeeds.some((n) => n.graduating > 0) && (
+            <ClassNeedsBar needs={classNeeds} active={recruitPosFilter} onSelect={onRecruitPosFilterChange} />
+          )}
+
           <div className="pos-filter-bar">
             {(['ALL', 'ATT', 'MID', 'DEF', 'GK', 'FOGO', 'LSM'] as const).map((pos) => (
               <button
@@ -396,6 +469,7 @@ export function RecruitingScreen({
             />
           ) : (
             <AllRecruitsList
+              key={`${recruitPosFilter}-${boardSort}-${hideCommitted}`}
               entries={recruitBoard.filter(matchesPosFilter)}
               sort={boardSort}
               hideCommitted={hideCommitted}
@@ -423,9 +497,13 @@ export function RecruitingScreen({
       {recruitTab === 'portal' && (
         <PortalBoard
           entries={portalEntries}
+          teams={portalTeams}
           userTeamId={userTeamId}
           teamMap={teamMap}
+          seasonYear={seasonYear}
+          scholarshipRoom={portalScholarshipRoom}
           onOffer={onOfferPortalPlayer}
+          onWithdraw={onWithdrawPortalOffer}
         />
       )}
     </div>
@@ -578,6 +656,7 @@ function AllRecruitsList({
   onToggleShortlist: (recruitId: string) => void;
   onSelectRecruit: (recruitId: string) => void;
 }) {
+  const [page, setPage] = useState(0);
   const visible = hideCommitted
     ? entries.filter(
         (e) =>
@@ -612,9 +691,28 @@ function AllRecruitsList({
           .sort((a, b) => sortValue(b.entry) - sortValue(a.entry) || a.index - b.index)
           .map(({ entry }) => entry);
 
+  const pageCount = Math.max(1, Math.ceil(sorted.length / RECRUITS_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageStart = currentPage * RECRUITS_PAGE_SIZE;
+  const pageEntries = sorted.slice(pageStart, pageStart + RECRUITS_PAGE_SIZE);
+  const pager = pageCount > 1 && (
+    <div className="pager recruit-pager" role="navigation" aria-label="Recruit pages">
+      <button className="ghost-btn" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 0}>
+        ‹ Prev
+      </button>
+      <span className="dim">
+        {pageStart + 1}–{pageStart + pageEntries.length} of {sorted.length}
+      </span>
+      <button className="ghost-btn" onClick={() => setPage(currentPage + 1)} disabled={currentPage >= pageCount - 1}>
+        Next ›
+      </button>
+    </div>
+  );
+
   return (
     <div className="recruit-list">
-      {sorted.map((entry) => {
+      {pager}
+      {pageEntries.map((entry) => {
         const { recruit } = entry;
         const tier = getScoutTier(recruit.id, scouting);
         const displayOvr = getDisplayOvr(recruit.id, recruit.ratings.overall, scouting);
@@ -742,7 +840,137 @@ function AllRecruitsList({
           <p className="dim">No recruits match the current filters.</p>
         </article>
       )}
+      {pager}
     </div>
+  );
+}
+
+const COLLAPSED_ITEMS = 5;
+
+/** Long assistant lists show the first few, with the rest a click away. */
+function CollapsibleList({ label, children }: { label: string; children: ReactNode[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const items = children.filter(Boolean);
+  const hidden = items.length - COLLAPSED_ITEMS;
+  return (
+    <>
+      <ul>{expanded || hidden <= 0 ? items : items.slice(0, COLLAPSED_ITEMS)}</ul>
+      {hidden > 0 && (
+        <button type="button" className="link-btn assistant-more" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? 'Show fewer' : `+${hidden} more ${label}`}
+        </button>
+      )}
+    </>
+  );
+}
+
+function AssistantReport({
+  report,
+  onSelectRecruit,
+  onMakeOffers,
+}: {
+  report: AssistantReportData;
+  onSelectRecruit: (recruitId: string) => void;
+  onMakeOffers: (offers: Array<{ recruitId: string; scholarshipPercent: number }>) => void;
+}) {
+  const { actions, needsOffer, suggestedOffers } = report;
+  const offersMade = actions.filter((a) => a.type === 'offer');
+  const suggestedCost = suggestedOffers.reduce((sum, o) => sum + o.scholarshipPercent / 100, 0);
+  const pitches = actions.filter((a) => a.type === 'pitch');
+  const scouts = actions.filter((a) => a.type === 'scout');
+  return (
+    <article className="card assistant-report" aria-label="Recruiting assistant report">
+      <h3>Recruiting Coordinator Report</h3>
+      {actions.length === 0 ? (
+        <p className="dim">Nothing to do: no hours left, or no pinned or offered recruits ready to pitch or scout.</p>
+      ) : (
+        <div className="assistant-columns">
+          <div>
+            <h4>Pitches ({pitches.length})</h4>
+            {pitches.length === 0 ? (
+              <p className="dim">No scouted targets to pitch yet. Pin or offer recruits and the staff pitches them once scouted.</p>
+            ) : (
+              <CollapsibleList label="pitches">
+                {pitches.map((a) => a.type === 'pitch' && (
+                  <li key={a.recruitId}>
+                    {a.name}: sold {MOTIVATION_LABELS[a.motivation]}{' '}
+                    <span className={a.interestChange > 0 ? 'positive' : 'negative'}>
+                      ({a.interestChange > 0 ? '+' : ''}{a.interestChange})
+                    </span>
+                  </li>
+                ))}
+              </CollapsibleList>
+            )}
+          </div>
+          <div>
+            <h4>Scouting ({scouts.length})</h4>
+            {scouts.length === 0 ? (
+              <p className="dim">No hours left for scouting.</p>
+            ) : (
+              <CollapsibleList label="scouting reports">
+                {scouts.map((a, i) => a.type === 'scout' && (
+                  <li key={`${a.recruitId}-${i}`}>
+                    {a.name}: {a.tier === 'full' ? 'full report' : 'first look'}
+                  </li>
+                ))}
+              </CollapsibleList>
+            )}
+          </div>
+        </div>
+      )}
+      {offersMade.length > 0 && (
+        <p className="assistant-offers-made">
+          <strong>Offers made:</strong>{' '}
+          {offersMade.map((a) => (a.type === 'offer' ? `${a.name} (${a.scholarshipPercent}%)` : '')).join(', ')}
+        </p>
+      )}
+      {suggestedOffers.length > 0 && (
+        <div className="assistant-offers" aria-label="Suggested scholarship offers">
+          <div className="assistant-offers-head">
+            <h4>Suggested Offers ({suggestedOffers.length})</h4>
+            <span className="dim">Replaces this year&apos;s graduates · {suggestedCost.toFixed(2)} scholarships</span>
+            <button
+              className="offer-btn assistant-btn"
+              onClick={() => onMakeOffers(suggestedOffers.map(({ recruitId, scholarshipPercent }) => ({ recruitId, scholarshipPercent })))}
+            >
+              Make All {suggestedOffers.length} Offers
+            </button>
+          </div>
+          <ul>
+            {suggestedOffers.map((o) => (
+              <li key={o.recruitId}>
+                <button className="link-btn" onClick={() => onSelectRecruit(o.recruitId)}>
+                  {o.name}
+                </button>
+                <span className="dim">
+                  {o.position} · {'★'.repeat(o.starRating)}
+                </span>
+                <button
+                  className="offer-btn assistant-btn offer-btn-sm"
+                  onClick={() => onMakeOffers([{ recruitId: o.recruitId, scholarshipPercent: o.scholarshipPercent }])}
+                >
+                  Offer {o.scholarshipPercent}%
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {needsOffer.length > 0 && (
+        <p className="assistant-needs-offer">
+          <strong>Needs your call:</strong> pitches alone won't land{' '}
+          {needsOffer.map((n, k) => (
+            <span key={n.recruitId}>
+              {k > 0 && ', '}
+              <button className="link-btn" onClick={() => onSelectRecruit(n.recruitId)}>
+                {n.name}
+              </button>
+            </span>
+          ))}
+          . They're on your board without a scholarship offer.
+        </p>
+      )}
+    </article>
   );
 }
 
@@ -964,161 +1192,51 @@ function ordinal(n: number): string {
   if (n === 3) return '3rd';
   return `${n}th`;
 }
-
-const OFFER_PERCENT_OPTIONS = [25, 50, 75, 100] as const;
-
-function OfferControl({
-  recruitId,
-  recruitName,
-  budgetRemaining,
-  onOffer,
+function ClassNeedsBar({
+  needs,
+  active,
+  onSelect,
 }: {
-  recruitId: string;
-  recruitName: string;
-  budgetRemaining: number;
-  onOffer: (recruitId: string, scholarshipPercent: number) => void;
+  needs: PositionNeed[];
+  active: LacrossePosition | 'ALL';
+  onSelect: (pos: LacrossePosition | 'ALL') => void;
 }) {
-  const affordable = OFFER_PERCENT_OPTIONS.filter((pct) => pct / 100 <= budgetRemaining + 1e-9);
-  const maxAffordable = affordable[affordable.length - 1];
-  const [percent, setPercent] = useState<number>(maxAffordable ?? 100);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const canAfford = percent / 100 <= budgetRemaining + 1e-9;
-
-  return (
-    <>
-      {showConfirm && (
-        <ConfirmModal
-          title="Full Scholarship Offer"
-          message={`Offer ${recruitName} a full scholarship (100%)? This uses a full equivalency from your budget.`}
-          confirmLabel="Yes, Offer 100%"
-          danger
-          onConfirm={() => { setShowConfirm(false); onOffer(recruitId, percent); }}
-          onCancel={() => setShowConfirm(false)}
-        />
-      )}
-      <div className="offer-control">
-        <select
-          aria-label={`Scholarship offer amount for ${recruitName}`}
-          className="offer-pct-select"
-          value={percent}
-          onChange={(e) => setPercent(Number(e.target.value))}
-        >
-          {OFFER_PERCENT_OPTIONS.map((pct) => (
-            <option key={pct} value={pct} disabled={pct / 100 > budgetRemaining + 1e-9}>
-              {pct}%
-            </option>
-          ))}
-        </select>
-        <button
-          className="offer-btn offer-btn-sm offer-btn-row"
-          disabled={!canAfford}
-          title={canAfford ? `Offer a ${percent}% scholarship` : 'Not enough scholarship budget'}
-          onClick={() => {
-            if (percent === 100) {
-              setShowConfirm(true);
-            } else {
-              onOffer(recruitId, percent);
-            }
-          }}
-        >
-          Offer
-        </button>
-      </div>
-    </>
+  const totals = needs.reduce(
+    (t, n) => ({ graduating: t.graduating + n.graduating, committed: t.committed + n.committed, open: t.open + n.open }),
+    { graduating: 0, committed: 0, open: 0 },
   );
-}
-
-function PortalBoard({
-  entries,
-  userTeamId,
-  teamMap,
-  onOffer,
-}: {
-  entries: LacrossePortalEntry[];
-  userTeamId: string;
-  teamMap: Map<string, string>;
-  onOffer: (id: string) => void;
-}) {
-  const available = entries.filter((e) => e.status === 'available');
-  const committed = entries.filter((e) => e.status === 'committed' && e.committedTeamId === userTeamId);
-
-  if (entries.length === 0) {
-    return (
-      <article className="card">
-        <h2>Transfer Portal</h2>
-        <p className="dim">Portal opens at the start of each new season. Check back after the offseason.</p>
-      </article>
-    );
-  }
-
   return (
-    <div className="portal-layout">
-      {committed.length > 0 && (
-        <article className="card portal-committed-card">
-          <h2>Committed Transfers · {committed.length}</h2>
-          <ul className="player-list">
-            {committed.map((entry) => (
-              <li key={entry.id}>
-                <strong>{entry.name.first} {entry.name.last}</strong>
-                <span>{entry.classYear} {entry.position} · {entry.ratings.overall} OVR · from {formatTeamName(teamMap.get(entry.sourceTeamId) ?? entry.sourceTeamId)}</span>
-              </li>
-            ))}
-          </ul>
-        </article>
-      )}
-
-      <div className="recruit-grid">
-        {available.map((entry) => {
-          const hasOffer = entry.offersByTeamId[userTeamId] !== undefined;
-          const userInterest = entry.interestByTeamId[userTeamId] ?? 0;
-          const competitors = Object.entries(entry.offersByTeamId)
-            .filter(([tid]) => tid !== userTeamId)
-            .map(([tid]) => ({ teamId: tid, name: formatTeamShort(teamMap.get(tid) ?? tid) }))
-            .slice(0, 3);
-
-          return (
-            <article key={entry.id} className={`card recruit-card portal-entry-card${hasOffer ? ' has-offer' : ''}`}>
-              <div className="recruit-header">
-                <div>
-                  <strong>{entry.name.first} {entry.name.last}</strong>
-                  <p className="recruit-sub">{entry.classYear} {entry.position} · from {formatTeamShort(teamMap.get(entry.sourceTeamId) ?? entry.sourceTeamId)}</p>
-                </div>
-                <div className="recruit-ovr-block">
-                  <span className="board-score">{entry.ratings.overall}</span>
-                  <span className="recruit-score-label">OVR</span>
-                </div>
-              </div>
-
-              {hasOffer && userInterest > 0 && (
-                <>
-                  <div className="interest-bar-wrap">
-                    <div className="interest-bar" style={{ width: `${userInterest}%` }} />
-                  </div>
-                  <p className="interest-label">Interest {userInterest}/100</p>
-                </>
-              )}
-
-              {competitors.length > 0 && (
-                <div className="competitor-row">
-                  {competitors.map((c) => (
-                    <span key={c.teamId} className="competitor-chip">{c.name}</span>
-                  ))}
-                </div>
-              )}
-
-              <div className="recruit-footer">
-                {hasOffer ? (
-                  <span className="badge badge-offered">Offered</span>
-                ) : (
-                  <button className="offer-btn" onClick={() => onOffer(entry.id)}>
-                    Offer Scholarship
-                  </button>
-                )}
-              </div>
-            </article>
-          );
-        })}
+    <section className="class-needs" aria-label="Class needs">
+      <div className="class-needs-summary">
+        <strong>Class Needs</strong>
+        <span className="dim">
+          {totals.graduating} graduating · {totals.committed} committed · {totals.open} spots open
+        </span>
       </div>
-    </div>
+      <div className="class-needs-row">
+        {needs
+          .filter((n) => n.graduating > 0 || n.committed > 0)
+          .map((n) => {
+            const status = n.open === 0 ? 'filled' : n.offersOut >= n.open ? 'covered' : 'short';
+            return (
+              <button
+                key={n.position}
+                type="button"
+                className={`class-need class-need-${status}${active === n.position ? ' active' : ''}`}
+                onClick={() => onSelect(active === n.position ? 'ALL' : (n.position as LacrossePosition))}
+                title={`${n.graduating} graduating, ${n.returning} returning, ${n.committed} committed, ${n.offersOut} live offers`}
+              >
+                <span className="class-need-pos">{n.position}</span>
+                <span className="class-need-count">
+                  {n.committed}/{n.graduating}
+                </span>
+                <span className="class-need-detail">
+                  {n.open === 0 ? 'Filled' : `${n.open} open · ${n.offersOut} out`}
+                </span>
+              </button>
+            );
+          })}
+      </div>
+    </section>
   );
 }

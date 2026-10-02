@@ -1,4 +1,4 @@
-import type { LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { LacrossePlayerGameStats, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 
 export interface PlayerSeasonStats {
@@ -200,11 +200,34 @@ export function updateSeasonStats(
   games: ScheduledGame[],
   teams: LacrosseTeam[],
   forWeek: number,
+  playerLines?: ReadonlyMap<string, LacrossePlayerGameStats[]>,
 ): SeasonStatsMap {
   const updated = { ...current };
 
   for (const game of games) {
     if (game.week !== forWeek || game.status !== 'final' || !game.result?.teamStats) continue;
+
+    // Preferred path: the sim already attributed the box score to the players
+    // who actually took the field.
+    const lines = playerLines?.get(game.id);
+    if (lines) {
+      for (const line of lines) {
+        updated[line.playerId] = addDelta(updated[line.playerId] ?? blankStats(line.playerId), {
+          gamesPlayed: 1,
+          goals: line.goals,
+          assists: line.assists,
+          shots: line.shots,
+          groundBalls: line.groundBalls,
+          turnovers: line.turnovers,
+          causedTurnovers: line.causedTurnovers,
+          faceoffWins: line.faceoffWins ?? 0,
+          faceoffAttempts: line.faceoffAttempts ?? 0,
+          saves: line.saves ?? 0,
+          goalsAllowed: line.goalsAllowed ?? 0,
+        });
+      }
+      continue;
+    }
 
     const homeTeam = teams.find((t) => t.id === game.homeTeamId);
     const awayTeam = teams.find((t) => t.id === game.awayTeamId);

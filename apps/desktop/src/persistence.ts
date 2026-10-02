@@ -1,12 +1,13 @@
-import { DEFAULT_GAME_PLAN } from '@sports-management-sim/sport-lacrosse';
-import type { GameLog, LacrosseDynastyState, LacrosseGamePlan } from '@sports-management-sim/sport-lacrosse';
+import { compactGameLog, normalizeGamePlan } from '@sports-management-sim/sport-lacrosse';
+import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
+import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, LacrossePortalEntry, LacrosseStaff, StaffMember } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
 import type { ConferenceBracket, TournamentGame, TournamentPhase, TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
 import type { ScoutingState } from './scouting';
-import { RECRUITING_HOURS_PER_WEEK } from './scouting';
+import { createProgramStaff, withStaffRecruitingHours } from './program-staff';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import type { RecruitingActivity } from './recruiting-activity';
 import type { SeasonStatsMap } from './stats';
@@ -50,6 +51,14 @@ export interface DynastySaveState {
   recruitingActivity: RecruitingActivity;
   /** Change in user interest per recruit over the last simulated week. */
   recruitTrends: Record<string, number>;
+  /** When on, the recruiting assistant spends leftover hours before each simulated week. */
+  autoRecruitingAssistant?: boolean;
+  /** When on, the assistant also makes its suggested scholarship offers. */
+  autoRecruitingOffers?: boolean;
+  /** The user's assistant coaches. Older saves get a starting staff on load. */
+  staff?: LacrosseStaff;
+  /** Coaches available to hire this year. */
+  staffCandidates?: StaffMember[];
 }
 
 export interface DynastySaveMetadata {
@@ -130,6 +139,75 @@ export function getActiveDynastySaveId(storage: Storage = window.localStorage): 
   return storage.getItem(ACTIVE_DYNASTY_SAVE_KEY);
 }
 
+/**
+ * Drop what can be rebuilt or isn't worth the space before writing to
+ * localStorage (about 5 MB per site, shared by every save slot):
+ * - the recruit board embeds a copy of every recruit; it's rebuilt on load.
+ * - play-by-play for CPU-vs-CPU regular-season games, except the latest week.
+ *   Their box scores stay on the schedule; only the play-by-play goes.
+ * - play-by-play from past seasons.
+ * - career stats for players who have left the league (graduated or gone);
+ *   only current players and portal entries have a card that shows them.
+ */
+export function compactForStorage<T extends DynastySaveState>(save: T): T {
+  const { dynasty } = save;
+  const { schedule } = dynasty.season;
+  const latestWeek = schedule.reduce((max, g) => (g.status === 'final' ? Math.max(max, g.week) : max), 0);
+  const keep = new Set(
+    schedule
+      .filter(
+        (g) =>
+          g.homeTeamId === dynasty.userTeamId ||
+          g.awayTeamId === dynasty.userTeamId ||
+          g.week === latestWeek,
+      )
+      .map((g) => g.id),
+  );
+  // Logs from past seasons aren't reachable from any screen, so they go too.
+  // Other programs' games keep only their scoring summary; the user's games
+  // keep the full play-by-play and every stat line.
+  const userGameIds = new Set(
+    schedule.filter((g) => g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId).map((g) => g.id),
+  );
+  const gameLogs = Object.fromEntries(
+    Object.entries(save.gameLogs)
+      .filter(([id]) => keep.has(id))
+      .map(([id, log]) => [id, userGameIds.has(id) ? log : compactGameLog(log)]),
+  );
+  const tournament = save.tournament ? compactTournamentLogs(save.tournament, dynasty.userTeamId) : save.tournament;
+  const activeIds = new Set([
+    ...dynasty.season.teams.flatMap((t) => t.roster.map((p) => p.id)),
+    ...dynasty.portalEntries.map((e) => e.playerId),
+  ]);
+  const careerStats = Object.fromEntries(Object.entries(save.careerStats).filter(([id]) => activeIds.has(id)));
+  return { ...save, dynasty: { ...dynasty, recruitBoard: [] }, gameLogs, careerStats, tournament };
+}
+
+/** Trim the play-by-play of every tournament game the user's program wasn't in. */
+function compactTournamentLogs(tournament: TournamentState, userTeamId: string): TournamentState {
+  const trimGame = <G extends TournamentGame | undefined>(game: G): G => {
+    if (!game?.result?.log) return game;
+    if (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId) return game;
+    return { ...game, result: { ...game.result, log: compactGameLog(game.result.log) } } as G;
+  };
+  const trimBracket = (bracket: ConferenceBracket): ConferenceBracket => ({
+    ...bracket,
+    semifinal1: trimGame(bracket.semifinal1),
+    semifinal2: trimGame(bracket.semifinal2),
+    ...(bracket.final ? { final: trimGame(bracket.final) } : {}),
+  });
+  const trimList = (games: TournamentGame[]) => games.map(trimGame);
+  return {
+    ...tournament,
+    conferenceBrackets: tournament.conferenceBrackets.map(trimBracket),
+    ...(tournament.ncaaFirstRound ? { ncaaFirstRound: trimList(tournament.ncaaFirstRound) } : {}),
+    ...(tournament.ncaaQuarterfinals ? { ncaaQuarterfinals: trimList(tournament.ncaaQuarterfinals) } : {}),
+    ...(tournament.nationalSemiFinal1 ? { nationalSemiFinal1: trimGame(tournament.nationalSemiFinal1) } : {}),
+    ...(tournament.nationalSemiFinal2 ? { nationalSemiFinal2: trimGame(tournament.nationalSemiFinal2) } : {}),
+    ...(tournament.nationalGame ? { nationalGame: trimGame(tournament.nationalGame) } : {}),
+  };
+}
+
 export function setActiveDynastySave(saveId: string, storage: Storage = window.localStorage): void {
   storage.setItem(ACTIVE_DYNASTY_SAVE_KEY, saveId);
 }
@@ -155,7 +233,7 @@ export function saveDynastySlot({
     name: saveName,
     ...state,
   };
-  storage.setItem(dynastySaveSlotKey(saveId), JSON.stringify(save));
+  storage.setItem(dynastySaveSlotKey(saveId), JSON.stringify(compactForStorage(save)));
   upsertSaveMetadata(createSaveMetadata(state, saveId, saveName, existing?.createdAt ?? now, now), storage);
   storage.setItem(ACTIVE_DYNASTY_SAVE_KEY, saveId);
   return save;
@@ -295,6 +373,9 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     }
     if (!parsed.dynasty.portalEntries) {
       parsed.dynasty = { ...parsed.dynasty, portalEntries: [] };
+    } else {
+      // Entries from before the portal carried the full player record.
+      parsed.dynasty = { ...parsed.dynasty, portalEntries: parsed.dynasty.portalEntries.map(upgradePortalEntry) };
     }
     if (!parsed.gameLogs) {
       parsed.gameLogs = {};
@@ -311,9 +392,8 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     if (parsed.bestNatRank === undefined) {
       parsed.bestNatRank = null;
     }
-    if (parsed.gamePlan === undefined) {
-      parsed.gamePlan = DEFAULT_GAME_PLAN;
-    }
+    // Older saves carried only tempo and defense; fill in the newer axes.
+    parsed.gamePlan = normalizeGamePlan(parsed.gamePlan);
     if (parsed.trainingFocus === undefined) {
       parsed.trainingFocus = 'balanced';
     }
@@ -332,13 +412,65 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     if (parsed.recruitTrends === undefined) {
       parsed.recruitTrends = {};
     }
-    // Older saves banked 3 scouting points a week; the unified recruiting-hours
-    // pool pays for pitches and visits too, so bring them up to the new rate.
-    if (parsed.scouting && parsed.scouting.pointsPerWeek < RECRUITING_HOURS_PER_WEEK) {
-      parsed.scouting = { ...parsed.scouting, pointsPerWeek: RECRUITING_HOURS_PER_WEEK };
+    // Compacted saves store an empty recruit board; rebuild it from the recruits.
+    const dynasty = parsed.dynasty;
+    if (dynasty && dynasty.recruitBoard.length === 0 && dynasty.recruits.length > 0) {
+      const userTeam = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+      if (userTeam) {
+        parsed.dynasty = {
+          ...dynasty,
+          recruitBoard: sortRecruitBoardForTeam(userTeam, dynasty.recruits, dynasty.rosterTargets),
+        };
+      }
+    }
+    // Saves from before the staff system get a starting staff; the recruiting
+    // coordinator now sets the weekly recruiting hours.
+    if (parsed.dynasty && parsed.staff === undefined) {
+      const created = createProgramStaff(parsed.dynasty);
+      parsed.staff = created.staff;
+      parsed.staffCandidates = created.staffCandidates;
+      if (parsed.scouting) parsed.scouting = withStaffRecruitingHours(parsed.scouting, created.staff);
     }
     return parsed as PersistedDynastySave;
   } catch {
     return null;
   }
+}
+
+/** Rebuild a portal entry saved before entries carried the player, reason and eligibility. */
+function upgradePortalEntry(entry: LacrossePortalEntry): LacrossePortalEntry {
+  if (entry.player !== undefined && entry.reason !== undefined) return entry;
+  const eligibilityByClass: Record<string, { played: number; remaining: number }> = {
+    FR: { played: 0, remaining: 4 },
+    SO: { played: 1, remaining: 3 },
+    JR: { played: 2, remaining: 2 },
+    SR: { played: 3, remaining: 1 },
+    GR: { played: 4, remaining: 1 },
+  };
+  const elig = eligibilityByClass[entry.classYear] ?? { played: 0, remaining: 4 };
+  const eligibility = entry.eligibility ?? { seasonsPlayed: elig.played, seasonsRemaining: elig.remaining, isEligible: elig.remaining > 0 };
+  const player: LacrossePlayer = entry.player ?? {
+    id: entry.playerId,
+    name: entry.name,
+    age: 20,
+    classYear: entry.classYear,
+    hometown: entry.regionId,
+    regionId: entry.regionId,
+    position: entry.position,
+    secondaryPositions: [],
+    ratings: entry.ratings,
+    traits: [],
+    sportTraits: entry.sportTraits ?? {
+      shooting: 50, passing: 50, dodging: 50, stickSkills: 55, offBallMovement: 50, defense: 50, checking: 45, groundBalls: 55, preferredHand: 'right',
+    },
+    scholarshipPercent: 50,
+    isWalkOn: false,
+    morale: 50,
+    health: 100,
+    fatigue: 0,
+    redshirtStatus: 'none',
+    eligibility,
+    createdSeason: 2027,
+  };
+  return { ...entry, player, eligibility, reason: entry.reason ?? 'playing_time', enteredSeason: entry.enteredSeason ?? 0 };
 }

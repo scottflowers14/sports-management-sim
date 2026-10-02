@@ -10,10 +10,13 @@ import {
 import {
   DEFAULT_GAME_PLAN,
   deriveCpuGamePlan,
+  programCoachingEdge,
   simulateLacrosseGameWithLog,
   type GameLog,
   type LacrosseDynastyState,
   type LacrosseGamePlan,
+  type LacrosseStaff,
+  type LacrossePlayerGameStats,
   type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, processInjuries } from './dynasty-helpers';
@@ -29,7 +32,8 @@ import type { RecruitingActivity } from './recruiting-activity';
 import { updateSeasonStats } from './stats';
 import type { SeasonStatsMap } from './stats';
 
-const MAX_NEWS_ITEMS = 60;
+// About ten items a week, so this keeps the whole regular season.
+const MAX_NEWS_ITEMS = 120;
 
 export interface WeekSimState {
   dynasty: LacrosseDynastyState;
@@ -44,6 +48,8 @@ export interface WeekSimState {
   gameLogs: Map<string, GameLog>;
   bestNatRank: number | null;
   lastSimWeek: number | null;
+  /** The user's hired coordinators; CPU staff quality comes from prestige. */
+  userStaff?: LacrosseStaff;
 }
 
 export function simulateOneWeek(
@@ -62,21 +68,31 @@ export function simulateOneWeek(
   const prevUserInterestById = new Map(
     dynasty.recruits.map((r) => [r.id, r.interestByTeamId[dynasty.userTeamId] ?? 0]),
   );
-  const finalWeek = dynasty.season.schedule.reduce((max, game) => Math.max(max, game.week), 10);
+  const finalWeek = dynasty.season.schedule.reduce((max, game) => Math.max(max, game.week), 0) || 10;
   const teamMap = new Map(dynasty.season.teams.map((t) => [t.id, t.name]));
 
   const weekLogs = new Map<string, GameLog>();
+  const weekPlayerLines = new Map<string, LacrossePlayerGameStats[]>();
+  const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
   const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
     team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
+  const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
   const newSeason = advanceSeasonWeek(dynasty.season, (game, homeTeam, awayTeam) => {
-    const result = simulateLacrosseGameWithLog({
-      homeTeam,
-      awayTeam,
+    // Injured players sit: the depth chart promotes the next man up for the
+    // rating, the game plan, and the box score.
+    const home = withoutInjured(homeTeam, injuredIds);
+    const away = withoutInjured(awayTeam, injuredIds);
+    const { log, players, ...result } = simulateLacrosseGameWithLog({
+      homeTeam: home,
+      awayTeam: away,
       random,
-      homeGamePlan: planFor(homeTeam),
-      awayGamePlan: planFor(awayTeam),
+      homeGamePlan: planFor(home),
+      awayGamePlan: planFor(away),
+      homeCoaching: programCoachingEdge(home, staffOwner),
+      awayCoaching: programCoachingEdge(away, staffOwner),
     });
-    weekLogs.set(game.id, result.log);
+    weekLogs.set(game.id, log);
+    weekPlayerLines.set(game.id, [...players.home, ...players.away]);
     return result;
   });
 
@@ -126,6 +142,7 @@ export function simulateOneWeek(
         id: `visit-${weekToSim}-${visitNews.length}`,
         week: weekToSim,
         category: 'recruiting',
+        featured: true,
         headline: `Campus visit: ${recruit.position} ${recruit.name.first} ${recruit.name.last} ${impressionText}${gameText} (+${outcome.interestChange} interest)`,
       });
       return outcome.recruit;
@@ -144,7 +161,12 @@ export function simulateOneWeek(
   const newDynasty = { ...dynasty, season: newSeason, recruits: newRecruits, recruitBoard: newBoard };
 
   const newRankings = computeNationalRankings(newSeason.teams, state.rankings);
-  const { injuries: newInjuries, newlyInjured, recovered } = processInjuries(state.injuries, newSeason.teams, random);
+  const playedTeamIds = new Set(
+    newSeason.schedule
+      .filter((g) => g.week === weekToSim && g.status === 'final')
+      .flatMap((g) => [g.homeTeamId, g.awayTeamId]),
+  );
+  const { injuries: newInjuries, newlyInjured, recovered } = processInjuries(state.injuries, newSeason.teams, random, playedTeamIds);
 
   const newlyCommitted = newRecruits.filter((r) => r.status !== 'open' && !prevCommittedIds.has(r.id));
 
@@ -173,6 +195,7 @@ export function simulateOneWeek(
       id: `finalists-${weekToSim}-${dramaNews.length}`,
       week: weekToSim,
       category: 'recruiting',
+      featured: true,
       headline: `${recruit.position} ${recruit.name.first} ${recruit.name.last} narrows his list to ${finalists.join(', ')} — decision expected Week ${decisionWeek}`,
     });
   }
@@ -207,7 +230,11 @@ export function simulateOneWeek(
         id: `injury-${weekToSim}-${i}`,
         week: weekToSim,
         category: 'injury' as const,
-        headline: `${inj.playerName} is out ${inj.weeksRemaining} week${inj.weeksRemaining > 1 ? 's' : ''} with an injury`,
+        featured: true,
+        headline:
+          inj.weeksRemaining >= 10
+            ? `${inj.playerName} is out for the season (${inj.description})`
+            : `${inj.playerName} is out ${inj.weeksRemaining} week${inj.weeksRemaining > 1 ? 's' : ''} (${inj.description})`,
       })),
     ...recovered
       .filter((r) => r.teamId === dynasty.userTeamId)
@@ -215,11 +242,12 @@ export function simulateOneWeek(
         id: `recovery-${weekToSim}-${i}`,
         week: weekToSim,
         category: 'injury' as const,
+        featured: true,
         headline: `${r.playerName} has returned from injury`,
       })),
   ];
 
-  const newSeasonStats = updateSeasonStats(state.seasonStats, newSeason.schedule, newSeason.teams, weekToSim);
+  const newSeasonStats = updateSeasonStats(state.seasonStats, newSeason.schedule, newSeason.teams, weekToSim, weekPlayerLines);
   const playerOfWeekNews = buildPlayerOfWeekNews(weekToSim, state.seasonStats, newSeasonStats, newSeason.teams);
 
   const mergedLogs = new Map(state.gameLogs);
@@ -244,6 +272,11 @@ export function simulateOneWeek(
     bestNatRank,
     lastSimWeek: weekToSim,
   };
+}
+
+export function withoutInjured(team: LacrosseTeam, injuredIds: ReadonlySet<string>): LacrosseTeam {
+  if (!team.roster.some((p) => injuredIds.has(p.id))) return team;
+  return { ...team, roster: team.roster.filter((p) => !injuredIds.has(p.id)) };
 }
 
 function buildPlayerOfWeekNews(
@@ -289,11 +322,14 @@ export function simulateRemainingWeeks(
   state: WeekSimState,
   userGamePlan: LacrosseGamePlan = DEFAULT_GAME_PLAN,
   random: () => number = Math.random,
+  /** Runs before each week is simulated, e.g. the auto recruiting assistant. */
+  beforeWeek?: (state: WeekSimState) => WeekSimState,
 ): WeekSimState {
   let current = state;
   // Safety bound: a season is far shorter than 64 weeks
   for (let i = 0; i < 64; i += 1) {
     if (!current.dynasty.season.schedule.some((g) => g.status === 'scheduled')) break;
+    if (beforeWeek) current = beforeWeek(current);
     current = simulateOneWeek(current, userGamePlan, random);
   }
   return current;

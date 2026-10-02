@@ -1,4 +1,4 @@
-import type { LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import { lacrossePollScore, type LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 
 export interface RankingEntry {
   teamId: string;
@@ -15,15 +15,7 @@ export function computeNationalRankings(
     previousRankings.map((entry) => [entry.teamId, entry.rank]),
   );
 
-  const scored = teams.map((team) => {
-    const wins = team.record.wins;
-    const losses = team.record.losses;
-    const winPct = wins / Math.max(1, wins + losses);
-    const score = Math.round(
-      winPct * 60 + team.reputation.nationalPrestige / 5 + team.reputation.recentSuccess / 10,
-    );
-    return { teamId: team.id, score };
-  });
+  const scored = teams.map((team) => ({ teamId: team.id, score: lacrossePollScore(team) }));
 
   scored.sort((a, b) => b.score - a.score);
 

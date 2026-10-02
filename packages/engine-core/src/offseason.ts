@@ -4,6 +4,8 @@ export interface RunTeamOffseasonOptions<Position extends string = string, Sport
   developmentRandom?: () => number;
   /** Extra development roll (0–1 scale) added per player, e.g. from a training focus. */
   developmentBonusFor?: (player: Player<Position, SportTraits>) => number;
+  /** The season that just ended; when set, each returning player's rating history records it. */
+  completedSeason?: number;
 }
 
 export function advancePlayerClass(classYear: PlayerClass): PlayerClass | null {
@@ -69,6 +71,14 @@ export function runTeamOffseason<Position extends string, SportTraits>(
     const bonus = options.developmentBonusFor?.(player) ?? 0;
     const roll = Math.min(1, Math.max(0, developmentRandom() + bonus));
     const progressed = progressPlayer(player, roll);
+    // One entry per season: a repeated rollover for the same year replaces it.
+    const ratingHistory =
+      options.completedSeason === undefined
+        ? player.ratingHistory
+        : [
+            ...(player.ratingHistory ?? []).filter((entry) => entry.season !== options.completedSeason),
+            { season: options.completedSeason, classYear: player.classYear, overall: player.ratings.overall },
+          ];
 
     return [
       {
@@ -76,6 +86,7 @@ export function runTeamOffseason<Position extends string, SportTraits>(
         age: progressed.age + 1,
         classYear: nextClass,
         fatigue: 0,
+        ...(ratingHistory ? { ratingHistory } : {}),
         eligibility: {
           ...progressed.eligibility,
           seasonsPlayed: progressed.eligibility.seasonsPlayed + 1,

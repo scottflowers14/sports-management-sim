@@ -63,7 +63,8 @@ export function calculateRecruitFitScore<Position extends string, SportTraits>(
     recruit.preferences.playingTimeImportance +
     recruit.preferences.academicImportance;
 
-  return Math.round(weightedTotal / totalWeight);
+  // A recruit with no stated preferences is indifferent, not NaN.
+  return totalWeight > 0 ? Math.round(weightedTotal / totalWeight) : 50;
 }
 
 export function applyScholarshipOffer<Position extends string, SportTraits>(
@@ -82,9 +83,13 @@ export function applyScholarshipOffer<Position extends string, SportTraits>(
     scholarshipOffers.push({ teamId, scholarshipPercent: clampedScholarshipPercent });
   }
 
+  // Only new money moves the needle: re-sending the same offer (or cutting it)
+  // earns nothing, so revising an offer can't be used to pump interest.
+  const previousPercent = existingOfferIndex >= 0 ? recruit.scholarshipOffers[existingOfferIndex]!.scholarshipPercent : 0;
+  const addedPercent = Math.max(0, clampedScholarshipPercent - previousPercent);
   const currentInterest = recruit.interestByTeamId[teamId] ?? 0;
   const interestBoost = Math.round(
-    clampedScholarshipPercent * (recruit.preferences.scholarshipImportance / 100) * 0.35 * interestMultiplier,
+    addedPercent * (recruit.preferences.scholarshipImportance / 100) * 0.35 * interestMultiplier,
   );
 
   return {

@@ -1,4 +1,4 @@
-import type { TournamentState, TournamentGame, ConferenceBracket } from '../tournament';
+import type { TournamentState, TournamentGame, ConferenceBracket, NcaaEntry } from '../tournament';
 import type { BoxScoreData } from '../ui/types';
 import { formatTeamName } from '../ui/format';
 
@@ -9,6 +9,8 @@ export function TournamentScreen({
   seasonComplete,
   onSimSemis,
   onSimFinals,
+  onSimNcaaFirstRound,
+  onSimNcaaQuarterfinals,
   onSimNationalSemis,
   onSimNational,
   onEnterOffseason,
@@ -21,6 +23,8 @@ export function TournamentScreen({
   seasonComplete: boolean;
   onSimSemis: () => void;
   onSimFinals: () => void;
+  onSimNcaaFirstRound: () => void;
+  onSimNcaaQuarterfinals: () => void;
   onSimNationalSemis: () => void;
   onSimNational: () => void;
   onEnterOffseason: () => void;
@@ -46,21 +50,68 @@ export function TournamentScreen({
   }
 
   const phase = tournament.phase;
+  const controls = (
+    <div className="tournament-controls">
+      {phase === 'conf_semis' && (
+        <button className="sim-btn" onClick={onSimSemis}>Sim Conference Semifinals</button>
+      )}
+      {phase === 'conf_finals' && (
+        <button className="sim-btn" onClick={onSimFinals}>Sim Conference Finals</button>
+      )}
+      {phase === 'ncaa_first_round' && (
+        <button className="sim-btn" onClick={onSimNcaaFirstRound}>Sim NCAA First Round</button>
+      )}
+      {phase === 'ncaa_quarterfinals' && (
+        <button className="sim-btn" onClick={onSimNcaaQuarterfinals}>Sim NCAA Quarterfinals</button>
+      )}
+      {phase === 'national_semis' && (
+        <button className="sim-btn" onClick={onSimNationalSemis}>Sim National Semifinals</button>
+      )}
+      {phase === 'national_final' && (
+        <button className="sim-btn" onClick={onSimNational}>Sim National Championship</button>
+      )}
+      {phase === 'complete' && (
+        <button className="offseason-btn" onClick={onEnterOffseason}>Enter Offseason →</button>
+      )}
+    </div>
+  );
+
+  const conferenceCards = (
+    <div className="tournament-conferences">
+      {tournament.conferenceBrackets.map((bracket) => (
+        <ConferenceBracketCard
+          key={bracket.conferenceId}
+          bracket={bracket}
+          confLabel={bracket.conferenceId.toUpperCase()}
+          teamMap={teamMap}
+          userTeamId={userTeamId}
+          onBoxScore={onBoxScore}
+        />
+      ))}
+    </div>
+  );
+
+  if (tournament.ncaaField) {
+    return (
+      <div className="tournament-layout">
+        {controls}
+        <NcaaSection tournament={tournament} field={tournament.ncaaField} teamMap={teamMap} userTeamId={userTeamId} onBoxScore={onBoxScore} />
+        <h2 className="tournament-section-title">Conference Tournaments</h2>
+        {conferenceCards}
+      </div>
+    );
+  }
 
   return (
     <div className="tournament-layout">
-      <div className="tournament-conferences">
-        {tournament.conferenceBrackets.map((bracket) => (
-          <ConferenceBracketCard
-            key={bracket.conferenceId}
-            bracket={bracket}
-            confLabel={bracket.conferenceId.toUpperCase()}
-            teamMap={teamMap}
-            userTeamId={userTeamId}
-            onBoxScore={onBoxScore}
-          />
-        ))}
-      </div>
+      {controls}
+      {phase === 'conf_finals' || phase === 'conf_semis' ? (
+        <p className="dim">
+          Conference champions earn automatic bids to a 12-team NCAA tournament. The best remaining teams by RPI
+          fill the at-large spots on selection day.
+        </p>
+      ) : null}
+      {conferenceCards}
 
       {(phase === 'national_semis' || phase === 'national_final' || phase === 'complete') &&
         tournament.nationalSemiFinal1 && tournament.nationalSemiFinal2 && (
@@ -96,35 +147,136 @@ export function TournamentScreen({
             onBoxScore={onBoxScore}
             title="National Championship"
           />
-          {tournament.nationalChampion && (
-            <div className="national-champion-banner">
-              <span className="champion-label">National Champion</span>
-              <span className="champion-name champion-name-lg">
-                {formatTeamName(teamMap.get(tournament.nationalChampion) ?? tournament.nationalChampion)}
-              </span>
-            </div>
-          )}
+          <ChampionBanner tournament={tournament} teamMap={teamMap} />
         </article>
       )}
-
-      <div className="tournament-controls">
-        {phase === 'conf_semis' && (
-          <button className="sim-btn" onClick={onSimSemis}>Sim Conference Semifinals</button>
-        )}
-        {phase === 'conf_finals' && (
-          <button className="sim-btn" onClick={onSimFinals}>Sim Conference Finals</button>
-        )}
-        {phase === 'national_semis' && (
-          <button className="sim-btn" onClick={onSimNationalSemis}>Sim National Semifinals</button>
-        )}
-        {phase === 'national_final' && (
-          <button className="sim-btn" onClick={onSimNational}>Sim National Championship</button>
-        )}
-        {phase === 'complete' && (
-          <button className="offseason-btn" onClick={onEnterOffseason}>Enter Offseason →</button>
-        )}
-      </div>
     </div>
+  );
+}
+
+function ChampionBanner({ tournament, teamMap }: { tournament: TournamentState; teamMap: Map<string, string> }) {
+  if (!tournament.nationalChampion) return null;
+  return (
+    <div className="national-champion-banner">
+      <span className="champion-label">National Champion</span>
+      <span className="champion-name champion-name-lg">
+        {formatTeamName(teamMap.get(tournament.nationalChampion) ?? tournament.nationalChampion)}
+      </span>
+    </div>
+  );
+}
+
+function NcaaSection({
+  tournament,
+  field,
+  teamMap,
+  userTeamId,
+  onBoxScore,
+}: {
+  tournament: TournamentState;
+  field: NcaaEntry[];
+  teamMap: Map<string, string>;
+  userTeamId: string;
+  onBoxScore: (data: BoxScoreData) => void;
+}) {
+  const seeds = [...field].sort((a, b) => a.seed - b.seed).map((e) => e.teamId);
+  const name = (id: string) => formatTeamName(teamMap.get(id) ?? id);
+  const userEntry = field.find((e) => e.teamId === userTeamId);
+  const userFirstOut = (tournament.ncaaFirstOut ?? []).findIndex((e) => e.teamId === userTeamId);
+  const userLine = userEntry
+    ? `${name(userTeamId)} is the #${userEntry.seed} seed (${userEntry.bid === 'auto' ? 'automatic bid' : 'at-large'})${userEntry.seed <= 4 ? ' with a first-round bye' : ''}.`
+    : userFirstOut >= 0
+      ? `${name(userTeamId)} was left out, number ${userFirstOut + 1} among the first four out.`
+      : `${name(userTeamId)} did not make the field.`;
+
+  const rounds: Array<{ label: string; games: TournamentGame[] | undefined; prefix: string; slots: number }> = [
+    { label: 'First Round', games: tournament.ncaaFirstRound, prefix: 'NCAA First Round', slots: 4 },
+    { label: 'Quarterfinals', games: tournament.ncaaQuarterfinals, prefix: 'NCAA Quarterfinal', slots: 4 },
+    {
+      label: 'Final Four',
+      games: tournament.nationalSemiFinal1 && tournament.nationalSemiFinal2
+        ? [tournament.nationalSemiFinal1, tournament.nationalSemiFinal2]
+        : undefined,
+      prefix: 'National Semifinal',
+      slots: 2,
+    },
+    {
+      label: 'Championship',
+      games: tournament.nationalGame ? [tournament.nationalGame] : undefined,
+      prefix: 'National Championship',
+      slots: 1,
+    },
+  ];
+
+  return (
+    <article className="card ncaa-card" aria-label="NCAA tournament">
+      <div className="ncaa-header">
+        <div>
+          <p className="eyebrow">Selection Day</p>
+          <h2>NCAA Tournament</h2>
+        </div>
+        <p className={userEntry ? 'ncaa-user-line in' : 'ncaa-user-line out'}>{userLine}</p>
+      </div>
+
+      <div className="ncaa-grid">
+        <div className="ncaa-field">
+          <table className="data-grid">
+            <thead>
+              <tr><th>Seed</th><th>Team</th><th>Bid</th><th>RPI</th></tr>
+            </thead>
+            <tbody>
+              {[...field].sort((a, b) => a.seed - b.seed).map((e) => (
+                <tr key={e.teamId} className={e.teamId === userTeamId ? 'user-row' : ''}>
+                  <td className="num">{e.seed}</td>
+                  <td>{name(e.teamId)}{e.seed <= 4 && <span className="conf-tag" title="First-round bye">BYE</span>}</td>
+                  <td>{e.bid === 'auto' ? 'AQ' : 'At-large'}</td>
+                  <td className="num">{e.rpi.toFixed(3).replace(/^0/, '')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(tournament.ncaaFirstOut?.length ?? 0) > 0 && (
+            <div className="ncaa-bubble">
+              <p className="section-label">First Four Out</p>
+              {tournament.ncaaFirstOut!.map((e) => (
+                <div key={e.teamId} className={e.teamId === userTeamId ? 'ncaa-bubble-row user' : 'ncaa-bubble-row'}>
+                  <span>{name(e.teamId)}</span>
+                  <span className="dim">{e.rpi.toFixed(3).replace(/^0/, '')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="ncaa-bracket">
+          {rounds.map((round) => (
+            <div key={round.label} className="ncaa-round">
+              <p className="section-label">{round.label}</p>
+              {round.games
+                ? round.games.map((game, i) => (
+                    <BracketMatchup
+                      key={game.id}
+                      game={game}
+                      seeds={seeds}
+                      teamMap={teamMap}
+                      userTeamId={userTeamId}
+                      onBoxScore={onBoxScore}
+                      title={round.slots > 1 ? `${round.prefix} ${i + 1}` : round.prefix}
+                    />
+                  ))
+                : Array.from({ length: round.slots }, (_, i) => (
+                    <div key={i} className="bracket-tbd">
+                      <div className="bracket-team tbd-team"><span>TBD</span></div>
+                      <div className="bracket-vs">vs</div>
+                      <div className="bracket-team tbd-team"><span>TBD</span></div>
+                    </div>
+                  ))}
+              {round.label === 'Championship' && <ChampionBanner tournament={tournament} teamMap={teamMap} />}
+            </div>
+          ))}
+        </div>
+      </div>
+    </article>
   );
 }
 

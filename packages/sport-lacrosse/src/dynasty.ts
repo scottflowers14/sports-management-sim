@@ -1,14 +1,13 @@
 import {
   advanceSeasonWeek,
   applyPortalOffer,
+  withdrawPortalOffer,
   applyScholarshipOffer,
   calculateRecruitFitScore,
   createRoundRobinSchedule,
   recruitPrestigeMultiplier,
-  resolvePortalCommitments,
   sortRecruitBoardForTeam,
   type Conference,
-  type PortalEntry,
   type RecruitBoardEntry,
   type Region,
   type ScheduledGame,
@@ -23,8 +22,7 @@ import {
 } from './roster-generation';
 import { makeLacrosseTeam } from './test-fixtures';
 import { simulateLacrosseGame } from './simulate-game';
-
-export type LacrossePortalEntry = PortalEntry<LacrossePosition, LacrossePlayerTraits>;
+import type { LacrossePortalEntry } from './transfer-portal';
 
 export interface LacrosseDynastyState {
   id: string;
@@ -406,9 +404,11 @@ export function offerLacrossePortalPlayer(
   return { ...state, portalEntries };
 }
 
-export function resolveLacrossePortal(state: LacrosseDynastyState): LacrosseDynastyState {
-  const resolved = resolvePortalCommitments(state.portalEntries, state.season.teams);
-  return { ...state, portalEntries: resolved };
+export function withdrawLacrossePortalOffer(state: LacrosseDynastyState, portalEntryId: string): LacrosseDynastyState {
+  const portalEntries = state.portalEntries.map((entry) =>
+    entry.id === portalEntryId ? withdrawPortalOffer(entry, state.userTeamId) : entry,
+  );
+  return { ...state, portalEntries };
 }
 
 export function getLacrosseRecruitingSummary(state: LacrosseDynastyState): LacrosseRecruitingSummary {
@@ -555,6 +555,9 @@ function applyCpuWeeklyOffers(
 ): LacrosseRecruit[] {
   const CPU_MAX_OFFERS = 12;
   const CPU_WEEKLY_NEW_OFFERS = 2;
+  // Once this many programs are on a recruit, the rest look elsewhere, so 36
+  // boards don't all chase the same dozen blue-chips and sign nobody.
+  const CPU_CROWDED_OFFERS = 5;
 
   const updated = [...recruits];
 
@@ -566,11 +569,16 @@ function applyCpuWeeklyOffers(
         .filter((r) => r.scholarshipOffers.some((o) => o.teamId === team.id))
         .map((r) => r.id),
     );
+    // Only offers to recruits still on the market count against the cap;
+    // otherwise a board freezes on dead offers once its targets sign elsewhere.
+    const liveOffers = updated.filter((r) => r.status === 'open' && alreadyOfferedIds.has(r.id)).length;
 
-    if (alreadyOfferedIds.size >= CPU_MAX_OFFERS) continue;
+    if (liveOffers >= CPU_MAX_OFFERS) continue;
 
-    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - alreadyOfferedIds.size);
-    const open = updated.filter((r) => r.status === 'open' && !alreadyOfferedIds.has(r.id));
+    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - liveOffers);
+    const open = updated.filter(
+      (r) => r.status === 'open' && !alreadyOfferedIds.has(r.id) && r.scholarshipOffers.length < CPU_CROWDED_OFFERS,
+    );
     const board = sortRecruitBoardForTeam(team, open, DEFAULT_LACROSSE_ROSTER_TARGETS);
 
     let count = 0;
@@ -609,10 +617,10 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function recruitingClassSize(teamCount: number): number {
-  // Roughly 8 prospects per program: with ~10-11 seniors graduating from each
-  // 42-man roster every year, a 5-per-team pool starved the league and rosters
-  // decayed season over season.
-  return Math.max(120, teamCount * 8);
+  // About 11 seniors graduate from each 42-man roster every year, and not every
+  // prospect signs, so the pool needs ~12 per program. At 8 per program the
+  // league lost ~3 players per roster each season (42 -> 33 by year four).
+  return Math.max(120, teamCount * 12);
 }
 
 function createInitialTeams(seed: number, seasonYear: number): LacrosseTeam[] {

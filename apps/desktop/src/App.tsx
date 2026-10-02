@@ -1,8 +1,12 @@
 import {
   calculateLacrosseTeamRating,
   deriveCpuGamePlan,
+  STAFF_ROLE_LABELS,
+  STAFF_ROLES,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
+import { classNeedsByPosition } from '@sports-management-sim/engine-core';
+
 import { getJobSecurityLabel, getJobSecurityColor } from './coach-profile';
 import { BoxScorePanel } from './components/BoxScorePanel';
 import { PlayerPanel } from './components/PlayerPanel';
@@ -17,12 +21,18 @@ import { TournamentScreen } from './screens/TournamentScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { OffseasonScreen } from './screens/OffseasonScreen';
+import { StaffScreen } from './screens/StaffScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
+import { ProgramsScreen } from './screens/ProgramsScreen';
+import { PlayersScreen } from './screens/PlayersScreen';
+import { useState } from 'react';
 import { formatTeamName } from './ui/format';
-import { useDynastyController } from './useDynastyController';
+import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
+
+const CLASS_NEED_POSITIONS = ['ATT', 'MID', 'DEF', 'LSM', 'FOGO', 'GK'] as const;
 
 export function App() {
   const {
@@ -73,6 +83,11 @@ export function App() {
     setGamePlan,
     trainingFocus,
     setTrainingFocus,
+    staff,
+    staffCandidates,
+    staffBudget,
+    hireStaff,
+    releaseStaff,
     pendingJobOffers,
     persistDynasty,
     startNewDynasty,
@@ -84,16 +99,27 @@ export function App() {
     simWeek,
     simToEnd,
     offerScholarship,
+    offerScholarships,
     doScoutRecruit,
     pitchRecruit,
     toggleVisitInvite,
     recruitingActivity,
     recruitTrends,
+    runRecruitingAssistant,
+    assistantReport,
+    autoRecruitingAssistant,
+    setAutoRecruitingAssistant,
+    autoRecruitingOffers,
+    setAutoRecruitingOffers,
     hasHomeGameThisWeek,
     offerPortalPlayer,
+    withdrawPortalOffer,
+    portalScholarshipRoom,
     enterTournament,
     simTournamentSemis,
     simTournamentFinals,
+    simNcaaFirstRound,
+    simNcaaQuarterfinals,
     simTournamentNationalSemis,
     simTournamentNational,
     enterOffseason,
@@ -105,6 +131,7 @@ export function App() {
     handleImportTeams,
     handleClearCustomTeams,
   } = useDynastyController();
+  const [viewedProgramId, setViewedProgramId] = useState<string | null>(null);
 
   if (screen === 'start') {
     return (
@@ -169,7 +196,9 @@ export function App() {
   ).length;
 
   const userRankEntry = rankings.find((r) => r.teamId === dynasty.userTeamId);
-  const unreadNewsCount = newsItems.length;
+  // Badge the stories about our program from the latest simulated week.
+  const latestNewsWeek = newsItems[0]?.week;
+  const unreadNewsCount = newsItems.filter((n) => n.week === latestNewsWeek && n.featured).length;
   const userInjuries = new Set(
     injuries.filter((inj) => inj.teamId === dynasty.userTeamId).map((inj) => inj.playerId),
   );
@@ -218,21 +247,96 @@ export function App() {
     : null;
   const selectedRecruit = selectedRecruitId ? dynasty.recruits.find((r) => r.id === selectedRecruitId) : null;
 
+  const advance = (() => {
+    if (offseasonSummary) {
+      if (view !== 'offseason') {
+        return { label: 'Offseason', title: 'Finish the offseason to start the new season', run: () => setView('offseason') };
+      }
+      // A fired coach has to pick a new job first; that choice lives on the offseason screen.
+      if (pendingJobOffers) return null;
+      // The offseason already rolled the dynasty over to next year's season.
+      return { label: `Season ${dynasty.season.year}`, title: 'Start the new season', run: startNewSeason };
+    }
+    if (hasScheduledGames) {
+      return { label: `Week ${dynasty.season.currentWeek}`, title: `Sim week ${dynasty.season.currentWeek}`, run: simWeek };
+    }
+    if (!tournament) return { label: 'Postseason', title: 'Start the conference tournaments', run: enterTournament };
+    const phaseActions = {
+      conf_semis: { label: 'Conf Semis', title: 'Sim the conference semifinals', run: simTournamentSemis },
+      conf_finals: { label: 'Conf Finals', title: 'Sim the conference finals, then the NCAA field is selected', run: simTournamentFinals },
+      ncaa_first_round: { label: 'NCAA 1st Round', title: 'Sim the NCAA first round', run: simNcaaFirstRound },
+      ncaa_quarterfinals: { label: 'NCAA Quarters', title: 'Sim the NCAA quarterfinals', run: simNcaaQuarterfinals },
+      national_semis: { label: 'Final Four', title: 'Sim the national semifinals', run: simTournamentNationalSemis },
+      national_final: { label: 'Title Game', title: 'Sim the national championship', run: simTournamentNational },
+      complete: { label: 'Offseason', title: 'Run the offseason: graduation, development and signing day', run: enterOffseason },
+    } as const;
+    return phaseActions[tournament.phase];
+  })();
+
+  const openProgram = (teamId: string | null) => {
+    setViewedProgramId(teamId);
+    if (teamId) setView('programs');
+  };
+
+  type NavItem = { view: View; label: string; badge?: number | string; alert?: boolean };
+  const navGroups: Array<{ title: string; items: NavItem[] }> = [
+    {
+      title: 'Office',
+      items: [
+        ...(offseasonSummary ? [{ view: 'offseason' as const, label: 'Offseason' }] : []),
+        { view: 'week-hub', label: 'Week Hub', ...(highPriorityCount > 0 ? { badge: highPriorityCount, alert: true } : {}) },
+        { view: 'season', label: 'Season' },
+        { view: 'news', label: 'News', ...(unreadNewsCount > 0 ? { badge: unreadNewsCount } : {}) },
+      ],
+    },
+    {
+      title: formatTeamName(userTeam.shortName || userTeam.name),
+      items: [
+        { view: 'team', label: 'Team' },
+        { view: 'schedule', label: 'Schedule' },
+        { view: 'staff', label: 'Staff' },
+        { view: 'recruiting', label: committedCount > 0 ? `Recruiting · ${committedCount}` : 'Recruiting' },
+      ],
+    },
+    {
+      title: 'League',
+      items: [
+        { view: 'standings', label: 'Standings' },
+        { view: 'programs', label: 'Programs' },
+        { view: 'players', label: 'Player Search' },
+        { view: 'stats', label: 'Stats' },
+        ...(seasonComplete || tournament !== null
+          ? [{ view: 'tournament' as const, label: 'Tournament', ...(tournament?.nationalChampion ? { badge: '✓' } : {}) }]
+          : []),
+        { view: 'history', label: 'History' },
+      ],
+    },
+  ];
+
   return (
     <main className="app-shell">
-      <header className="hero">
-        <div>
+      <header className="top-bar">
+        <div className="brand">
           <p className="eyebrow">
-            Men&apos;s College Lacrosse · Season {dynasty.season.year}
+            Men&apos;s College Lacrosse ·{' '}
+            {offseasonSummary ? `${offseasonSummary.seasonYear} Offseason` : `Season ${dynasty.season.year}`}
           </p>
           <h1>Sports Management Sim</h1>
-          <p className="lede">Build a roster, recruit hotbeds, and chase May.</p>
         </div>
-        <section className="card team-card" aria-label="User team summary">
-          <span className="label">User Team</span>
-          <strong>{formatTeamName(userTeam.name)}</strong>
-          <span>
-            {seasonComplete
+        <section className="top-team" aria-label="User team summary">
+          <strong className="top-team-name">{formatTeamName(userTeam.name)}</strong>
+          <span className="top-record">
+            {offseasonSummary
+              ? `${offseasonSummary.userRecord.wins}–${offseasonSummary.userRecord.losses}`
+              : `${userTeam.record.wins}–${userTeam.record.losses}`}
+          </span>
+          {userRankEntry && (
+            <span className="national-rank">#{userRankEntry.rank} Nationally</span>
+          )}
+          <span className="top-phase">
+            {offseasonSummary
+              ? 'Offseason'
+              : seasonComplete
               ? tournament?.phase === 'complete'
                 ? 'Tournament Complete'
                 : tournament
@@ -240,15 +344,53 @@ export function App() {
                   : 'Season Complete'
               : `Week ${dynasty.season.currentWeek}`}
           </span>
-          <span className="record-big">
-            {userTeam.record.wins}–{userTeam.record.losses}
-          </span>
-          {userRankEntry && (
-            <span className="national-rank">#{userRankEntry.rank} Nationally</span>
-          )}
           {injuredCount > 0 && (
             <span className="injury-count">{injuredCount} injured</span>
           )}
+        </section>
+        <div className="top-actions save-actions" aria-label="Save controls">
+          {advance && (
+            <button type="button" className="advance-btn" title={advance.title} onClick={advance.run}>
+              ▶ Advance: {advance.label}
+            </button>
+          )}
+          <button type="button" onClick={() => persistDynasty()}>
+            Save Now
+          </button>
+          <button type="button" onClick={resetDynasty}>
+            New Dynasty
+          </button>
+          <span>{saveStatus}</span>
+        </div>
+      </header>
+
+      <div className="shell-body">
+        <aside className="side-nav">
+          <nav aria-label="Main navigation">
+            {navGroups.map((group) => (
+              <div key={group.title} className="nav-group">
+                <span className="nav-group-title">{group.title}</span>
+                {group.items.map((item) => (
+                  <button
+                    key={item.view}
+                    type="button"
+                    className={view === item.view ? 'tab active' : 'tab'}
+                    aria-current={view === item.view ? 'page' : undefined}
+                    onClick={() => {
+                      if (item.view === 'programs') setViewedProgramId(null);
+                      setView(item.view);
+                    }}
+                  >
+                    {item.label}
+                    {item.badge !== undefined && (
+                      <span className={item.alert ? 'tab-badge tab-badge-alert' : 'tab-badge'}>{item.badge}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+
           {coachProfile && (
             <div className="coach-block">
               <span className="coach-name">HC {coachProfile.name}</span>
@@ -296,70 +438,9 @@ export function App() {
               </ul>
             </div>
           )}
-          <div className="save-actions" aria-label="Save controls">
-            <button type="button" onClick={() => persistDynasty()}>
-              Save Now
-            </button>
-            <button type="button" onClick={resetDynasty}>
-              New Dynasty
-            </button>
-            <span>{saveStatus}</span>
-          </div>
-        </section>
-      </header>
+        </aside>
 
-      <nav className="tab-bar" aria-label="Main navigation">
-        <button
-          className={view === 'week-hub' ? 'tab active' : 'tab'}
-          onClick={() => setView('week-hub')}
-        >
-          Week Hub
-          {highPriorityCount > 0 && (
-            <span className="tab-badge tab-badge-alert">{highPriorityCount}</span>
-          )}
-        </button>
-        {(['season', 'team', 'schedule', 'recruiting', 'standings'] as const).map((v) => (
-          <button
-            key={v}
-            className={view === v ? 'tab active' : 'tab'}
-            onClick={() => setView(v)}
-          >
-            {v === 'recruiting' && committedCount > 0
-              ? `Recruiting · ${committedCount}`
-              : v.charAt(0).toUpperCase() + v.slice(1)}
-          </button>
-        ))}
-        {(seasonComplete || tournament !== null) && (
-          <button
-            className={view === 'tournament' ? 'tab active' : 'tab'}
-            onClick={() => setView('tournament')}
-          >
-            Tournament
-            {tournament?.nationalChampion && <span className="tab-badge">✓</span>}
-          </button>
-        )}
-        <button
-          className={view === 'stats' ? 'tab active' : 'tab'}
-          onClick={() => setView('stats')}
-        >
-          Stats
-        </button>
-        <button
-          className={view === 'news' ? 'tab active' : 'tab'}
-          onClick={() => setView('news')}
-        >
-          News
-          {unreadNewsCount > 0 && <span className="tab-badge">{unreadNewsCount}</span>}
-        </button>
-        <button
-          className={view === 'history' ? 'tab active' : 'tab'}
-          onClick={() => setView('history')}
-        >
-          History
-        </button>
-        {view === 'offseason' && <button className="tab active">Offseason</button>}
-      </nav>
-
+        <section className="screen-area">
       {view === 'week-hub' && (
         <WeekHubScreen
           currentWeek={dynasty.season.currentWeek}
@@ -380,6 +461,8 @@ export function App() {
           onSimWeek={simWeek}
           onBoxScore={setSelectedBoxScore}
           onNavigate={(v) => setView(v as Parameters<typeof setView>[0])}
+          classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
+          vacantStaffRoles={STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase())}
         />
       )}
 
@@ -421,6 +504,7 @@ export function App() {
           injuries={userInjuries}
           injuredCount={injuredCount}
           rating={userTeamRating}
+          gamePlan={gamePlan}
           onSelectPlayer={setSelectedPlayerId}
           onDepthChartChange={updateDepthChartSlot}
         />
@@ -440,6 +524,7 @@ export function App() {
 
       {view === 'recruiting' && (
         <RecruitingScreen
+          classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
           recruitBoard={dynasty.recruitBoard}
           portalEntries={dynasty.portalEntries}
           scouting={scouting}
@@ -460,11 +545,22 @@ export function App() {
           onPitchRecruit={pitchRecruit}
           onToggleVisitInvite={toggleVisitInvite}
           onOfferPortalPlayer={offerPortalPlayer}
+          onWithdrawPortalOffer={withdrawPortalOffer}
+          portalTeams={dynasty.season.teams}
+          portalScholarshipRoom={portalScholarshipRoom}
+          seasonYear={dynasty.season.year}
           onRecruitPosFilterChange={setRecruitPosFilter}
           onRecruitTabChange={setRecruitTab}
           onToggleShortlist={toggleShortlist}
           onBoardViewChange={setRecruitBoardView}
           onSelectRecruit={setSelectedRecruitId}
+          assistantReport={assistantReport}
+          autoAssistant={autoRecruitingAssistant}
+          onRunAssistant={runRecruitingAssistant}
+          onAutoAssistantChange={setAutoRecruitingAssistant}
+          onMakeOffers={offerScholarships}
+          autoOffers={autoRecruitingOffers}
+          onAutoOffersChange={setAutoRecruitingOffers}
         />
       )}
 
@@ -476,6 +572,7 @@ export function App() {
           conferences={dynasty.season.conferences}
           userTeamId={dynasty.userTeamId}
           teamMap={teamMap}
+          onOpenProgram={openProgram}
         />
       )}
 
@@ -487,6 +584,8 @@ export function App() {
           seasonComplete={seasonComplete}
           onSimSemis={simTournamentSemis}
           onSimFinals={simTournamentFinals}
+          onSimNcaaFirstRound={simNcaaFirstRound}
+          onSimNcaaQuarterfinals={simNcaaQuarterfinals}
           onSimNationalSemis={simTournamentNationalSemis}
           onSimNational={simTournamentNational}
           onEnterOffseason={enterOffseason}
@@ -504,7 +603,17 @@ export function App() {
       )}
 
       {view === 'news' && (
-        <NewsScreen newsItems={newsItems} />
+        <NewsScreen newsItems={newsItems} userTeamName={userTeam?.shortName} />
+      )}
+
+      {view === 'staff' && (
+        <StaffScreen
+          staff={staff}
+          candidates={staffCandidates}
+          budget={staffBudget}
+          onHire={hireStaff}
+          onRelease={releaseStaff}
+        />
       )}
 
       {view === 'history' && (
@@ -525,8 +634,38 @@ export function App() {
           onAcceptJobOffer={acceptJobOffer}
           onStartNewSeason={startNewSeason}
           onOfferPortalPlayer={offerPortalPlayer}
+          portalTeams={dynasty.season.teams}
+          portalScholarshipRoom={portalScholarshipRoom}
+          onOpenPortal={() => { setRecruitTab('portal'); setView('recruiting'); }}
         />
       )}
+
+      {view === 'programs' && (
+        <ProgramsScreen
+          teams={dynasty.season.teams}
+          conferences={dynasty.season.conferences}
+          rankings={rankings}
+          schedule={dynasty.season.schedule}
+          seasonStats={seasonStats}
+          userTeamId={dynasty.userTeamId}
+          programId={viewedProgramId}
+          onOpenProgram={openProgram}
+          onSelectPlayer={setSelectedPlayerId}
+        />
+      )}
+
+      {view === 'players' && (
+        <PlayersScreen
+          teams={dynasty.season.teams}
+          conferences={dynasty.season.conferences}
+          seasonStats={seasonStats}
+          userTeamId={dynasty.userTeamId}
+          onSelectPlayer={setSelectedPlayerId}
+          onOpenProgram={openProgram}
+        />
+      )}
+        </section>
+      </div>
 
       {selectedPlayer && (
         <PlayerPanel
@@ -554,7 +693,12 @@ export function App() {
       )}
 
       {selectedBoxScore && (
-        <BoxScorePanel data={selectedBoxScore} onClose={() => setSelectedBoxScore(null)} />
+        <BoxScorePanel
+          data={selectedBoxScore}
+          onClose={() => setSelectedBoxScore(null)}
+          playerName={(id) => playerLookup.get(id)?.name}
+          playerPosition={(id) => playerLookup.get(id)?.position}
+        />
       )}
     </main>
   );

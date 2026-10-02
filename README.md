@@ -14,6 +14,8 @@ The first implementation milestone is the core data model for players, teams, se
 
 Gameplay features:
 
+- Menu-driven management shell in the style of Out of the Park Baseball: a sticky top bar with your record, rank, and an always-available Advance button (sims the week, then each tournament round), plus a grouped side menu (Office / your team / League).
+- League browser: a sortable Programs table for all 36 teams (prestige, record, goals for/against, team ratings) that opens any program's page with full roster ratings and its schedule, and a league-wide Player Search with name, position, class, conference, and program filters and sortable rating and stat columns.
 - Multi-season dynasty with recruiting, scouting, transfer portal, injuries, and offseason player development.
 - Two-level recruiting board: browse and sort the full national recruit pool, then pin prospects to a personal "My Board" shortlist that tracks offers, commitments, signings, and recruits lost to rivals.
 - Active recruiting on a weekly hours budget: scouting, pitches, and campus visits all draw from one pool of recruiting hours, so working one target hard means another goes cold. Pitches sell a specific angle (playing time, the big stage, scholarship money...) and only land when they match what scouting revealed the recruit cares about.

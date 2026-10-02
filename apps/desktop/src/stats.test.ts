@@ -48,7 +48,8 @@ describe('apportionByWeight', () => {
 
 function freshState(): WeekSimState {
   return {
-    dynasty: createFreshLacrosseDynasty(),
+    // Fixed seed: an unseeded dynasty made these distribution checks flaky.
+    dynasty: createFreshLacrosseDynasty({ now: () => 1_000 }),
     rankings: [],
     injuries: [],
     newsItems: [],
@@ -62,25 +63,57 @@ function freshState(): WeekSimState {
   };
 }
 
-function topScorerShareByTeam(seasonStats: SeasonStatsMap, dynasty: WeekSimState['dynasty']): number {
-  let worstShare = 0;
+/** Each team's top scorer's share of its goals, sorted low to high. */
+function topScorerShares(seasonStats: SeasonStatsMap, dynasty: WeekSimState['dynasty']): number[] {
+  const shares: number[] = [];
   for (const team of dynasty.season.teams) {
     const offensive = team.roster.filter((p) => p.position === 'ATT' || p.position === 'MID');
     const goals = offensive.map((p) => seasonStats[p.id]?.goals ?? 0);
     const teamGoals = goals.reduce((s, g) => s + g, 0);
     if (teamGoals === 0) continue;
-    const share = Math.max(...goals) / teamGoals;
-    worstShare = Math.max(worstShare, share);
+    shares.push(Math.max(...goals) / teamGoals);
   }
-  return worstShare;
+  return shares.sort((a, b) => a - b);
 }
 
 describe('season scoring distribution', () => {
   it('spreads goals across the roster rather than one player', () => {
     const finished = simulateRemainingWeeks(freshState(), undefined, seededRandom(7));
-    // No team's leading scorer should monopolize their offense. With the old
-    // bug this hit ~30%+ on a single low-rated player.
-    const share = topScorerShareByTeam(finished.seasonStats, finished.dynasty);
-    expect(share).toBeLessThan(0.25);
+    // Stars should lead their teams, but no one player should monopolize the
+    // offense. Real D1 leaders take roughly 20-35% of their team's goals; a
+    // lone star on a thin roster can go a little higher.
+    const shares = topScorerShares(finished.seasonStats, finished.dynasty);
+    expect(shares[Math.floor(shares.length / 2)]).toBeLessThan(0.3);
+    expect(shares.at(-1)).toBeLessThan(0.5);
+  });
+
+  it('produces star scorers instead of a flat league', () => {
+    const finished = simulateRemainingWeeks(freshState(), undefined, seededRandom(11));
+    const points = Object.values(finished.seasonStats).map((s) => s.goals + s.assists).sort((a, b) => b - a);
+    // The old even split capped the national leader near 18 points over 10 games.
+    expect(points[0]).toBeGreaterThan(35);
+    expect(points[0]! - points[14]!).toBeGreaterThan(5);
+  });
+
+  it('only credits games played to players who take the field', () => {
+    const state = freshState();
+    const injured = state.dynasty.season.teams[0]!.roster[0]!;
+    const finished = simulateRemainingWeeks(
+      { ...state, injuries: [{ playerId: injured.id, teamId: state.dynasty.season.teams[0]!.id, weeksRemaining: 99 }] },
+      undefined,
+      seededRandom(5),
+    );
+    expect(finished.seasonStats[injured.id]?.gamesPlayed ?? 0).toBe(0);
+    // Each team suits up its playing group, not all 42 players, and exactly
+    // one goalie plays each game.
+    for (const team of finished.dynasty.season.teams) {
+      const teamGames = team.record.wins + team.record.losses;
+      const goalieGames = team.roster
+        .filter((p) => p.position === 'GK')
+        .reduce((n, p) => n + (finished.seasonStats[p.id]?.gamesPlayed ?? 0), 0);
+      expect(goalieGames).toBe(teamGames);
+      const appeared = team.roster.filter((p) => (finished.seasonStats[p.id]?.gamesPlayed ?? 0) > 0);
+      expect(appeared.length).toBeLessThan(team.roster.length);
+    }
   });
 });

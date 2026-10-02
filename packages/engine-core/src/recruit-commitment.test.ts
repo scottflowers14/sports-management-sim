@@ -120,4 +120,16 @@ describe('recruit commitment', () => {
 
     expect(commitRecruit(recruit, [])).toEqual(recruit);
   });
+
+  it('never commits a recruit to a program that did not offer him', () => {
+    const recruit = makeRecruit({
+      interestByTeamId: { bystander: 90, offering: 5 },
+      scholarshipOffers: [{ teamId: 'offering', scholarshipPercent: 25 }],
+    });
+    const committed = commitRecruit(recruit, [makeTeam('bystander'), makeTeam('offering')]);
+    expect(committed.committedTeamId).toBe('offering');
+
+    const noOffersOnTheTable = commitRecruit(recruit, [makeTeam('bystander')]);
+    expect(noOffersOnTheTable).toEqual(recruit);
+  });
 });
