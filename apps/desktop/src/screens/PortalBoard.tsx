@@ -101,7 +101,7 @@ export function PortalBoard({ entries, teams, userTeamId, teamMap, seasonYear, s
       <article className="card dense-card portal-board-card" aria-label="Transfer portal">
         <div className="screen-toolbar">
           <div>
-            <p className="eyebrow">{seasonYear} Offseason</p>
+            <p className="eyebrow">Portal for the {seasonYear} season</p>
             <h2>Transfer Portal</h2>
           </div>
           <div className="portal-stats" aria-label="Portal summary">

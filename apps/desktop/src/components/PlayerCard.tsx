@@ -1,5 +1,21 @@
 import type { ReactNode } from 'react';
-import type { PlayerCardData } from '../player-card-model';
+import type { CardRatingRow, PlayerCardData } from '../player-card-model';
+
+function RatingRows({ rows }: { rows: CardRatingRow[] }) {
+  return (
+    <div>
+      {rows.map((r) => (
+        <div key={r.label} className="rating-row">
+          <span>{r.label}</span>
+          <div className="rating-bar-wrap">
+            <div className="rating-bar-fill" style={{ width: r.value === null ? '0%' : `${r.value}%` }} />
+          </div>
+          <span className="rating-val">{r.value === null ? '—' : r.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Presentational identity card shared by every detail view (recruits, roster
@@ -32,17 +48,14 @@ export function PlayerCard({ data, footer }: { data: PlayerCardData; footer?: Re
         </div>
       </div>
 
-      <div>
-        {data.ratings.map((r) => (
-          <div key={r.label} className="rating-row">
-            <span>{r.label}</span>
-            <div className="rating-bar-wrap">
-              <div className="rating-bar-fill" style={{ width: r.value === null ? '0%' : `${r.value}%` }} />
-            </div>
-            <span className="rating-val">{r.value === null ? '—' : r.value}</span>
-          </div>
-        ))}
-      </div>
+      <RatingRows rows={data.ratings} />
+
+      {data.skills.length > 0 && (
+        <div aria-label="Lacrosse skills">
+          <p className="panel-section-label">Skills</p>
+          <RatingRows rows={data.skills} />
+        </div>
+      )}
 
       {data.traits.length > 0 && (
         <div className="trait-list">

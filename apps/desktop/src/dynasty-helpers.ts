@@ -18,7 +18,9 @@ import {
   generateLacrosseRecruitingClass,
   generateLacrosseWalkOns,
   recruitingClassSize,
+  carryOverallChangeToSkills,
   developmentBonusFor,
+  IN_SEASON_DEVELOPMENT_OFFSET,
   programStaffRating,
   rollLacrosseInjuries,
   openLacrossePortal,
@@ -120,6 +122,8 @@ export function processInjuries(
   teams: LacrosseTeam[],
   random: () => number,
   playedTeamIds?: Set<string>,
+  /** Scales a team's injury risk, e.g. from its practice intensity. */
+  riskMultiplierFor?: (teamId: string) => number,
 ): {
   injuries: InjuredPlayer[];
   newlyInjured: NewInjury[];
@@ -153,7 +157,8 @@ export function processInjuries(
   for (const team of teams) {
     const healthy = { ...team, roster: team.roster.filter((p) => !injuredIds.has(p.id)) };
     const played = playedTeamIds ? playedTeamIds.has(team.id) : true;
-    for (const injury of rollLacrosseInjuries(healthy, { played, random })) {
+    const riskMultiplier = riskMultiplierFor?.(team.id) ?? 1;
+    for (const injury of rollLacrosseInjuries(healthy, { played, random, riskMultiplier })) {
       const player = team.roster.find((p) => p.id === injury.playerId)!;
       newlyInjured.push({
         playerId: injury.playerId,
@@ -455,11 +460,21 @@ export function runOffseason(
     // a bigger push for the chosen position group.
     const staffBonus = developmentBonusFor(programStaffRating(team, 'development', staffOwner));
     const userFocus = team.id === userTeamId ? focusPositions : null;
-    const afterOffseason = runTeamOffseason(team, {
+    const overallBefore = new Map(team.roster.map((p) => [p.id, p.ratings.overall]));
+    const progressed = runTeamOffseason(team, {
       completedSeason: season.year,
+      // Part of each year's growth now happens at in-season practice. Players
+      // already at their ceiling skip the offset so it doesn't raise their
+      // regression odds.
       developmentBonusFor: (player) =>
-        staffBonus + (userFocus?.includes(player.position) ? TRAINING_FOCUS_BONUS : 0),
+        (player.ratings.potential > player.ratings.overall ? IN_SEASON_DEVELOPMENT_OFFSET : 0) +
+        staffBonus +
+        (userFocus?.includes(player.position) ? TRAINING_FOCUS_BONUS : 0),
     });
+    const afterOffseason = {
+      ...progressed,
+      roster: progressed.roster.map((p) => carryOverallChangeToSkills(p, overallBefore.get(p.id) ?? p.ratings.overall)),
+    };
     const withClass = addSignedRecruitsToTeam(afterOffseason, signed, newYear);
     const withWalkOns = backfillWalkOns(withClass, rosterTargets, seed + newYear, newYear);
     const trimmed = team.id === userTeamId ? withWalkOns : enforceRosterLimit(withWalkOns);

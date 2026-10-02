@@ -24,6 +24,14 @@ import {
   updateLacrosseDepthChartSlot,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StaffRole } from '@sports-management-sim/sport-lacrosse';
+import {
+  autoDevelopmentPlans,
+  MAX_DEVELOPMENT_PLANS,
+  prunePracticePlan,
+  type DevelopmentFocusArea,
+  type LacrossePracticePlan,
+  type PracticeIntensity,
+} from '@sports-management-sim/sport-lacrosse';
 import { createProgramStaff, withStaffRecruitingHours } from './program-staff';
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
@@ -32,7 +40,7 @@ import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-h
 import { simulateOneWeek, simulateRemainingWeeks, withoutInjured } from './week-sim';
 import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
-import type { WeekSimState } from './week-sim';
+import type { PracticeLogEntry, WeekSimState } from './week-sim';
 import {
   createCoachProfile,
   generateCoachName,
@@ -115,7 +123,8 @@ export type View =
   | 'stats'
   | 'programs'
   | 'players'
-  | 'staff';
+  | 'staff'
+  | 'practice';
 
 export function useDynastyController() {
   const [screen, setScreen] = useState<'start' | 'game'>('start');
@@ -173,6 +182,10 @@ export function useDynastyController() {
   const [bestNatRank, setBestNatRank] = useState<number | null>(() => loadedSave?.bestNatRank ?? null);
   const [gamePlan, setGamePlan] = useState<LacrosseGamePlan>(() => normalizeGamePlan(loadedSave?.gamePlan));
   const [trainingFocus, setTrainingFocus] = useState<TrainingFocus>(() => loadedSave?.trainingFocus ?? 'balanced');
+  const [practicePlan, setPracticePlan] = useState<LacrossePracticePlan>(
+    () => loadedSave?.practicePlan ?? defaultPracticePlan(dynasty),
+  );
+  const [practiceGains, setPracticeGains] = useState<PracticeLogEntry[]>(() => loadedSave?.practiceGains ?? []);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
 
@@ -195,6 +208,8 @@ export function useDynastyController() {
     bestNatRank,
     gamePlan,
     trainingFocus,
+    practicePlan,
+    practiceGains,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -203,7 +218,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -235,6 +250,7 @@ export function useDynastyController() {
     setBestNatRank(null);
     setGamePlan(DEFAULT_GAME_PLAN);
     setTrainingFocus('balanced');
+    setPracticeGains([]);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
     setAutoRecruitingOffers(false);
@@ -271,6 +287,8 @@ export function useDynastyController() {
     setAdConfidence(60);
     setSeasonGoals(goals);
     setBestNatRank(null);
+    const newPracticePlan = defaultPracticePlan(nextDynasty);
+    setPracticePlan(newPracticePlan);
     const state: DynastySaveState = {
       dynasty: nextDynasty,
       lastSimWeek: null,
@@ -290,6 +308,8 @@ export function useDynastyController() {
       bestNatRank: null,
       gamePlan: DEFAULT_GAME_PLAN,
       trainingFocus: 'balanced',
+      practicePlan: newPracticePlan,
+      practiceGains: [],
       pendingJobOffers: null,
       shortlistIds: [],
       recruitingActivity: emptyRecruitingActivity(),
@@ -339,6 +359,8 @@ export function useDynastyController() {
     setBestNatRank(save.bestNatRank ?? null);
     setGamePlan(normalizeGamePlan(save.gamePlan));
     setTrainingFocus(save.trainingFocus ?? 'balanced');
+    setPracticePlan(save.practicePlan ?? defaultPracticePlan(save.dynasty));
+    setPracticeGains(save.practiceGains ?? []);
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -408,7 +430,9 @@ export function useDynastyController() {
     bestNatRank,
     lastSimWeek,
     userStaff: staffState.staff,
-  }), [staffState.staff, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+    practicePlan,
+    practiceGains,
+  }), [staffState.staff, practicePlan, practiceGains, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((result: WeekSimState) => {
     setDynasty(result.dynasty);
@@ -422,6 +446,7 @@ export function useDynastyController() {
     setGameLogs(result.gameLogs);
     setBestNatRank(result.bestNatRank);
     setLastSimWeek(result.lastSimWeek);
+    setPracticeGains(result.practiceGains ?? []);
     setAssistantReport(null);
     // Offers the assistant made during the sim pin those recruits, as manual offers do.
     const userId = result.dynasty.userTeamId;
@@ -803,6 +828,8 @@ export function useDynastyController() {
     const newStaff = createProgramStaff(nextDynasty);
     setStaffState(newStaff);
     setScouting((s) => withStaffRecruitingHours(s, newStaff.staff));
+    setPracticePlan((plan) => ({ ...defaultPracticePlan(nextDynasty), intensity: plan.intensity }));
+    setPracticeGains([]);
     setCoachProfile((prev) => (prev ? { name: prev.name, tenureSeasons: 0, contractYearsRemaining: 4 } : prev));
     setAdConfidence(55);
     setPendingJobOffers(null);
@@ -836,6 +863,36 @@ export function useDynastyController() {
     setSaveStatus(`Released ${member.name.first} ${member.name.last}`);
   }, [staffState]);
 
+  const setPracticeIntensity = useCallback((intensity: PracticeIntensity) => {
+    setPracticePlan((plan) => ({ ...plan, intensity }));
+  }, []);
+
+  /** Add or update one player's plan; a fifth player is refused. */
+  const setDevelopmentPlan = useCallback((playerId: string, focus: DevelopmentFocusArea) => {
+    setPracticePlan((plan) => {
+      const existing = plan.developmentPlans.some((p) => p.playerId === playerId);
+      if (!existing && plan.developmentPlans.length >= MAX_DEVELOPMENT_PLANS) return plan;
+      const developmentPlans = existing
+        ? plan.developmentPlans.map((p) => (p.playerId === playerId ? { playerId, focus } : p))
+        : [...plan.developmentPlans, { playerId, focus }];
+      return { ...plan, developmentPlans };
+    });
+  }, []);
+
+  const removeDevelopmentPlan = useCallback((playerId: string) => {
+    setPracticePlan((plan) => ({ ...plan, developmentPlans: plan.developmentPlans.filter((p) => p.playerId !== playerId) }));
+  }, []);
+
+  /** Fill open plan slots with the staff's picks: the young players with the most room to grow. */
+  const autoFillDevelopmentPlans = useCallback(() => {
+    if (!userTeam) return;
+    setPracticePlan((plan) => {
+      const taken = new Set(plan.developmentPlans.map((p) => p.playerId));
+      const picks = autoDevelopmentPlans(userTeam, MAX_DEVELOPMENT_PLANS + taken.size).filter((p) => !taken.has(p.playerId));
+      return { ...plan, developmentPlans: [...plan.developmentPlans, ...picks].slice(0, MAX_DEVELOPMENT_PLANS) };
+    });
+  }, [userTeam]);
+
   const startNewSeason = useCallback(() => {
     // Resolve the portal once, outside the state updater: updaters must be pure,
     // and this one feeds the news feed and several other pieces of state.
@@ -852,6 +909,9 @@ export function useDynastyController() {
     setSeasonGoals(goals);
     setBestNatRank(null);
     setRankings(computeNationalRankings(nextDynasty.season.teams, []));
+    // Graduates and transfers drop off their development plans.
+    if (userTeamData) setPracticePlan((plan) => prunePracticePlan(plan, userTeamData));
+    setPracticeGains([]);
     setOffseasonSummary(null);
     // Empty chairs don't stay empty into the season.
     const filled = fillStaffVacancies(staffState.staff, staffState.staffCandidates, staffBudget);
@@ -990,6 +1050,12 @@ export function useDynastyController() {
     setGamePlan,
     trainingFocus,
     setTrainingFocus,
+    practicePlan,
+    practiceGains,
+    setPracticeIntensity,
+    setDevelopmentPlan,
+    removeDevelopmentPlan,
+    autoFillDevelopmentPlans,
     pendingJobOffers,
     persistDynasty,
     startNewDynasty,
@@ -1040,4 +1106,10 @@ function countUserGames(
   userTeamId: string,
 ): number {
   return schedule.filter((g) => g.homeTeamId === userTeamId || g.awayTeamId === userTeamId).length;
+}
+
+/** A new program starts on a normal week with the staff's picks for individual plans. */
+function defaultPracticePlan(dynasty: LacrosseDynastyState): LacrossePracticePlan {
+  const team = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+  return { intensity: 'normal', developmentPlans: team ? autoDevelopmentPlans(team) : [] };
 }

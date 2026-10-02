@@ -110,6 +110,22 @@ describe('offseason progression', () => {
     expect(player.ratings.overall).toBe(60);
   });
 
+  it('moves physical and mental ratings with the overall, so they keep pace as players grow', () => {
+    const player = makePlayer('p1', 'SO', {
+      ratings: {
+        ...makePlayer('base', 'SO').ratings,
+        overall: 60,
+        potential: 80,
+        athleticism: 58,
+        workEthic: 90,
+      },
+    });
+    const progressed = progressPlayer(player, 1);
+    const delta = progressed.ratings.overall - player.ratings.overall;
+    expect(delta).toBeGreaterThan(1);
+    expect(progressed.ratings.athleticism).toBe(58 + delta);
+  });
+
   it('does not progress a player beyond potential', () => {
     const player = makePlayer('p1', 'SO', {
       ratings: {

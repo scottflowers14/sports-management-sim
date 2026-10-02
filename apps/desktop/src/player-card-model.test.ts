@@ -26,6 +26,7 @@ const player = {
   ratings: ratings(84),
   traits: ['gym_rat', 'high_floor'],
   redshirtStatus: 'none',
+  sportTraits: { shooting: 88, passing: 70, dodging: 81, stickSkills: 77, offBallMovement: 74, defense: 40, checking: 35, groundBalls: 60, preferredHand: 'left' },
 } as unknown as LacrossePlayer;
 
 const recruit = {
@@ -35,6 +36,7 @@ const recruit = {
   starRating: 4,
   status: 'open',
   ratings: ratings(78),
+  sportTraits: { shooting: 72, passing: 80, dodging: 76, stickSkills: 74, offBallMovement: 70, defense: 66, checking: 50, groundBalls: 71, preferredHand: 'right' },
   preferences: { proximityImportance: 50, prestigeImportance: 80, scholarshipImportance: 40, playingTimeImportance: 30, academicImportance: 20 },
   interestByTeamId: {},
   scholarshipOffers: [],
@@ -77,5 +79,25 @@ describe('cardFromRecruit', () => {
     expect(card.overallFuzzy).toBe(false);
     expect(card.potential).toBe(84);
     expect(card.ratings.every((r) => r.value !== null)).toBe(true);
+  });
+});
+
+describe('skills on the card', () => {
+  it('shows the lacrosse skills that matter at his position', () => {
+    expect(cardFromPlayer(player).skills).toEqual([
+      { label: 'Shooting', value: 88 },
+      { label: 'Dodging', value: 81 },
+      { label: 'Passing', value: 70 },
+      { label: 'Stick Skills', value: 77 },
+      { label: 'Off-Ball', value: 74 },
+    ]);
+  });
+
+  it('hides a recruit’s skills until he is fully scouted', () => {
+    const hidden = cardFromRecruit(recruit, { tier: 'partial', displayOvr: 77, starsPublic: false });
+    expect(hidden.skills.length).toBeGreaterThan(0);
+    expect(hidden.skills.every((s) => s.value === null)).toBe(true);
+    const shown = cardFromRecruit(recruit, { tier: 'full', displayOvr: 78, starsPublic: false });
+    expect(shown.skills.find((s) => s.label === 'Passing')?.value).toBe(80);
   });
 });

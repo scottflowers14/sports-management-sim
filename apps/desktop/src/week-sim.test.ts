@@ -5,6 +5,7 @@ import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import { simulateOneWeek, simulateRemainingWeeks, type WeekSimState } from './week-sim';
 import { healInjuriesOneWeek } from './dynasty-helpers';
+import { createProgramStaff } from './program-staff';
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -117,5 +118,58 @@ describe('healInjuriesOneWeek', () => {
     expect(after).toEqual([{ playerId: 'b', teamId: 't', weeksRemaining: 2, description: 'broken hand' }]);
     expect(healInjuriesOneWeek(healInjuriesOneWeek(after))).toEqual([]);
     expect(list[0]!.weeksRemaining).toBe(1);
+  });
+});
+
+describe('practice during the season', () => {
+  it('grows the user team at practice, logs the gains, and reports them in the news', () => {
+    const base = freshState();
+    const userTeam = base.dynasty.season.teams.find((t) => t.id === base.dynasty.userTeamId)!;
+    const target = userTeam.roster.find((p) => p.ratings.potential > p.ratings.overall + 5)!;
+    const primed = {
+      ...base,
+      dynasty: {
+        ...base.dynasty,
+        season: {
+          ...base.dynasty.season,
+          teams: base.dynasty.season.teams.map((t) =>
+            t.id === userTeam.id
+              ? { ...t, roster: t.roster.map((p) => (p.id === target.id ? { ...p, developmentProgress: 99 } : p)) }
+              : t,
+          ),
+        },
+      },
+      practicePlan: { intensity: 'normal' as const, developmentPlans: [{ playerId: target.id, focus: 'balanced' as const }] },
+    };
+    const next = simulateOneWeek(primed, undefined, seededRandom(3));
+    const grown = next.dynasty.season.teams.find((t) => t.id === userTeam.id)!.roster.find((p) => p.id === target.id);
+    expect(grown!.ratings.overall).toBe(target.ratings.overall + 1);
+    expect(next.practiceGains?.some((g) => g.playerId === target.id && g.week === base.dynasty.season.currentWeek)).toBe(true);
+    const report = next.newsItems.find((n) => n.headline.startsWith('Practice report:'));
+    expect(report?.headline).toContain(`${target.name.last} up to ${target.ratings.overall + 1}`);
+    expect(next.practicePlan).toEqual(primed.practicePlan);
+  });
+
+  it('keeps the user staff for every week of a sim to the end of the season', () => {
+    const base = freshState();
+    const { staff } = createProgramStaff(base.dynasty);
+    const done = simulateRemainingWeeks({ ...base, userStaff: staff }, undefined, seededRandom(2));
+    expect(done.userStaff).toBe(staff);
+  });
+
+  it('hurts more players on intense practice than light', () => {
+    const count = (intensity: 'light' | 'intense') => {
+      let total = 0;
+      for (let seed = 1; seed <= 6; seed += 1) {
+        const done = simulateRemainingWeeks(
+          { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 42 }), practicePlan: { intensity, developmentPlans: [] } },
+          undefined,
+          seededRandom(seed),
+        );
+        total += done.newsItems.filter((n) => n.category === 'injury' && !n.headline.includes('returned')).length;
+      }
+      return total;
+    };
+    expect(count('intense')).toBeGreaterThan(count('light'));
   });
 });
