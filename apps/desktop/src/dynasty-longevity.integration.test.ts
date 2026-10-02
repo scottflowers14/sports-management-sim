@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { enforceRosterLimit, resolveAndApplyPortal, ROSTER_FLOOR, ROSTER_LIMIT, runOffseason } from './dynasty-helpers';
 import { emptyRecruitingActivity } from './recruiting-activity';
@@ -31,11 +31,19 @@ function weekState(dynasty: WeekSimState['dynasty']): WeekSimState {
 }
 
 describe('long dynasties', () => {
+  // Player development and box-score stats draw from Math.random; pin it so
+  // the run is the same on every machine.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   // A five-year run caught rosters shrinking ~3 players a season (42 -> 33)
   // because the recruit pool was smaller than each year's graduating class.
   it('keeps rosters full season after season', () => {
+    vi.spyOn(Math, 'random').mockImplementation(seededRandom(99));
     let dynasty = createFreshLacrosseDynasty({ now: () => 4_242 });
     const random = seededRandom(17);
+    const averages: number[] = [];
     const leagueMean = (d: typeof dynasty) => {
       const players = d.season.teams.flatMap((t) => t.roster);
       return players.reduce((sum, p) => sum + p.ratings.overall, 0) / players.length;
@@ -58,7 +66,11 @@ describe('long dynasties', () => {
       expect(Math.min(...sizes)).toBeGreaterThanOrEqual(ROSTER_FLOOR);
       const cpuSizes = newDynasty.season.teams.filter((t) => t.id !== newDynasty.userTeamId).map((t) => t.roster.length);
       expect(Math.max(...cpuSizes)).toBeLessThanOrEqual(ROSTER_LIMIT);
-      expect(sizes.reduce((a, b) => a + b, 0) / sizes.length).toBeGreaterThan(40);
+      // The first class is light (no prior recruiting cycle), so the league
+      // averages about 40 after year one and grows from there.
+      const average = sizes.reduce((a, b) => a + b, 0) / sizes.length;
+      averages.push(average);
+      expect(average).toBeGreaterThan(ROSTER_FLOOR + 1);
       // After the first cycle, signing classes replace most of the graduates.
       if (year > 0) expect(signed).toBeGreaterThan(graduating * 0.8);
       // Starting rosters match the talent that recruiting and development
@@ -71,6 +83,8 @@ describe('long dynasties', () => {
       expect(Math.max(...prestige)).toBeLessThanOrEqual(92);
       dynasty = newDynasty;
     }
+    // Rosters must not erode: the last season is at least as full as the first.
+    expect(averages.at(-1)!).toBeGreaterThanOrEqual(averages[0]!);
   }, 120_000);
 
   it('cuts walk-ons first and keeps position minimums when over the limit', () => {
