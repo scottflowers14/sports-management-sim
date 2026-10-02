@@ -4,6 +4,7 @@ import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
+import { simulateRemainingWeeks } from './week-sim';
 import {
   ACTIVE_DYNASTY_SAVE_KEY,
   DYNASTY_SAVE_INDEX_KEY,
@@ -13,6 +14,7 @@ import {
   listDynastySaves,
   loadActiveDynastySave,
   loadDynastySaveSlot,
+  compactForStorage,
   deleteDynastySave,
   saveDynastySlot,
   saveDynastyState,
@@ -140,5 +142,51 @@ describe('multi-save persistence', () => {
     expect(loaded!.recruitTrends).toEqual({});
     expect(loaded!.scouting.pointsPerWeek).toBe(6);
     expect(loaded!.scouting.pointsAvailable).toBe(2);
+  });
+});
+
+describe('save compaction', () => {
+  function playedSave(): DynastySaveState {
+    const base = makeSave(2001);
+    const played = simulateRemainingWeeks({
+      dynasty: base.dynasty,
+      rankings: [],
+      injuries: [],
+      newsItems: [],
+      scouting: base.scouting,
+      recruitingActivity: base.recruitingActivity,
+      recruitTrends: {},
+      seasonStats: base.seasonStats,
+      gameLogs: new Map(),
+      bestNatRank: null,
+      lastSimWeek: null,
+    });
+    return { ...base, dynasty: played.dynasty, gameLogs: Object.fromEntries(played.gameLogs) };
+  }
+
+  it('keeps play-by-play for the user and the latest week only', () => {
+    const save = playedSave();
+    const compact = compactForStorage(save);
+    const { schedule } = save.dynasty.season;
+    const latestWeek = Math.max(...schedule.map((g) => g.week));
+    const user = save.dynasty.userTeamId;
+    for (const game of schedule) {
+      const keep = game.homeTeamId === user || game.awayTeamId === user || game.week === latestWeek;
+      expect(game.id in compact.gameLogs).toBe(keep);
+    }
+    expect(compact.dynasty.recruitBoard).toEqual([]);
+    // Box scores survive on the schedule.
+    expect(compact.dynasty.season.schedule.every((g) => g.result !== undefined)).toBe(true);
+  });
+
+  it('rebuilds the recruit board on load and shrinks the save', () => {
+    const storage = makeStorage();
+    const save = playedSave();
+    saveDynastySlot({ saveId: 'save-c', state: save, storage });
+    const stored = storage.getItem(dynastySaveSlotKey('save-c'))!;
+    expect(stored.length).toBeLessThan(JSON.stringify(save).length * 0.75);
+
+    const loaded = loadDynastySaveSlot('save-c', storage)!;
+    expect(loaded.dynasty.recruitBoard.map((e) => e.recruit.id)).toEqual(save.dynasty.recruitBoard.map((e) => e.recruit.id));
   });
 });

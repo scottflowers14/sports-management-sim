@@ -134,6 +134,7 @@ export function simulateOneWeek(
         id: `visit-${weekToSim}-${visitNews.length}`,
         week: weekToSim,
         category: 'recruiting',
+        featured: true,
         headline: `Campus visit: ${recruit.position} ${recruit.name.first} ${recruit.name.last} ${impressionText}${gameText} (+${outcome.interestChange} interest)`,
       });
       return outcome.recruit;
@@ -181,6 +182,7 @@ export function simulateOneWeek(
       id: `finalists-${weekToSim}-${dramaNews.length}`,
       week: weekToSim,
       category: 'recruiting',
+      featured: true,
       headline: `${recruit.position} ${recruit.name.first} ${recruit.name.last} narrows his list to ${finalists.join(', ')} — decision expected Week ${decisionWeek}`,
     });
   }
@@ -215,6 +217,7 @@ export function simulateOneWeek(
         id: `injury-${weekToSim}-${i}`,
         week: weekToSim,
         category: 'injury' as const,
+        featured: true,
         headline: `${inj.playerName} is out ${inj.weeksRemaining} week${inj.weeksRemaining > 1 ? 's' : ''} with an injury`,
       })),
     ...recovered
@@ -223,6 +226,7 @@ export function simulateOneWeek(
         id: `recovery-${weekToSim}-${i}`,
         week: weekToSim,
         category: 'injury' as const,
+        featured: true,
         headline: `${r.playerName} has returned from injury`,
       })),
   ];

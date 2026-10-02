@@ -1,4 +1,5 @@
 import { DEFAULT_GAME_PLAN } from '@sports-management-sim/sport-lacrosse';
+import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import type { RankingEntry } from './rankings';
@@ -132,6 +133,31 @@ export function getActiveDynastySaveId(storage: Storage = window.localStorage): 
   return storage.getItem(ACTIVE_DYNASTY_SAVE_KEY);
 }
 
+/**
+ * Drop what can be rebuilt or isn't worth the space before writing to
+ * localStorage (about 5 MB per site, shared by every save slot):
+ * - the recruit board embeds a copy of every recruit; it's rebuilt on load.
+ * - play-by-play for CPU-vs-CPU regular-season games, except the latest week.
+ *   Their box scores stay on the schedule; only the play-by-play goes.
+ */
+export function compactForStorage<T extends DynastySaveState>(save: T): T {
+  const { dynasty } = save;
+  const { schedule } = dynasty.season;
+  const latestWeek = schedule.reduce((max, g) => (g.status === 'final' ? Math.max(max, g.week) : max), 0);
+  const droppable = new Set(
+    schedule
+      .filter(
+        (g) =>
+          g.homeTeamId !== dynasty.userTeamId &&
+          g.awayTeamId !== dynasty.userTeamId &&
+          g.week !== latestWeek,
+      )
+      .map((g) => g.id),
+  );
+  const gameLogs = Object.fromEntries(Object.entries(save.gameLogs).filter(([id]) => !droppable.has(id)));
+  return { ...save, dynasty: { ...dynasty, recruitBoard: [] }, gameLogs };
+}
+
 export function setActiveDynastySave(saveId: string, storage: Storage = window.localStorage): void {
   storage.setItem(ACTIVE_DYNASTY_SAVE_KEY, saveId);
 }
@@ -157,7 +183,7 @@ export function saveDynastySlot({
     name: saveName,
     ...state,
   };
-  storage.setItem(dynastySaveSlotKey(saveId), JSON.stringify(save));
+  storage.setItem(dynastySaveSlotKey(saveId), JSON.stringify(compactForStorage(save)));
   upsertSaveMetadata(createSaveMetadata(state, saveId, saveName, existing?.createdAt ?? now, now), storage);
   storage.setItem(ACTIVE_DYNASTY_SAVE_KEY, saveId);
   return save;
@@ -333,6 +359,17 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     }
     if (parsed.recruitTrends === undefined) {
       parsed.recruitTrends = {};
+    }
+    // Compacted saves store an empty recruit board; rebuild it from the recruits.
+    const dynasty = parsed.dynasty;
+    if (dynasty && dynasty.recruitBoard.length === 0 && dynasty.recruits.length > 0) {
+      const userTeam = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+      if (userTeam) {
+        parsed.dynasty = {
+          ...dynasty,
+          recruitBoard: sortRecruitBoardForTeam(userTeam, dynasty.recruits, dynasty.rosterTargets),
+        };
+      }
     }
     // Older saves banked 3 scouting points a week; the unified recruiting-hours
     // pool pays for pitches and visits too, so bring them up to the new rate.

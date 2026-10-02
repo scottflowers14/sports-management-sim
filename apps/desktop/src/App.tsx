@@ -179,7 +179,9 @@ export function App() {
   ).length;
 
   const userRankEntry = rankings.find((r) => r.teamId === dynasty.userTeamId);
-  const unreadNewsCount = newsItems.length;
+  // Badge the stories about our program from the latest simulated week.
+  const latestNewsWeek = newsItems[0]?.week;
+  const unreadNewsCount = newsItems.filter((n) => n.week === latestNewsWeek && n.featured).length;
   const userInjuries = new Set(
     injuries.filter((inj) => inj.teamId === dynasty.userTeamId).map((inj) => inj.playerId),
   );
@@ -562,7 +564,7 @@ export function App() {
       )}
 
       {view === 'news' && (
-        <NewsScreen newsItems={newsItems} />
+        <NewsScreen newsItems={newsItems} userTeamName={userTeam?.shortName} />
       )}
 
       {view === 'history' && (

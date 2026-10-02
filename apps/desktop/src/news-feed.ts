@@ -8,7 +8,16 @@ export interface NewsItem {
   week: number;
   category: NewsCategory;
   headline: string;
+  /** About the user's program: their games, poll moves, commitments. */
+  featured?: boolean;
 }
+
+/** Two teams ranked this high meeting is a headline. */
+const HEADLINE_RANK = 10;
+/** A top-10 team losing to a team this many spots worse (or unranked) is an upset. */
+const UPSET_RANK_GAP = 10;
+/** Commitments at this star rating or better get their own headline. */
+const HEADLINE_STARS = 4;
 
 export interface RankingEntry {
   teamId: string;
@@ -36,7 +45,15 @@ export function generateWeeklyNews(params: GenerateWeeklyNewsParams): NewsItem[]
   const { week, season, previousRankings, newRankings, userTeamId, teamMap } = params;
   const items: NewsItem[] = [];
 
-  // Game results
+  // Game results: the user's game, top-10 matchups, and top-10 upsets. The
+  // rest of the slate is folded into one "around the league" line.
+  const prevRank = new Map(previousRankings.map((r) => [r.teamId, r.rank]));
+  const label = (teamId: string) => {
+    const name = teamMap.get(teamId) ?? teamId;
+    const rank = prevRank.get(teamId);
+    return rank !== undefined && rank <= 20 ? `#${rank} ${name}` : name;
+  };
+  let otherResults = 0;
   for (const game of season.schedule) {
     if (game.week !== week || game.status !== 'final' || game.result === undefined) {
       continue;
@@ -44,8 +61,10 @@ export function generateWeeklyNews(params: GenerateWeeklyNewsParams): NewsItem[]
 
     const { result } = game;
     const userInGame = game.homeTeamId === userTeamId || game.awayTeamId === userTeamId;
-
-    let headline: string;
+    const winnerIsHome = game.homeTeamId === result.winnerTeamId;
+    const winnerScore = winnerIsHome ? result.homeScore : result.awayScore;
+    const loserScore = winnerIsHome ? result.awayScore : result.homeScore;
+    const ot = result.overtime ? ' (OT)' : '';
 
     if (userInGame) {
       const userIsHome = game.homeTeamId === userTeamId;
@@ -53,37 +72,44 @@ export function generateWeeklyNews(params: GenerateWeeklyNewsParams): NewsItem[]
       const opponentScore = userIsHome ? result.awayScore : result.homeScore;
       const opponentId = userIsHome ? game.awayTeamId : game.homeTeamId;
       const userTeamName = teamMap.get(userTeamId) ?? userTeamId;
-      const opponentName = teamMap.get(opponentId) ?? opponentId;
-      const userWon = result.winnerTeamId === userTeamId;
-
-      if (userWon) {
-        headline = `${userTeamName} wins ${userScore}-${opponentScore} over ${opponentName}`;
-      } else {
-        headline = `${userTeamName} falls ${userScore}-${opponentScore} to ${opponentName}`;
-      }
-
-      if (result.overtime) {
-        headline += ' (OT)';
-      }
-    } else {
-      const winnerName = teamMap.get(result.winnerTeamId) ?? result.winnerTeamId;
-      const loserName = teamMap.get(result.loserTeamId) ?? result.loserTeamId;
-      const winnerIsHome = game.homeTeamId === result.winnerTeamId;
-      const winnerScore = winnerIsHome ? result.homeScore : result.awayScore;
-      const loserScore = winnerIsHome ? result.awayScore : result.homeScore;
-
-      headline = `${winnerName} defeats ${loserName} ${winnerScore}-${loserScore}`;
-
-      if (result.overtime) {
-        headline += ' (OT)';
-      }
+      const verb = result.winnerTeamId === userTeamId ? `wins ${userScore}-${opponentScore} over` : `falls ${userScore}-${opponentScore} to`;
+      items.push({
+        id: `week-${week}-${items.length}`,
+        week,
+        category: 'game',
+        headline: `${userTeamName} ${verb} ${label(opponentId)}${ot}`,
+        featured: true,
+      });
+      continue;
     }
 
+    const winnerRank = prevRank.get(result.winnerTeamId) ?? Infinity;
+    const loserRank = prevRank.get(result.loserTeamId) ?? Infinity;
+    const isUpset = loserRank <= HEADLINE_RANK && winnerRank - loserRank >= UPSET_RANK_GAP;
+    if (isUpset) {
+      items.push({
+        id: `week-${week}-${items.length}`,
+        week,
+        category: 'game',
+        headline: `Upset: ${label(result.winnerTeamId)} stuns ${label(result.loserTeamId)} ${winnerScore}-${loserScore}${ot}`,
+      });
+    } else if (winnerRank <= HEADLINE_RANK && loserRank <= HEADLINE_RANK) {
+      items.push({
+        id: `week-${week}-${items.length}`,
+        week,
+        category: 'game',
+        headline: `${label(result.winnerTeamId)} defeats ${label(result.loserTeamId)} ${winnerScore}-${loserScore}${ot}`,
+      });
+    } else {
+      otherResults += 1;
+    }
+  }
+  if (otherResults > 0) {
     items.push({
       id: `week-${week}-${items.length}`,
       week,
       category: 'game',
-      headline,
+      headline: `Around the league: ${otherResults} more result${otherResults === 1 ? '' : 's'} on the Schedule screen`,
     });
   }
 
@@ -101,6 +127,7 @@ export function generateWeeklyNews(params: GenerateWeeklyNewsParams): NewsItem[]
         week,
         category: 'rankings',
         headline: `${userTeamName} rises to #${newEntry.rank} in the national poll`,
+        featured: true,
       });
     } else if (rankChange <= -2) {
       items.push({
@@ -108,6 +135,7 @@ export function generateWeeklyNews(params: GenerateWeeklyNewsParams): NewsItem[]
         week,
         category: 'rankings',
         headline: `${userTeamName} falls to #${newEntry.rank} in the national poll`,
+        featured: true,
       });
     }
   }
@@ -116,25 +144,41 @@ export function generateWeeklyNews(params: GenerateWeeklyNewsParams): NewsItem[]
 }
 
 export function generateRecruitingNews(params: GenerateRecruitingNewsParams): NewsItem[] {
-  const { week, recruits, teamMap } = params;
+  const { week, recruits, userTeamId, teamMap } = params;
   const items: NewsItem[] = [];
+  let quietCommits = 0;
 
-  for (const recruit of recruits) {
+  // Our commitments and blue-chip recruits get headlines; the rest are one line.
+  const ordered = [...recruits].sort((a, b) => b.starRating - a.starRating);
+  for (const recruit of ordered) {
     if (recruit.committedTeamId === undefined) {
+      continue;
+    }
+    const ours = recruit.committedTeamId === userTeamId;
+    if (!ours && recruit.starRating < HEADLINE_STARS) {
+      quietCommits += 1;
       continue;
     }
 
     const teamName = teamMap.get(recruit.committedTeamId) ?? recruit.committedTeamId;
     const stars = '★'.repeat(recruit.starRating);
     const recruitName = `${recruit.name.first} ${recruit.name.last}`;
-    const headline = `${stars} ${recruit.position} ${recruitName} commits to ${teamName}`;
-
     items.push({
       // Distinct prefix: game/ranking news already uses `week-${week}-${i}` ids.
       id: `commit-${week}-${items.length}`,
       week,
       category: 'recruiting',
-      headline,
+      headline: `${ours ? 'Commitment! ' : ''}${stars} ${recruit.position} ${recruitName} commits to ${teamName}`,
+      ...(ours ? { featured: true } : {}),
+    });
+  }
+
+  if (quietCommits > 0) {
+    items.push({
+      id: `commit-${week}-${items.length}`,
+      week,
+      category: 'recruiting',
+      headline: `${quietCommits} more recruit${quietCommits === 1 ? '' : 's'} rated 3★ or lower committed elsewhere`,
     });
   }
 
