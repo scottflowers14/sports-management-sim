@@ -1,6 +1,6 @@
-import { getLacrosseParticipationMinutes } from './player-stats';
+import { getLacrosseParticipationMinutes } from './lineups';
 import type { LacrossePlayer, LacrosseTeam } from './models';
-import type { RandomSource } from './simulate-game';
+import type { RandomSource } from './possession-sim';
 
 export interface LacrosseInjury {
   playerId: string;

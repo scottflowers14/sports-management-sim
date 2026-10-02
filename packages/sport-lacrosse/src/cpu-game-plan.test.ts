@@ -67,6 +67,23 @@ describe('deriveCpuGamePlan', () => {
     expect(deriveCpuGamePlan(team).defense).toBe('shell');
   });
 
+  it('rides aggressively with an athletic attack and conservatively behind a shell', () => {
+    const athletic = makeLacrosseTeam('athletic', makeRoster((p) => (p.position === 'ATT' ? { ...p, ratings: { ...p.ratings, athleticism: 80 } } : p)));
+    expect(deriveCpuGamePlan(athletic).ride).toBe('aggressive');
+    const shell = makeLacrosseTeam('brick-wall', makeRoster((p) => boost(p, ['GK'], 35)));
+    expect(deriveCpuGamePlan(shell).ride).toBe('conservative');
+  });
+
+  it('rolls lines deep when the midfield is even and rides a first line that stands out', () => {
+    const even = makeLacrosseTeam('even', makeRoster((p) => p));
+    expect(deriveCpuGamePlan(even).rotation).toBe('deep');
+    const topHeavy = makeLacrosseTeam(
+      'top-heavy',
+      makeRoster((p) => (p.position === 'MID' && Number(p.id.split('-')[1]) < 9 ? boost(p, ['MID'], 15) : p)),
+    );
+    expect(deriveCpuGamePlan(topHeavy).rotation).toBe('tight');
+  });
+
   it('is deterministic for the same roster', () => {
     const team = makeLacrosseTeam('steady', makeRoster((p) => p));
     expect(deriveCpuGamePlan(team)).toEqual(deriveCpuGamePlan(team));
@@ -75,7 +92,7 @@ describe('deriveCpuGamePlan', () => {
 
 describe('describeGamePlan', () => {
   it('formats tempo and defensive style labels', () => {
-    expect(describeGamePlan({ tempo: 'uptempo', defense: 'shell' })).toBe('Uptempo · Shell');
-    expect(describeGamePlan({ tempo: 'balanced', defense: 'balanced' })).toBe('Balanced · Balanced');
+    expect(describeGamePlan({ tempo: 'uptempo', defense: 'shell' })).toBe('Uptempo · Shell · Standard ride · Balanced rotation');
+    expect(describeGamePlan({ tempo: 'balanced', defense: 'balanced' })).toBe('Balanced · Balanced · Standard ride · Balanced rotation');
   });
 });

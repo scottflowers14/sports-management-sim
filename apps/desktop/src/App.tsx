@@ -502,6 +502,7 @@ export function App() {
           injuries={userInjuries}
           injuredCount={injuredCount}
           rating={userTeamRating}
+          gamePlan={gamePlan}
           onSelectPlayer={setSelectedPlayerId}
           onDepthChartChange={updateDepthChartSlot}
         />
@@ -687,6 +688,7 @@ export function App() {
           data={selectedBoxScore}
           onClose={() => setSelectedBoxScore(null)}
           playerName={(id) => playerLookup.get(id)?.name}
+          playerPosition={(id) => playerLookup.get(id)?.position}
         />
       )}
     </main>

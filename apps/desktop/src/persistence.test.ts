@@ -147,6 +147,21 @@ describe('multi-save persistence', () => {
     expect(loaded!.scouting.pointsPerWeek).toBe(recruitingHoursFor(loaded!.staff!.recruiting!.rating));
     expect(loaded!.scouting.pointsAvailable).toBe(2);
   });
+
+  it('fills in the ride and rotation of a game plan saved before they existed', () => {
+    const storage = makeStorage();
+    const save = makeSave(4002);
+    const legacy: Record<string, unknown> = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      ...save,
+      gamePlan: { tempo: 'uptempo', defense: 'shell' },
+    };
+    storage.setItem(dynastySaveSlotKey('save-plan'), JSON.stringify(legacy));
+
+    const loaded = loadDynastySaveSlot('save-plan', storage);
+    expect(loaded!.gamePlan).toEqual({ tempo: 'uptempo', defense: 'shell', ride: 'standard', rotation: 'balanced' });
+  });
 });
 
 describe('save compaction', () => {
@@ -183,6 +198,26 @@ describe('save compaction', () => {
     expect('2027-week-1-old-vs-older' in compactForStorage({ ...save, gameLogs: { ...save.gameLogs, '2027-week-1-old-vs-older': save.gameLogs[schedule[0]!.id]! } }).gameLogs).toBe(false);
     // Box scores survive on the schedule.
     expect(compact.dynasty.season.schedule.every((g) => g.result !== undefined)).toBe(true);
+  });
+
+  it('keeps every possession for the user and only the scoring summary for other programs', () => {
+    const save = playedSave();
+    const compact = compactForStorage(save);
+    const user = save.dynasty.userTeamId;
+    for (const [id, log] of Object.entries(compact.gameLogs)) {
+      const game = save.dynasty.season.schedule.find((g) => g.id === id)!;
+      const isUserGame = game.homeTeamId === user || game.awayTeamId === user;
+      const nonScoring = log.events.filter((e) => e.type !== 'goal' && e.type !== 'period_end');
+      if (isUserGame) {
+        expect(nonScoring.length).toBeGreaterThan(0);
+        expect(log.playerLines!.length).toBeGreaterThan(0);
+      } else {
+        expect(nonScoring).toEqual([]);
+        expect(log.playerLines).toBeUndefined();
+        // The goals and the running score survive.
+        expect(log.events.filter((e) => e.type === 'goal').length).toBe(game.result!.homeScore + game.result!.awayScore);
+      }
+    }
   });
 
   it('keeps career stats only for players still in the league', () => {

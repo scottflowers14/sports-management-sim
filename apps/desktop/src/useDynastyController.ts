@@ -11,6 +11,7 @@ import {
   DEFAULT_GAME_PLAN,
   LACROSSE_CLASS_SCHOLARSHIP_BUDGET,
   deriveCpuGamePlan,
+  normalizeGamePlan,
   fillStaffVacancies,
   hireStaffCandidate,
   offerLacrossePortalPlayer,
@@ -167,7 +168,7 @@ export function useDynastyController() {
   const [adConfidence, setAdConfidence] = useState<number>(() => loadedSave?.adConfidence ?? 60);
   const [seasonGoals, setSeasonGoals] = useState<SeasonGoals | null>(() => loadedSave?.seasonGoals ?? null);
   const [bestNatRank, setBestNatRank] = useState<number | null>(() => loadedSave?.bestNatRank ?? null);
-  const [gamePlan, setGamePlan] = useState<LacrosseGamePlan>(() => loadedSave?.gamePlan ?? DEFAULT_GAME_PLAN);
+  const [gamePlan, setGamePlan] = useState<LacrosseGamePlan>(() => normalizeGamePlan(loadedSave?.gamePlan));
   const [trainingFocus, setTrainingFocus] = useState<TrainingFocus>(() => loadedSave?.trainingFocus ?? 'balanced');
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
@@ -327,7 +328,7 @@ export function useDynastyController() {
     setAdConfidence(save.adConfidence ?? 60);
     setSeasonGoals(save.seasonGoals ?? null);
     setBestNatRank(save.bestNatRank ?? null);
-    setGamePlan(save.gamePlan ?? DEFAULT_GAME_PLAN);
+    setGamePlan(normalizeGamePlan(save.gamePlan));
     setTrainingFocus(save.trainingFocus ?? 'balanced');
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateLacrosseRoster } from './roster-generation';
-import { getLacrosseParticipationMinutes } from './player-stats';
+import { getLacrosseParticipationMinutes } from './lineups';
 import {
   GAME_INJURY_RATE,
   LACROSSE_INJURY_TYPES,
