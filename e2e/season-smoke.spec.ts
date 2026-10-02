@@ -12,6 +12,8 @@ function trackErrors(page: Page): string[] {
 
 test('plays a season through the title game and offseason into year two', async ({ page }) => {
   const errors = trackErrors(page);
+  // Dynasty seeds come from the clock; pin it so every run plays the same league.
+  await page.clock.setFixedTime(new Date('2026-10-02T12:00:00Z'));
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
