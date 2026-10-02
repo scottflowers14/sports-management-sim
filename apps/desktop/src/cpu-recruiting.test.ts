@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
@@ -37,7 +37,14 @@ function simState(dynasty: LacrosseDynastyState): WeekSimState {
  * multi-season dynasty.
  */
 describe('CPU recruiting league health (idle user)', () => {
+  // Player development and box-score stats draw from Math.random; pin it so
+  // the run is the same on every machine.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('keeps every roster at or near the floor across two idle seasons and stratifies recruits by prestige', () => {
+    vi.spyOn(Math, 'random').mockImplementation(seededRandom(7));
     let dynasty = createFreshLacrosseDynasty({ now: () => 424242 });
 
     for (let season = 1; season <= 2; season++) {
