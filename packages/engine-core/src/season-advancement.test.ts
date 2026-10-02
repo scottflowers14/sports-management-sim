@@ -138,4 +138,23 @@ describe('advanceSeasonWeek', () => {
     expect(season.schedule[0]?.status).toBe('scheduled');
     expect(season.teams[0]?.record.wins).toBe(0);
   });
+
+  it('ranks standings by record, not by the order the teams are stored', () => {
+    const season = makeSeason();
+    // The away side wins; the stored order is a, b, c, d.
+    const advanced = advanceSeasonWeek(season, (game) => ({
+      homeScore: 5,
+      awayScore: 9,
+      winnerTeamId: game.awayTeamId,
+      loserTeamId: game.homeTeamId,
+      overtime: false,
+    }));
+    const byId = new Map(advanced.standings.map((entry) => [entry.teamId, entry]));
+    // Only week 1 (a vs b) has played: b is 1-0, a is 0-1, c and d are 0-0.
+    expect(byId.get('b')!.nationalRank).toBe(1);
+    expect(byId.get('b')!.conferenceRank).toBe(1);
+    expect(byId.get('a')!.nationalRank).toBe(4);
+    expect(byId.get('a')!.conferenceRank).toBe(4);
+    expect([...advanced.standings].map((e) => e.nationalRank).sort()).toEqual([1, 2, 3, 4]);
+  });
 });

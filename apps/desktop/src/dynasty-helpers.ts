@@ -162,6 +162,17 @@ export function processInjuries(
   };
 }
 
+/**
+ * A postseason weekend passes: everyone on the injury list heals a week and
+ * anyone whose time is up returns. Nobody gets hurt in the postseason sim, so
+ * this is the only way the list changes between the regular season and the offseason.
+ */
+export function healInjuriesOneWeek(currentInjuries: InjuredPlayer[]): InjuredPlayer[] {
+  return currentInjuries
+    .map((inj) => ({ ...inj, weeksRemaining: inj.weeksRemaining - 1 }))
+    .filter((inj) => inj.weeksRemaining > 0);
+}
+
 /** A recruit shuts down their recruitment early only when one school is a runaway leader. */
 const EARLY_COMMIT_INTEREST = 95;
 const EARLY_COMMIT_LEAD = 20;
@@ -539,8 +550,9 @@ export function resolveAndApplyPortal(dynasty: LacrosseDynastyState): LacrosseDy
       preferredHand: 'right',
     };
 
+    // The transfer keeps his id: his career stats from the old school stay linked.
     const newPlayers: LacrossePlayer[] = userCommits.map((entry) => ({
-      id: `portal-player-${entry.id}`,
+      id: entry.playerId,
       name: entry.name,
       age: 19,
       classYear: entry.classYear,

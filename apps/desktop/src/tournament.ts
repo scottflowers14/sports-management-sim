@@ -227,7 +227,7 @@ export function selectNcaaField(
   const auto = [...new Set(champions)];
   const autoSet = new Set(auto);
   const pool = teams.map((t) => t.id).filter((id) => !autoSet.has(id)).sort(byRpi);
-  const atLargeCount = Math.max(0, Math.min(NCAA_FIELD_SIZE, teams.length) - auto.length);
+  const atLargeCount = Math.max(0, ncaaFieldSize(teams.length) - auto.length);
   const firstOut = pool
     .slice(atLargeCount, atLargeCount + 4)
     .map((teamId) => ({ teamId, rpi: rpi.get(teamId) ?? 0 }));
@@ -239,6 +239,16 @@ export function selectNcaaField(
     rpi: rpi.get(teamId) ?? 0,
   }));
   return { field, firstOut };
+}
+
+/**
+ * How many teams the bracket can actually play: the full 12-team field, a
+ * seeded final four for small leagues, or a title game for the tiniest.
+ */
+export function ncaaFieldSize(teamCount: number): number {
+  if (teamCount >= NCAA_FIELD_SIZE) return NCAA_FIELD_SIZE;
+  if (teamCount >= 4) return 4;
+  return Math.max(2, teamCount);
 }
 
 export function advanceTournamentNationalSemis(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan, coachingFor: CoachingResolver = NO_COACHING): TournamentState {
@@ -272,12 +282,22 @@ export function advanceNationalChampionship(state: TournamentState, teams: Lacro
 }
 
 function buildBracket(confId: string, teamIds: string[], standings: StandingsEntry[]): ConferenceBracket {
+  // Conference tournaments seed by league record; overall record breaks ties.
   const seeded = teamIds
     .map((id) => {
       const s = standings.find((e) => e.teamId === id);
-      return { id, wins: s?.record.wins ?? 0, losses: s?.record.losses ?? 0 };
+      return {
+        id,
+        confWins: s?.record.conferenceWins ?? 0,
+        confLosses: s?.record.conferenceLosses ?? 0,
+        wins: s?.record.wins ?? 0,
+        losses: s?.record.losses ?? 0,
+      };
     })
-    .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+    .sort(
+      (a, b) =>
+        b.confWins - a.confWins || a.confLosses - b.confLosses || b.wins - a.wins || a.losses - b.losses,
+    );
 
   const s1 = seeded[0]?.id ?? teamIds[0]!;
   const s2 = seeded[1]?.id ?? teamIds[1]!;
