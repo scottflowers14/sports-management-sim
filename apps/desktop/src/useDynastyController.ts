@@ -18,6 +18,7 @@ import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition,
 import { runOffseason, resolveAndApplyPortal } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { simulateOneWeek, simulateRemainingWeeks, withoutInjured } from './week-sim';
+import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { WeekSimState } from './week-sim';
 import {
   createCoachProfile,
@@ -129,6 +130,10 @@ export function useDynastyController() {
     () => loadedSave?.recruitingActivity ?? emptyRecruitingActivity(),
   );
   const [recruitTrends, setRecruitTrends] = useState<Record<string, number>>(() => loadedSave?.recruitTrends ?? {});
+  const [assistantReport, setAssistantReport] = useState<AssistantReport | null>(null);
+  const [autoRecruitingAssistant, setAutoRecruitingAssistant] = useState<boolean>(
+    () => loadedSave?.autoRecruitingAssistant ?? false,
+  );
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
   const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadedSave?.careerStats ?? emptyCareerStats());
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded dynasty save' : 'Choose or create a dynasty'));
@@ -170,7 +175,8 @@ export function useDynastyController() {
     shortlistIds,
     recruitingActivity,
     recruitTrends,
-  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends]);
+    autoRecruitingAssistant,
+  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -279,6 +285,7 @@ export function useDynastyController() {
     setScouting(save.scouting);
     setRecruitingActivity(save.recruitingActivity ?? emptyRecruitingActivity());
     setRecruitTrends(save.recruitTrends ?? {});
+    setAutoRecruitingAssistant(save.autoRecruitingAssistant ?? false);
     setSeasonStats(save.seasonStats);
     setCareerStats(save.careerStats ?? emptyCareerStats());
     setCoachProfile(save.coachProfile ?? null);
@@ -369,6 +376,7 @@ export function useDynastyController() {
     setGameLogs(result.gameLogs);
     setBestNatRank(result.bestNatRank);
     setLastSimWeek(result.lastSimWeek);
+    setAssistantReport(null);
   }, []);
 
   // Simming is locked while the offseason is pending; send the coach back there instead.
@@ -377,16 +385,32 @@ export function useDynastyController() {
       setView('offseason');
       return;
     }
-    applyWeekSimResult(simulateOneWeek(buildWeekSimState(), gamePlan));
-  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary]);
+    const start = autoRecruitingAssistant ? applyAssistantToWeekState(buildWeekSimState(), shortlistIds).state : buildWeekSimState();
+    applyWeekSimResult(simulateOneWeek(start, gamePlan));
+  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary, autoRecruitingAssistant, shortlistIds]);
 
   const simToEnd = useCallback(() => {
     if (offseasonSummary) {
       setView('offseason');
       return;
     }
-    applyWeekSimResult(simulateRemainingWeeks(buildWeekSimState(), gamePlan));
-  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary]);
+    const beforeWeek = autoRecruitingAssistant
+      ? (state: WeekSimState) => applyAssistantToWeekState(state, shortlistIds).state
+      : undefined;
+    applyWeekSimResult(simulateRemainingWeeks(buildWeekSimState(), gamePlan, Math.random, beforeWeek));
+  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary, autoRecruitingAssistant, shortlistIds]);
+
+  // The recruiting coordinator spends this week's leftover hours on pitches and scouting.
+  const runRecruitingAssistant = useCallback(() => {
+    const { state, report } = applyAssistantToWeekState(buildWeekSimState(), shortlistIds);
+    if (report.actions.length > 0) {
+      setDynasty(state.dynasty);
+      setScouting(state.scouting);
+      setRecruitingActivity(state.recruitingActivity);
+    }
+    setAssistantReport(report);
+    setSaveStatus(summarizeAssistantActions(report.actions));
+  }, [buildWeekSimState, shortlistIds]);
 
   const offerScholarship = useCallback((recruitId: string, scholarshipPercent = 100) => {
     const recruit = dynasty.recruits.find((r) => r.id === recruitId);
@@ -805,6 +829,10 @@ export function useDynastyController() {
     toggleVisitInvite,
     recruitingActivity,
     recruitTrends,
+    runRecruitingAssistant,
+    assistantReport,
+    autoRecruitingAssistant,
+    setAutoRecruitingAssistant,
     hasHomeGameThisWeek,
     offerPortalPlayer,
     enterTournament,

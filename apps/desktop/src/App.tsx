@@ -92,6 +92,10 @@ export function App() {
     toggleVisitInvite,
     recruitingActivity,
     recruitTrends,
+    runRecruitingAssistant,
+    assistantReport,
+    autoRecruitingAssistant,
+    setAutoRecruitingAssistant,
     hasHomeGameThisWeek,
     offerPortalPlayer,
     enterTournament,
@@ -512,6 +516,10 @@ export function App() {
           onToggleShortlist={toggleShortlist}
           onBoardViewChange={setRecruitBoardView}
           onSelectRecruit={setSelectedRecruitId}
+          assistantReport={assistantReport}
+          autoAssistant={autoRecruitingAssistant}
+          onRunAssistant={runRecruitingAssistant}
+          onAutoAssistantChange={setAutoRecruitingAssistant}
         />
       )}
 

@@ -283,6 +283,21 @@ describe('Desktop App', () => {
     expect(screen.getAllByTitle(/Already pitched this week/i).length).toBeGreaterThan(0);
   });
 
+  it('runs the recruiting assistant and pages the full recruit list', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
+
+    const pager = screen.getAllByRole('navigation', { name: /Recruit pages/i })[0]!;
+    expect(pager).toHaveTextContent(/^.*1–25 of \d+/);
+    await userEvent.click(within(pager).getByRole('button', { name: /Next/i }));
+    expect(screen.getAllByRole('navigation', { name: /Recruit pages/i })[0]!).toHaveTextContent(/26–50 of/);
+
+    await userEvent.click(screen.getByRole('button', { name: /^Run Assistant$/i }));
+    const report = screen.getByLabelText(/Recruiting assistant report/i);
+    expect(report).toHaveTextContent(/Scouting \(\d+\)/);
+    expect(screen.getByRole('button', { name: /^Run Assistant$/i })).toBeDisabled();
+  });
+
   it('shows the weekly hub and opens a player card from a player to watch', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));

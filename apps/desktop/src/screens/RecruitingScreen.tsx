@@ -12,6 +12,7 @@ import {
 import type { ScoutingState } from '../scouting';
 import { getDisplayOvr, getScoutTier, HOURS_COST } from '../scouting';
 import type { RecruitingActivity } from '../recruiting-activity';
+import type { AssistantReport as AssistantReportData } from '../recruiting-assistant';
 import { formatTeamName, formatTeamShort } from '../ui/format';
 
 type LacrosseBoardEntry = RecruitBoardEntry<LacrossePosition, LacrossePlayerTraits>;
@@ -21,6 +22,9 @@ type BoardSort = 'rank' | 'stars' | 'ovr' | 'interest';
 
 /** 4★+ recruits are nationally ranked — their star tier is public knowledge. */
 const PUBLIC_STAR_FLOOR = 4;
+
+/** All Recruits shows this many rows per page; the full board runs to hundreds. */
+export const RECRUITS_PAGE_SIZE = 25;
 
 const MOTIVATION_LABELS: Record<RecruitMotivation, string> = {
   proximity: 'Close to Home',
@@ -234,6 +238,10 @@ export function RecruitingScreen({
   onToggleShortlist,
   onBoardViewChange,
   onSelectRecruit,
+  assistantReport,
+  autoAssistant,
+  onRunAssistant,
+  onAutoAssistantChange,
 }: {
   recruitBoard: LacrosseBoardEntry[];
   portalEntries: LacrossePortalEntry[];
@@ -260,6 +268,10 @@ export function RecruitingScreen({
   onToggleShortlist: (recruitId: string) => void;
   onBoardViewChange: (view: RecruitBoardView) => void;
   onSelectRecruit: (recruitId: string) => void;
+  assistantReport?: AssistantReportData | null;
+  autoAssistant?: boolean;
+  onRunAssistant?: () => void;
+  onAutoAssistantChange?: (on: boolean) => void;
 }) {
   const [boardSort, setBoardSort] = useState<BoardSort>('rank');
   const [hideCommitted, setHideCommitted] = useState(false);
@@ -302,9 +314,31 @@ export function RecruitingScreen({
             <span className="scout-pts-hint">
               (+{scouting.pointsPerWeek}/wk · scout {HOURS_COST.scout}h · pitch {HOURS_COST.pitch}h · visit {HOURS_COST.visit}h)
             </span>
+            {onRunAssistant && (
+              <div className="assistant-controls">
+                <button
+                  className="offer-btn assistant-btn"
+                  onClick={onRunAssistant}
+                  disabled={scouting.pointsAvailable < 1}
+                  title="Your recruiting coordinator pitches the recruits you've offered or pinned, then scouts the best fits. It never offers scholarships or books visits."
+                >
+                  Run Assistant
+                </button>
+                <label className="assistant-auto">
+                  <input
+                    type="checkbox"
+                    checked={autoAssistant ?? false}
+                    onChange={(e) => onAutoAssistantChange?.(e.target.checked)}
+                  />
+                  Auto each week
+                </label>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {recruitTab === 'board' && assistantReport && <AssistantReport report={assistantReport} onSelectRecruit={onSelectRecruit} />}
 
       {recruitTab === 'board' && (
         <>
@@ -396,6 +430,7 @@ export function RecruitingScreen({
             />
           ) : (
             <AllRecruitsList
+              key={`${recruitPosFilter}-${boardSort}-${hideCommitted}`}
               entries={recruitBoard.filter(matchesPosFilter)}
               sort={boardSort}
               hideCommitted={hideCommitted}
@@ -578,6 +613,7 @@ function AllRecruitsList({
   onToggleShortlist: (recruitId: string) => void;
   onSelectRecruit: (recruitId: string) => void;
 }) {
+  const [page, setPage] = useState(0);
   const visible = hideCommitted
     ? entries.filter(
         (e) =>
@@ -612,9 +648,28 @@ function AllRecruitsList({
           .sort((a, b) => sortValue(b.entry) - sortValue(a.entry) || a.index - b.index)
           .map(({ entry }) => entry);
 
+  const pageCount = Math.max(1, Math.ceil(sorted.length / RECRUITS_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageStart = currentPage * RECRUITS_PAGE_SIZE;
+  const pageEntries = sorted.slice(pageStart, pageStart + RECRUITS_PAGE_SIZE);
+  const pager = pageCount > 1 && (
+    <div className="pager recruit-pager" role="navigation" aria-label="Recruit pages">
+      <button className="ghost-btn" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 0}>
+        ‹ Prev
+      </button>
+      <span className="dim">
+        {pageStart + 1}–{pageStart + pageEntries.length} of {sorted.length}
+      </span>
+      <button className="ghost-btn" onClick={() => setPage(currentPage + 1)} disabled={currentPage >= pageCount - 1}>
+        Next ›
+      </button>
+    </div>
+  );
+
   return (
     <div className="recruit-list">
-      {sorted.map((entry) => {
+      {pager}
+      {pageEntries.map((entry) => {
         const { recruit } = entry;
         const tier = getScoutTier(recruit.id, scouting);
         const displayOvr = getDisplayOvr(recruit.id, recruit.ratings.overall, scouting);
@@ -742,7 +797,76 @@ function AllRecruitsList({
           <p className="dim">No recruits match the current filters.</p>
         </article>
       )}
+      {pager}
     </div>
+  );
+}
+
+function AssistantReport({
+  report,
+  onSelectRecruit,
+}: {
+  report: AssistantReportData;
+  onSelectRecruit: (recruitId: string) => void;
+}) {
+  const { actions, needsOffer } = report;
+  const pitches = actions.filter((a) => a.type === 'pitch');
+  const scouts = actions.filter((a) => a.type === 'scout');
+  return (
+    <article className="card assistant-report" aria-label="Recruiting assistant report">
+      <h3>Recruiting Coordinator Report</h3>
+      {actions.length === 0 ? (
+        <p className="dim">Nothing to do: no hours left, or no pinned or offered recruits ready to pitch or scout.</p>
+      ) : (
+        <div className="assistant-columns">
+          <div>
+            <h4>Pitches ({pitches.length})</h4>
+            {pitches.length === 0 ? (
+              <p className="dim">No scouted targets to pitch yet. Pin or offer recruits and the staff pitches them once scouted.</p>
+            ) : (
+              <ul>
+                {pitches.map((a) => a.type === 'pitch' && (
+                  <li key={a.recruitId}>
+                    {a.name}: sold {MOTIVATION_LABELS[a.motivation]}{' '}
+                    <span className={a.interestChange > 0 ? 'positive' : 'negative'}>
+                      ({a.interestChange > 0 ? '+' : ''}{a.interestChange})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4>Scouting ({scouts.length})</h4>
+            {scouts.length === 0 ? (
+              <p className="dim">No hours left for scouting.</p>
+            ) : (
+              <ul>
+                {scouts.map((a, i) => a.type === 'scout' && (
+                  <li key={`${a.recruitId}-${i}`}>
+                    {a.name}: {a.tier === 'full' ? 'full report' : 'first look'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+      {needsOffer.length > 0 && (
+        <p className="assistant-needs-offer">
+          <strong>Needs your call:</strong> pitches alone won't land{' '}
+          {needsOffer.map((n, k) => (
+            <span key={n.recruitId}>
+              {k > 0 && ', '}
+              <button className="link-btn" onClick={() => onSelectRecruit(n.recruitId)}>
+                {n.name}
+              </button>
+            </span>
+          ))}
+          . They're on your board without a scholarship offer.
+        </p>
+      )}
+    </article>
   );
 }
 

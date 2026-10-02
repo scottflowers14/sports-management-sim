@@ -302,11 +302,14 @@ export function simulateRemainingWeeks(
   state: WeekSimState,
   userGamePlan: LacrosseGamePlan = DEFAULT_GAME_PLAN,
   random: () => number = Math.random,
+  /** Runs before each week is simulated, e.g. the auto recruiting assistant. */
+  beforeWeek?: (state: WeekSimState) => WeekSimState,
 ): WeekSimState {
   let current = state;
   // Safety bound: a season is far shorter than 64 weeks
   for (let i = 0; i < 64; i += 1) {
     if (!current.dynasty.season.schedule.some((g) => g.status === 'scheduled')) break;
+    if (beforeWeek) current = beforeWeek(current);
     current = simulateOneWeek(current, userGamePlan, random);
   }
   return current;

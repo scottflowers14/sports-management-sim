@@ -4396,3 +4396,76 @@ li span {
 .tournament-section-title {
   margin: 8px 0 0;
 }
+
+/* Recruiting assistant */
+.assistant-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 14px;
+}
+.assistant-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-dim, #9fb0c8);
+  white-space: nowrap;
+}
+.assistant-report {
+  margin-bottom: 12px;
+}
+.assistant-report h3 {
+  margin: 0 0 10px;
+}
+.assistant-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.assistant-columns h4 {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim, #9fb0c8);
+}
+.assistant-columns ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+.assistant-columns .positive {
+  color: #5fd38d;
+}
+.assistant-columns .negative {
+  color: #f07a7a;
+}
+.recruit-pager {
+  margin: 8px 0;
+}
+.assistant-btn {
+  display: inline-block;
+  width: auto;
+  white-space: nowrap;
+}
+.assistant-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.assistant-needs-offer {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 196, 87, 0.08);
+  border: 1px solid rgba(255, 196, 87, 0.3);
+  font-size: 0.88rem;
+}
+.assistant-needs-offer strong {
+  color: #ffc457;
+}
+.assistant-columns li span {
+  display: inline;
+  margin: 0;
+}

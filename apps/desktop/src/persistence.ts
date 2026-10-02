@@ -50,6 +50,8 @@ export interface DynastySaveState {
   recruitingActivity: RecruitingActivity;
   /** Change in user interest per recruit over the last simulated week. */
   recruitTrends: Record<string, number>;
+  /** When on, the recruiting assistant spends leftover hours before each simulated week. */
+  autoRecruitingAssistant?: boolean;
 }
 
 export interface DynastySaveMetadata {
