@@ -4506,3 +4506,13 @@ li span {
   color: #f2f7fb;
   font-weight: 700;
 }
+
+.hub-injury-name {
+  flex-wrap: wrap;
+}
+.hub-injury-type {
+  flex-basis: 100%;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: #f0a07a;
+}

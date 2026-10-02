@@ -32,6 +32,7 @@ export function PlayerPanel({
       {isInjured && injuryData && (
         <p className="injury-status">
           Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}
+          {injuryData.description ? ` (${injuryData.description})` : ''}
         </p>
       )}
       {liveStats && <PlayerStatsSection stats={liveStats} position={player.position} seasonYear={seasonYear} />}

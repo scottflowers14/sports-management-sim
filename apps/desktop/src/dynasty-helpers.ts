@@ -17,6 +17,7 @@ import {
   generateLacrosseRecruitingClass,
   generateLacrosseWalkOns,
   recruitingClassSize,
+  rollLacrosseInjuries,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
   LacrossePlayer,
@@ -79,16 +80,32 @@ export interface InjuredPlayer {
   playerId: string;
   teamId: string;
   weeksRemaining: number;
+  /** e.g. "ankle sprain"; missing on saves from before injury types. */
+  description?: string;
 }
 
+export interface NewInjury {
+  playerId: string;
+  teamId: string;
+  playerName: string;
+  weeksRemaining: number;
+  description: string;
+}
+
+/**
+ * Advance existing injuries a week and roll new ones. Injury risk comes from
+ * the engine (rollLacrosseInjuries) and follows time on the field, so teams
+ * listed in `playedTeamIds` face game risk and everyone else only practice risk.
+ * Omit `playedTeamIds` to treat every team as having played.
+ */
 export function processInjuries(
   currentInjuries: InjuredPlayer[],
   teams: LacrosseTeam[],
   random: () => number,
-  injuryChance = 0.03,
+  playedTeamIds?: Set<string>,
 ): {
   injuries: InjuredPlayer[];
-  newlyInjured: { playerId: string; teamId: string; playerName: string; weeksRemaining: number }[];
+  newlyInjured: NewInjury[];
   recovered: { playerId: string; teamId: string; playerName: string }[];
 } {
   const decremented = currentInjuries.map((inj) => ({
@@ -112,28 +129,30 @@ export function processInjuries(
     }
   }
 
-  const injuredIds = new Set(stillActive.map((inj) => inj.playerId));
-  const newlyInjured: { playerId: string; teamId: string; playerName: string; weeksRemaining: number }[] = [];
-  const newEntries: InjuredPlayer[] = [];
+  // Anyone hurt going into this week sat out, so they weren't on the field to get hurt again.
+  const injuredIds = new Set(currentInjuries.map((inj) => inj.playerId));
+  const newlyInjured: NewInjury[] = [];
 
   for (const team of teams) {
-    for (const player of team.roster) {
-      if (injuredIds.has(player.id)) continue;
-      if (random() < injuryChance) {
-        const weeksRemaining = 1 + Math.floor(random() * 4);
-        newlyInjured.push({
-          playerId: player.id,
-          teamId: team.id,
-          playerName: `${player.name.first} ${player.name.last}`,
-          weeksRemaining,
-        });
-        newEntries.push({ playerId: player.id, teamId: team.id, weeksRemaining });
-      }
+    const healthy = { ...team, roster: team.roster.filter((p) => !injuredIds.has(p.id)) };
+    const played = playedTeamIds ? playedTeamIds.has(team.id) : true;
+    for (const injury of rollLacrosseInjuries(healthy, { played, random })) {
+      const player = team.roster.find((p) => p.id === injury.playerId)!;
+      newlyInjured.push({
+        playerId: injury.playerId,
+        teamId: team.id,
+        playerName: `${player.name.first} ${player.name.last}`,
+        weeksRemaining: injury.weeksOut,
+        description: injury.description,
+      });
     }
   }
 
   return {
-    injuries: [...stillActive, ...newEntries],
+    injuries: [
+      ...stillActive,
+      ...newlyInjured.map(({ playerId, teamId, weeksRemaining, description }) => ({ playerId, teamId, weeksRemaining, description })),
+    ],
     newlyInjured,
     recovered,
   };

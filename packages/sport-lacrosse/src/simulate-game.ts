@@ -12,7 +12,15 @@ export interface SimulateLacrosseGameInput {
   random?: RandomSource;
   homeGamePlan?: LacrosseGamePlan;
   awayGamePlan?: LacrosseGamePlan;
+  /** Championship-weekend games are played at a neutral site: no home edge. */
+  neutralSite?: boolean;
 }
+
+/**
+ * Home teams score a little more often (crowd, familiarity, last change).
+ * Worth about half a goal a game, so home teams win about 57% of even matchups.
+ */
+export const HOME_SCORING_EDGE = 0.012;
 
 export type LacrosseGameResult = GameResult<LacrosseTeamStats>;
 
@@ -54,7 +62,9 @@ function simulateTeamResult({
   random = Math.random,
   homeGamePlan = DEFAULT_GAME_PLAN,
   awayGamePlan = DEFAULT_GAME_PLAN,
+  neutralSite = false,
 }: SimulateLacrosseGameInput): LacrosseGameResult {
+  const homeEdge = neutralSite ? 0 : HOME_SCORING_EDGE;
   const homeRating = calculateLacrosseTeamRating(homeTeam);
   const awayRating = calculateLacrosseTeamRating(awayTeam);
   const homePossessionEdge = (homeRating.faceoff - awayRating.faceoff) / 12;
@@ -70,7 +80,7 @@ function simulateTeamResult({
     Math.round(44 + Math.floor(random() * 12) - homePossessionEdge + awayMods.ownPossessions + homeMods.oppPossessions),
   );
 
-  let homeScore = simulateGoals(homePossessions, homeRating, awayRating, random, homeMods.ownScoringChance + awayMods.oppScoringChance);
+  let homeScore = simulateGoals(homePossessions, homeRating, awayRating, random, homeMods.ownScoringChance + awayMods.oppScoringChance + homeEdge);
   let awayScore = simulateGoals(awayPossessions, awayRating, homeRating, random, awayMods.ownScoringChance + homeMods.oppScoringChance);
   let overtime = false;
 

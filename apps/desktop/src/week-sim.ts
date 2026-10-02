@@ -30,7 +30,8 @@ import type { RecruitingActivity } from './recruiting-activity';
 import { updateSeasonStats } from './stats';
 import type { SeasonStatsMap } from './stats';
 
-const MAX_NEWS_ITEMS = 60;
+// About ten items a week, so this keeps the whole regular season.
+const MAX_NEWS_ITEMS = 120;
 
 export interface WeekSimState {
   dynasty: LacrosseDynastyState;
@@ -153,7 +154,12 @@ export function simulateOneWeek(
   const newDynasty = { ...dynasty, season: newSeason, recruits: newRecruits, recruitBoard: newBoard };
 
   const newRankings = computeNationalRankings(newSeason.teams, state.rankings);
-  const { injuries: newInjuries, newlyInjured, recovered } = processInjuries(state.injuries, newSeason.teams, random);
+  const playedTeamIds = new Set(
+    newSeason.schedule
+      .filter((g) => g.week === weekToSim && g.status === 'final')
+      .flatMap((g) => [g.homeTeamId, g.awayTeamId]),
+  );
+  const { injuries: newInjuries, newlyInjured, recovered } = processInjuries(state.injuries, newSeason.teams, random, playedTeamIds);
 
   const newlyCommitted = newRecruits.filter((r) => r.status !== 'open' && !prevCommittedIds.has(r.id));
 
@@ -218,7 +224,10 @@ export function simulateOneWeek(
         week: weekToSim,
         category: 'injury' as const,
         featured: true,
-        headline: `${inj.playerName} is out ${inj.weeksRemaining} week${inj.weeksRemaining > 1 ? 's' : ''} with an injury`,
+        headline:
+          inj.weeksRemaining >= 10
+            ? `${inj.playerName} is out for the season (${inj.description})`
+            : `${inj.playerName} is out ${inj.weeksRemaining} week${inj.weeksRemaining > 1 ? 's' : ''} (${inj.description})`,
       })),
     ...recovered
       .filter((r) => r.teamId === dynasty.userTeamId)

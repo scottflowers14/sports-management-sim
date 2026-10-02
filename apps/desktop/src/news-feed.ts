@@ -10,6 +10,8 @@ export interface NewsItem {
   headline: string;
   /** About the user's program: their games, poll moves, commitments. */
   featured?: boolean;
+  /** A roll-up line ("Around the league: ...") rather than a story. */
+  summary?: boolean;
 }
 
 /** Two teams ranked this high meeting is a headline. */
@@ -110,6 +112,7 @@ export function generateWeeklyNews(params: GenerateWeeklyNewsParams): NewsItem[]
       week,
       category: 'game',
       headline: `Around the league: ${otherResults} more result${otherResults === 1 ? '' : 's'} on the Schedule screen`,
+      summary: true,
     });
   }
 
@@ -179,6 +182,7 @@ export function generateRecruitingNews(params: GenerateRecruitingNewsParams): Ne
       week,
       category: 'recruiting',
       headline: `${quietCommits} more recruit${quietCommits === 1 ? '' : 's'} rated 3★ or lower committed elsewhere`,
+      summary: true,
     });
   }
 

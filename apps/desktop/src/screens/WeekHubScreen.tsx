@@ -162,7 +162,7 @@ export function WeekHubScreen({
   onBoxScore: (data: BoxScoreData) => void;
   onNavigate: (view: string) => void;
 }) {
-  const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting').slice(0, 3);
+  const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
     (e) => e.status === 'committed' && e.committedTeamId === userTeamId,
   );
@@ -333,6 +333,7 @@ export function WeekHubScreen({
                     <div className="hub-injury-name">
                       {player.name.first} {player.name.last}
                       <span className="hub-injury-pos">{player.position}</span>
+                      {inj.description && <span className="hub-injury-type">{inj.description}</span>}
                     </div>
                     <div className="hub-injury-weeks">
                       Out {inj.weeksRemaining} wk{inj.weeksRemaining > 1 ? 's' : ''}

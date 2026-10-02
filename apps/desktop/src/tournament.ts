@@ -238,8 +238,8 @@ export function selectNcaaField(
 
 export function advanceTournamentNationalSemis(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan): TournamentState {
   if (!state.nationalSemiFinal1 || !state.nationalSemiFinal2) return state;
-  const result1 = playTournamentGame(state.nationalSemiFinal1, teams, planFor);
-  const result2 = playTournamentGame(state.nationalSemiFinal2, teams, planFor);
+  const result1 = playTournamentGame(state.nationalSemiFinal1, teams, planFor, true);
+  const result2 = playTournamentGame(state.nationalSemiFinal2, teams, planFor, true);
   const nationalGame: TournamentGame = {
     id: 'national-championship',
     homeTeamId: result1.winnerId,
@@ -257,7 +257,7 @@ export function advanceTournamentNationalSemis(state: TournamentState, teams: La
 
 export function advanceNationalChampionship(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan): TournamentState {
   if (!state.nationalGame) return state;
-  const result = playTournamentGame(state.nationalGame, teams, planFor);
+  const result = playTournamentGame(state.nationalGame, teams, planFor, true);
   return {
     ...state,
     phase: 'complete',
@@ -308,7 +308,12 @@ function simulateFinal(bracket: ConferenceBracket, teams: LacrosseTeam[], planFo
   return { ...bracket, final: { ...final, result }, champion: result.winnerId };
 }
 
-function playTournamentGame(game: TournamentGame, teams: LacrosseTeam[], planFor: GamePlanResolver): TournamentGameResult {
+function playTournamentGame(
+  game: TournamentGame,
+  teams: LacrosseTeam[],
+  planFor: GamePlanResolver,
+  neutralSite = false,
+): TournamentGameResult {
   const homeTeam = teams.find((t) => t.id === game.homeTeamId)!;
   const awayTeam = teams.find((t) => t.id === game.awayTeamId)!;
   const result = simulateLacrosseGameWithLog({
@@ -316,6 +321,7 @@ function playTournamentGame(game: TournamentGame, teams: LacrosseTeam[], planFor
     awayTeam,
     homeGamePlan: planFor(homeTeam),
     awayGamePlan: planFor(awayTeam),
+    neutralSite,
   });
   const homeWon = result.winnerTeamId === homeTeam.id;
 

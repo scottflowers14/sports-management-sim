@@ -11,3 +11,4 @@ export * from './cpu-game-plan';
 export * from './roster-generation';
 export * from './names';
 export * from './player-stats';
+export * from './injuries';

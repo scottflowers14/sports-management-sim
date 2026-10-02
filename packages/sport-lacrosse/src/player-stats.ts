@@ -188,6 +188,22 @@ export function generateLacrossePlayerStats(
   return { players: participants.map((p) => p.line), scoringPlays };
 }
 
+/**
+ * Share of a game (0–1) each player on the depth chart is on the field.
+ * Players past the playing depth at their position don't play (0).
+ */
+export function getLacrosseParticipationMinutes(team: LacrosseTeam): Map<string, number> {
+  const minutes = new Map<string, number>();
+  for (const position of Object.keys(PLAYING_DEPTH) as Array<LacrossePlayer['position']>) {
+    getLacrosseOrderedPlayers(team, position)
+      .slice(0, PLAYING_DEPTH[position])
+      .forEach((player, slot) => {
+        minutes.set(player.id, Math.max(minutes.get(player.id) ?? 0, minutesFor(position, slot)));
+      });
+  }
+  return minutes;
+}
+
 function minutesFor(position: LacrossePlayer['position'], slot: number): number {
   switch (position) {
     case 'ATT':
