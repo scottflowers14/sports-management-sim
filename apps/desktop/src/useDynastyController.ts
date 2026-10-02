@@ -83,7 +83,7 @@ import {
 } from './dynasty-factory';
 import type { CustomTeamsFile } from '@sports-management-sim/sport-lacrosse';
 
-type View =
+export type View =
   | 'week-hub'
   | 'season'
   | 'team'
@@ -94,7 +94,9 @@ type View =
   | 'news'
   | 'tournament'
   | 'history'
-  | 'stats';
+  | 'stats'
+  | 'programs'
+  | 'players';
 
 export function useDynastyController() {
   const [screen, setScreen] = useState<'start' | 'game'>('start');

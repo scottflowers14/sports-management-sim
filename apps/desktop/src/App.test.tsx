@@ -364,4 +364,46 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
     expect(screen.getByRole('heading', { name: /National Rankings/i })).toBeInTheDocument();
   });
+
+  it('browses every program from the League menu and opens a program page', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Programs$/i }));
+    expect(screen.getByRole('heading', { name: /^Programs$/i })).toBeInTheDocument();
+    expect(screen.getByText(/36 programs/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /^Long Island Tech$/i }));
+    expect(screen.getByText(/Program Page/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Roster \(\d+\)/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /All Programs/i }));
+    expect(screen.getByText(/36 programs/i)).toBeInTheDocument();
+  });
+
+  it('opens a program page from the standings', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
+    const [first] = screen.getAllByRole('button', { name: /^Syracuse Heights$/i });
+    await userEvent.click(first!);
+    expect(screen.getByRole('heading', { name: /^Syracuse Heights$/i })).toBeInTheDocument();
+  });
+
+  it('searches league-wide players and opens a player card', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Player Search/i }));
+    expect(screen.getByText(/of \d+ players/i)).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText(/Filter by position/i), 'FOGO');
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(within(row).getByText('FOGO')).toBeInTheDocument();
+
+    await userEvent.click(rows[0]!);
+    expect(screen.getByLabelText(/Close player panel/i)).toBeInTheDocument();
+  });
+
+  it('advances the week from the top bar', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    expect(screen.getByRole('button', { name: /Advance: Week 2/i })).toBeInTheDocument();
+  });
 });

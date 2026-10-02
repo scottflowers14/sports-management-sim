@@ -10,6 +10,7 @@ export function StandingsScreen({
   conferences,
   userTeamId,
   teamMap,
+  onOpenProgram,
 }: {
   rankings: RankingEntry[];
   sortedStandings: StandingsEntry[];
@@ -17,7 +18,14 @@ export function StandingsScreen({
   conferences: Conference[];
   userTeamId: string;
   teamMap: Map<string, string>;
+  onOpenProgram: (teamId: string) => void;
 }) {
+  const teamLink = (teamId: string) => (
+    <button type="button" className="link-btn" onClick={() => onOpenProgram(teamId)}>
+      {formatTeamName(teamMap.get(teamId) ?? teamId)}
+    </button>
+  );
+
   return (
     <div className="standings-layout">
       <article className="card">
@@ -55,7 +63,7 @@ export function StandingsScreen({
                       )}
                     </td>
                     <td>
-                      {formatTeamName(teamMap.get(entry.teamId) ?? entry.teamId)}
+                      {teamLink(entry.teamId)}
                       {team && (
                         <span className="prestige-pip" title={`Prestige ${team.reputation.nationalPrestige}`}>
                           {' '}
@@ -105,7 +113,7 @@ export function StandingsScreen({
                       className={entry.teamId === userTeamId ? 'user-row' : ''}
                     >
                       <td className="rank">#{i + 1}</td>
-                      <td>{formatTeamName(teamMap.get(entry.teamId) ?? entry.teamId)}</td>
+                      <td>{teamLink(entry.teamId)}</td>
                       <td>{entry.record.wins}</td>
                       <td>{entry.record.losses}</td>
                       <td>{entry.record.conferenceWins}–{entry.record.conferenceLosses}</td>
