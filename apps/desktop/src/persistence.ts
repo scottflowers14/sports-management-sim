@@ -139,23 +139,32 @@ export function getActiveDynastySaveId(storage: Storage = window.localStorage): 
  * - the recruit board embeds a copy of every recruit; it's rebuilt on load.
  * - play-by-play for CPU-vs-CPU regular-season games, except the latest week.
  *   Their box scores stay on the schedule; only the play-by-play goes.
+ * - play-by-play from past seasons.
+ * - career stats for players who have left the league (graduated or gone);
+ *   only current players and portal entries have a card that shows them.
  */
 export function compactForStorage<T extends DynastySaveState>(save: T): T {
   const { dynasty } = save;
   const { schedule } = dynasty.season;
   const latestWeek = schedule.reduce((max, g) => (g.status === 'final' ? Math.max(max, g.week) : max), 0);
-  const droppable = new Set(
+  const keep = new Set(
     schedule
       .filter(
         (g) =>
-          g.homeTeamId !== dynasty.userTeamId &&
-          g.awayTeamId !== dynasty.userTeamId &&
-          g.week !== latestWeek,
+          g.homeTeamId === dynasty.userTeamId ||
+          g.awayTeamId === dynasty.userTeamId ||
+          g.week === latestWeek,
       )
       .map((g) => g.id),
   );
-  const gameLogs = Object.fromEntries(Object.entries(save.gameLogs).filter(([id]) => !droppable.has(id)));
-  return { ...save, dynasty: { ...dynasty, recruitBoard: [] }, gameLogs };
+  // Logs from past seasons aren't reachable from any screen, so they go too.
+  const gameLogs = Object.fromEntries(Object.entries(save.gameLogs).filter(([id]) => keep.has(id)));
+  const activeIds = new Set([
+    ...dynasty.season.teams.flatMap((t) => t.roster.map((p) => p.id)),
+    ...dynasty.portalEntries.map((e) => e.playerId),
+  ]);
+  const careerStats = Object.fromEntries(Object.entries(save.careerStats).filter(([id]) => activeIds.has(id)));
+  return { ...save, dynasty: { ...dynasty, recruitBoard: [] }, gameLogs, careerStats };
 }
 
 export function setActiveDynastySave(saveId: string, storage: Storage = window.localStorage): void {

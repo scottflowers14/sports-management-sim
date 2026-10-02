@@ -175,8 +175,18 @@ describe('save compaction', () => {
       expect(game.id in compact.gameLogs).toBe(keep);
     }
     expect(compact.dynasty.recruitBoard).toEqual([]);
+    // Logs from an earlier season (ids not on this schedule) are dropped.
+    expect('2027-week-1-old-vs-older' in compactForStorage({ ...save, gameLogs: { ...save.gameLogs, '2027-week-1-old-vs-older': save.gameLogs[schedule[0]!.id]! } }).gameLogs).toBe(false);
     // Box scores survive on the schedule.
     expect(compact.dynasty.season.schedule.every((g) => g.result !== undefined)).toBe(true);
+  });
+
+  it('keeps career stats only for players still in the league', () => {
+    const save = playedSave();
+    const current = save.dynasty.season.teams[0]!.roster[0]!.id;
+    const line = { seasons: [], totals: {} } as unknown as DynastySaveState['careerStats'][string];
+    const compact = compactForStorage({ ...save, careerStats: { [current]: line, 'graduated-player': line } });
+    expect(Object.keys(compact.careerStats)).toEqual([current]);
   });
 
   it('rebuilds the recruit board on load and shrinks the save', () => {

@@ -609,10 +609,10 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function recruitingClassSize(teamCount: number): number {
-  // Roughly 8 prospects per program: with ~10-11 seniors graduating from each
-  // 42-man roster every year, a 5-per-team pool starved the league and rosters
-  // decayed season over season.
-  return Math.max(120, teamCount * 8);
+  // About 11 seniors graduate from each 42-man roster every year, and not every
+  // prospect signs, so the pool needs ~12 per program. At 8 per program the
+  // league lost ~3 players per roster each season (42 -> 33 by year four).
+  return Math.max(120, teamCount * 12);
 }
 
 function createInitialTeams(seed: number, seasonYear: number): LacrosseTeam[] {

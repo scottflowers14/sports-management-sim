@@ -10,7 +10,7 @@ function trackErrors(page: Page): string[] {
   return errors;
 }
 
-test('plays a season through the national title and reloads the save', async ({ page }) => {
+test('plays a season through the title game and offseason into year two', async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
@@ -31,21 +31,30 @@ test('plays a season through the national title and reloads the save', async ({ 
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Season' }).click();
   await page.getByRole('button', { name: /Sim to End of Season/ }).click();
   await expect(advance).toContainText('Postseason');
-  for (let round = 0; round < 8 && !(await advance.innerText()).includes('Wrap Season'); round += 1) {
+  for (let round = 0; round < 8 && !(await advance.innerText()).includes('Offseason'); round += 1) {
     await advance.click();
   }
-  await expect(advance).toContainText('Wrap Season');
   await expect(page.locator('.ncaa-bracket')).toBeVisible();
+  await expect(page.locator('.national-champion-banner')).toBeVisible();
 
   // The News feed has this season's stories.
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /News/ }).click();
   await expect(page.locator('.news-week-heading').first()).toBeVisible();
 
+  // One click runs the offseason, a second starts year two.
+  await advance.click();
+  await expect(page.locator('.season-recap-card')).toBeVisible();
+  await expect(advance).toContainText(/Season \d{4}/);
+  const nextYear = (await advance.innerText()).match(/Season (\d{4})/)![1]!;
+  await advance.click();
+  await expect(advance).toContainText('Week 1');
+  await expect(page.locator('.top-bar')).toContainText(`Season ${nextYear}`);
+
   // Saves survive a reload.
   await page.getByRole('button', { name: 'Save Now' }).click();
   await page.reload();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.locator('.top-team')).toContainText('Tournament Complete');
+  await expect(page.locator('.top-bar')).toContainText(`Season ${nextYear}`);
 
   expect(errors).toEqual([]);
 });

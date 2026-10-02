@@ -232,8 +232,13 @@ export function App() {
 
   const advance = (() => {
     if (offseasonSummary) {
-      if (view === 'offseason') return null;
-      return { label: 'Offseason', title: 'Finish the offseason to start the new season', run: () => setView('offseason') };
+      if (view !== 'offseason') {
+        return { label: 'Offseason', title: 'Finish the offseason to start the new season', run: () => setView('offseason') };
+      }
+      // A fired coach has to pick a new job first; that choice lives on the offseason screen.
+      if (pendingJobOffers) return null;
+      // The offseason already rolled the dynasty over to next year's season.
+      return { label: `Season ${dynasty.season.year}`, title: 'Start the new season', run: startNewSeason };
     }
     if (hasScheduledGames) {
       return { label: `Week ${dynasty.season.currentWeek}`, title: `Sim week ${dynasty.season.currentWeek}`, run: simWeek };
@@ -246,7 +251,7 @@ export function App() {
       ncaa_quarterfinals: { label: 'NCAA Quarters', title: 'Sim the NCAA quarterfinals', run: simNcaaQuarterfinals },
       national_semis: { label: 'Final Four', title: 'Sim the national semifinals', run: simTournamentNationalSemis },
       national_final: { label: 'Title Game', title: 'Sim the national championship', run: simTournamentNational },
-      complete: { label: 'Wrap Season', title: 'Review the bracket and head to the offseason', run: () => setView('tournament') },
+      complete: { label: 'Offseason', title: 'Run the offseason: graduation, development and signing day', run: enterOffseason },
     } as const;
     return phaseActions[tournament.phase];
   })();
@@ -295,20 +300,25 @@ export function App() {
       <header className="top-bar">
         <div className="brand">
           <p className="eyebrow">
-            Men&apos;s College Lacrosse · Season {dynasty.season.year}
+            Men&apos;s College Lacrosse ·{' '}
+            {offseasonSummary ? `${offseasonSummary.seasonYear} Offseason` : `Season ${dynasty.season.year}`}
           </p>
           <h1>Sports Management Sim</h1>
         </div>
         <section className="top-team" aria-label="User team summary">
           <strong className="top-team-name">{formatTeamName(userTeam.name)}</strong>
           <span className="top-record">
-            {userTeam.record.wins}–{userTeam.record.losses}
+            {offseasonSummary
+              ? `${offseasonSummary.userRecord.wins}–${offseasonSummary.userRecord.losses}`
+              : `${userTeam.record.wins}–${userTeam.record.losses}`}
           </span>
           {userRankEntry && (
             <span className="national-rank">#{userRankEntry.rank} Nationally</span>
           )}
           <span className="top-phase">
-            {seasonComplete
+            {offseasonSummary
+              ? 'Offseason'
+              : seasonComplete
               ? tournament?.phase === 'complete'
                 ? 'Tournament Complete'
                 : tournament

@@ -286,6 +286,8 @@ function cpuBoardForTeam(
 
 const CPU_ROSTER_TARGETS = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
 const ROSTER_CAP = 45;
+/** NCAA men's lacrosse roster limit; CPU programs never sign past it. */
+export const ROSTER_LIMIT = 48;
 
 /** Next fall's roster if every current pledge signs: leavers out, commits in. */
 function projectedRosterSize(team: LacrosseTeam, recruits: LacrosseRecruit[]): number {
@@ -370,12 +372,17 @@ export function runOffseason(
   // CPU teams make offers to their top targets before signing day
   const withCpuOffers = applyeCpuOffers(recruits, season.teams, userTeamId);
 
-  // Commit remaining open recruits who have an offer
-  const fullyCommitted = withCpuOffers.map((r) =>
-    r.status === 'open' && r.scholarshipOffers.length > 0
-      ? commitRecruit(r, season.teams)
-      : r,
-  );
+  // Signing day: open recruits who hold offers pick among the programs that
+  // still have room under the NCAA's 48-man roster limit.
+  const fullyCommitted = [...withCpuOffers];
+  for (let i = 0; i < fullyCommitted.length; i += 1) {
+    const r = fullyCommitted[i]!;
+    if (r.status !== 'open' || r.scholarshipOffers.length === 0) continue;
+    const withRoom = season.teams.filter(
+      (t) => t.id === userTeamId || projectedRosterSize(t, fullyCommitted) < ROSTER_LIMIT,
+    );
+    fullyCommitted[i] = commitRecruit(r, withRoom);
+  }
 
   // Signing-day drama: a school that kept working a committed recruit and clearly
   // overtook their pledge steals the signature at the last moment.
@@ -422,7 +429,8 @@ export function runOffseason(
         : runTeamOffseason(team);
     const withClass = addSignedRecruitsToTeam(afterOffseason, signed, newYear);
     const withWalkOns = backfillWalkOns(withClass, rosterTargets, seed + newYear, newYear);
-    return pruneDepthChart(withWalkOns);
+    const trimmed = team.id === userTeamId ? withWalkOns : enforceRosterLimit(withWalkOns);
+    return pruneDepthChart(trimmed);
   });
 
   // Capture user team signing class for summary
@@ -669,8 +677,35 @@ function evolvePrestige(
   });
 }
 
+/** Never cut a team below this many at a position. */
+const POSITION_MINIMUMS: Partial<Record<LacrossePlayer['position'], number>> = { GK: 2, FOGO: 1 };
+
+/**
+ * CPU programs over the roster limit (in-season commits and signing-day flips
+ * can land a few extra) make preseason cuts: walk-ons first, then the
+ * lowest-rated players, never below the position minimums.
+ */
+export function enforceRosterLimit(team: LacrosseTeam, limit = ROSTER_LIMIT): LacrosseTeam {
+  const excess = team.roster.length - limit;
+  if (excess <= 0) return team;
+  const counts = new Map<string, number>();
+  for (const p of team.roster) counts.set(p.position, (counts.get(p.position) ?? 0) + 1);
+  const candidates = [...team.roster].sort(
+    (a, b) => Number(b.isWalkOn) - Number(a.isWalkOn) || a.ratings.overall - b.ratings.overall,
+  );
+  const cut = new Set<string>();
+  for (const player of candidates) {
+    if (cut.size >= excess) break;
+    const left = counts.get(player.position) ?? 0;
+    if (left <= (POSITION_MINIMUMS[player.position] ?? 0)) continue;
+    counts.set(player.position, left - 1);
+    cut.add(player.id);
+  }
+  return { ...team, roster: team.roster.filter((p) => !cut.has(p.id)) };
+}
+
 /** No program fields fewer players than this — walk-on tryouts fill the gap. */
-const ROSTER_FLOOR = 30;
+export const ROSTER_FLOOR = 38;
 
 /**
  * Backfill thin rosters with freshman walk-ons after signing day. Positions are
