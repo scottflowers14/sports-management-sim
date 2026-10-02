@@ -555,6 +555,9 @@ function applyCpuWeeklyOffers(
 ): LacrosseRecruit[] {
   const CPU_MAX_OFFERS = 12;
   const CPU_WEEKLY_NEW_OFFERS = 2;
+  // Once this many programs are on a recruit, the rest look elsewhere, so 36
+  // boards don't all chase the same dozen blue-chips and sign nobody.
+  const CPU_CROWDED_OFFERS = 5;
 
   const updated = [...recruits];
 
@@ -566,11 +569,16 @@ function applyCpuWeeklyOffers(
         .filter((r) => r.scholarshipOffers.some((o) => o.teamId === team.id))
         .map((r) => r.id),
     );
+    // Only offers to recruits still on the market count against the cap;
+    // otherwise a board freezes on dead offers once its targets sign elsewhere.
+    const liveOffers = updated.filter((r) => r.status === 'open' && alreadyOfferedIds.has(r.id)).length;
 
-    if (alreadyOfferedIds.size >= CPU_MAX_OFFERS) continue;
+    if (liveOffers >= CPU_MAX_OFFERS) continue;
 
-    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - alreadyOfferedIds.size);
-    const open = updated.filter((r) => r.status === 'open' && !alreadyOfferedIds.has(r.id));
+    const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - liveOffers);
+    const open = updated.filter(
+      (r) => r.status === 'open' && !alreadyOfferedIds.has(r.id) && r.scholarshipOffers.length < CPU_CROWDED_OFFERS,
+    );
     const board = sortRecruitBoardForTeam(team, open, DEFAULT_LACROSSE_ROSTER_TARGETS);
 
     let count = 0;

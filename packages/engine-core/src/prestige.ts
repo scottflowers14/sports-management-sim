@@ -38,7 +38,10 @@ export function evolveProgramPrestige<Position extends string, SportTraits>(
     } else if (winPct < 0.35) {
       nationalPrestige -= 1;
     }
-    nationalPrestige += Math.round((PRESTIGE_CENTER - team.reputation.nationalPrestige) * PRESTIGE_REVERSION);
+    // Round the pull toward the middle symmetrically: Math.round sends -1.5 to
+    // -1 but +1.5 to +2, which let bottom programs climb faster than blue bloods fell.
+    const drift = (PRESTIGE_CENTER - team.reputation.nationalPrestige) * PRESTIGE_REVERSION;
+    nationalPrestige += Math.sign(drift) * Math.round(Math.abs(drift));
 
     return {
       ...team,

@@ -265,8 +265,8 @@ describe('transfer portal lifecycle', () => {
 
       // Scholarship usage is within the cap and the new player has the offered percent
       expect(userTeam.resources.scholarshipUsed).toBeLessThanOrEqual(userTeam.resources.scholarshipLimit);
-      // Portal players get a deterministic ID: portal-player-<entry.id>
-      const newPlayer = userTeam.roster.find((p) => p.id === `portal-player-${target.id}`);
+      // A transfer keeps his player id so his career stats follow him.
+      const newPlayer = userTeam.roster.find((p) => p.id === target.playerId);
       expect(newPlayer).toBeDefined();
       expect(newPlayer?.scholarshipPercent).toBe(100);
     } else {

@@ -25,7 +25,7 @@ import type { StaffRole } from '@sports-management-sim/sport-lacrosse';
 import { createProgramStaff, withStaffRecruitingHours } from './program-staff';
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
-import { runOffseason, resolveAndApplyPortal } from './dynasty-helpers';
+import { healInjuriesOneWeek, runOffseason, resolveAndApplyPortal } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { simulateOneWeek, simulateRemainingWeeks, withoutInjured } from './week-sim';
 import { computeNationalRankings } from './rankings';
@@ -52,6 +52,7 @@ import {
   advanceTournamentFinals,
   advanceTournamentNationalSemis,
   advanceNationalChampionship,
+  compareConferenceStanding,
 } from './tournament';
 import type { TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
@@ -232,6 +233,9 @@ export function useDynastyController() {
     setGamePlan(DEFAULT_GAME_PLAN);
     setTrainingFocus('balanced');
     setPendingJobOffers(null);
+    setAutoRecruitingAssistant(false);
+    setAutoRecruitingOffers(false);
+    setAssistantReport(null);
   }, []);
 
   const persistDynasty = useCallback((status = 'Saved locally') => {
@@ -287,6 +291,8 @@ export function useDynastyController() {
       shortlistIds: [],
       recruitingActivity: emptyRecruitingActivity(),
       recruitTrends: {},
+      autoRecruitingAssistant: false,
+      autoRecruitingOffers: false,
       ...newStaff,
     };
     saveDynastySlot({ saveId, state });
@@ -321,6 +327,7 @@ export function useDynastyController() {
     setRecruitTrends(save.recruitTrends ?? {});
     setAutoRecruitingAssistant(save.autoRecruitingAssistant ?? false);
     setAutoRecruitingOffers(save.autoRecruitingOffers ?? false);
+    setAssistantReport(null);
     setSeasonStats(save.seasonStats);
     setCareerStats(save.careerStats ?? emptyCareerStats());
     setCoachProfile(save.coachProfile ?? null);
@@ -413,6 +420,14 @@ export function useDynastyController() {
     setBestNatRank(result.bestNatRank);
     setLastSimWeek(result.lastSimWeek);
     setAssistantReport(null);
+    // Offers the assistant made during the sim pin those recruits, as manual offers do.
+    const userId = result.dynasty.userTeamId;
+    const offeredIds = result.dynasty.recruits
+      .filter((r) => r.status === 'open' && r.scholarshipOffers.some((o) => o.teamId === userId))
+      .map((r) => r.id);
+    if (offeredIds.length > 0) {
+      setShortlistIds((prev) => [...prev, ...offeredIds.filter((id) => !prev.includes(id))]);
+    }
   }, []);
 
   // Simming is locked while the offseason is pending; send the coach back there instead.
@@ -612,14 +627,19 @@ export function useDynastyController() {
     setTournament((prev) =>
       prev ? advanceTournamentFinals(prev, tournamentTeams, tournamentPlanFor, dynasty.season.schedule, tournamentCoachingFor) : prev,
     );
+    // The conference weekend is over; a week passes before the NCAA first round.
+    setInjuries((prev) => healInjuriesOneWeek(prev));
   }, [tournamentTeams, tournamentPlanFor, tournamentCoachingFor, dynasty.season.schedule]);
 
   const simNcaaFirstRound = useCallback(() => {
     setTournament((prev) => prev ? advanceNcaaFirstRound(prev, tournamentTeams, tournamentPlanFor, tournamentCoachingFor) : prev);
+    setInjuries((prev) => healInjuriesOneWeek(prev));
   }, [tournamentTeams, tournamentPlanFor, tournamentCoachingFor]);
 
   const simNcaaQuarterfinals = useCallback(() => {
     setTournament((prev) => prev ? advanceNcaaQuarterfinals(prev, tournamentTeams, tournamentPlanFor, tournamentCoachingFor) : prev);
+    // Championship weekend plays semis and the final on consecutive days.
+    setInjuries((prev) => healInjuriesOneWeek(prev));
   }, [tournamentTeams, tournamentPlanFor, tournamentCoachingFor]);
 
   const simTournamentNationalSemis = useCallback(() => {
@@ -644,7 +664,7 @@ export function useDynastyController() {
     const confRank =
       [...dynasty.season.standings]
         .filter((s) => confTeamIds.includes(s.teamId))
-        .sort((a, b) => b.record.wins - a.record.wins)
+        .sort(compareConferenceStanding)
         .findIndex((s) => s.teamId === dynasty.userTeamId) + 1;
 
     const userTeamThisSeason = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
@@ -711,15 +731,13 @@ export function useDynastyController() {
     if (coachProfile && seasonGoals) {
       const userTeamData = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
       const userRecord = userTeamData?.record ?? { wins: 0, losses: 0 };
-      const recruitClassSize = dynasty.recruits.filter(
-        (r) => r.signedTeamId === dynasty.userTeamId || r.committedTeamId === dynasty.userTeamId,
-      ).length;
+      // Grade the class that actually signed, after signing-day commits and flips.
       const evaluated = evaluateSeasonGoals(
         seasonGoals,
         userRecord,
         bestNatRank,
         isConfChamp ?? false,
-        recruitClassSize,
+        summary.signingClass.length,
       );
       const { confidence: newConfidence } = updateADConfidence(
         adConfidence,
@@ -799,20 +817,20 @@ export function useDynastyController() {
   }, [staffState]);
 
   const startNewSeason = useCallback(() => {
-    setDynasty((prev) => {
-      const nextDynasty = resolveAndApplyPortal(prev);
-      const userTeamData = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
-      const prestige = userTeamData?.reputation.nationalPrestige ?? 50;
-      const goals = generateSeasonGoals(
-        prestige,
-        nextDynasty.season.year,
-        countUserGames(nextDynasty.season.schedule, nextDynasty.userTeamId),
-      );
-      setSeasonGoals(goals);
-      setBestNatRank(null);
-      setRankings(computeNationalRankings(nextDynasty.season.teams, []));
-      return nextDynasty;
-    });
+    // Resolve the portal once, outside the state updater: updaters must be pure,
+    // and this one rolls dice and feeds several other pieces of state.
+    const nextDynasty = resolveAndApplyPortal(dynasty);
+    const userTeamData = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
+    const prestige = userTeamData?.reputation.nationalPrestige ?? 50;
+    const goals = generateSeasonGoals(
+      prestige,
+      nextDynasty.season.year,
+      countUserGames(nextDynasty.season.schedule, nextDynasty.userTeamId),
+    );
+    setDynasty(nextDynasty);
+    setSeasonGoals(goals);
+    setBestNatRank(null);
+    setRankings(computeNationalRankings(nextDynasty.season.teams, []));
     setOffseasonSummary(null);
     // Empty chairs don't stay empty into the season.
     const filled = fillStaffVacancies(staffState.staff, staffState.staffCandidates, staffBudget);
@@ -840,7 +858,7 @@ export function useDynastyController() {
     setShortlistIds([]);
     setRecruitBoardView('all');
     setView('week-hub');
-  }, [staffState, staffBudget]);
+  }, [dynasty, staffState, staffBudget]);
 
   const handleExportSave = useCallback((saveId: string) => {
     const json = exportSaveAsJson(saveId);

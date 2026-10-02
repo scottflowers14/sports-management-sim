@@ -26,11 +26,18 @@ describe('player stat attribution', () => {
         expect(sum(lines.map((l) => l.goals))).toBe(team.goals);
         expect(sum(lines.map((l) => l.assists))).toBe(Math.min(team.assists, team.goals));
         expect(sum(lines.map((l) => l.shots))).toBe(team.shots);
+        expect(sum(lines.map((l) => l.shotsOnGoal))).toBe(team.shotsOnGoal);
+        expect(sum(lines.map((l) => l.penalties))).toBe(team.penalties);
+        expect(sum(lines.map((l) => l.penaltyMinutes))).toBeCloseTo(team.penaltyMinutes, 5);
         expect(sum(lines.map((l) => l.saves ?? 0))).toBe(team.saves);
         expect(sum(lines.map((l) => l.faceoffWins ?? 0))).toBe(team.faceoffWins);
         expect(sum(lines.map((l) => l.groundBalls))).toBe(team.groundBalls);
         expect(sum(lines.map((l) => l.causedTurnovers))).toBe(team.causedTurnovers);
-        for (const l of lines) expect(l.shots).toBeGreaterThanOrEqual(l.goals);
+        for (const l of lines) {
+          expect(l.shots).toBeGreaterThanOrEqual(l.shotsOnGoal);
+          expect(l.shotsOnGoal).toBeGreaterThanOrEqual(l.goals);
+          if (l.penalties === 0) expect(l.penaltyMinutes).toBe(0);
+        }
       }
     }
   });
@@ -65,5 +72,16 @@ describe('player stat attribution', () => {
     for (const line of [...game.players.home, ...game.players.away]) {
       expect(goalsByPlayer.get(`${line.teamId}:${line.playerId}`) ?? 0).toBe(line.goals);
     }
+  });
+});
+
+describe('depth chart integrity', () => {
+  it('ignores a saved chart that lists a player under a position he does not play', () => {
+    const team = makeLacrosseTeam('home');
+    const midfielder = team.roster.find((p) => p.position === 'MID')!;
+    const stale = { ...team, depthChart: { ATT: [midfielder.id] } };
+    expect(getLacrosseStarters(stale, 'ATT').map((p) => p.id)).not.toContain(midfielder.id);
+    const { players } = simulateLacrosseGameDetailed({ homeTeam: stale, awayTeam: makeLacrosseTeam('away'), random: seededRandom(4) });
+    expect(players.home.filter((l) => l.playerId === midfielder.id).length).toBeLessThanOrEqual(1);
   });
 });

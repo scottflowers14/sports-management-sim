@@ -68,7 +68,7 @@ export function simulateOneWeek(
   const prevUserInterestById = new Map(
     dynasty.recruits.map((r) => [r.id, r.interestByTeamId[dynasty.userTeamId] ?? 0]),
   );
-  const finalWeek = dynasty.season.schedule.reduce((max, game) => Math.max(max, game.week), 10);
+  const finalWeek = dynasty.season.schedule.reduce((max, game) => Math.max(max, game.week), 0) || 10;
   const teamMap = new Map(dynasty.season.teams.map((t) => [t.id, t.name]));
 
   const weekLogs = new Map<string, GameLog>();

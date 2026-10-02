@@ -101,7 +101,7 @@ function computeStatBasedAwards(season: LacrosseSeason, allPlayers: PlayerWithTe
   );
 
   const freshmanEntry = maxBy(
-    allPlayers.filter((e) => (e.player.classYear === 'FR' || e.player.classYear === 'SO') && points(e) > 0),
+    allPlayers.filter((e) => e.player.classYear === 'FR' && points(e) > 0),
     points,
   );
 
@@ -168,7 +168,7 @@ function computeRatingBasedAwards(season: LacrosseSeason, allPlayers: PlayerWith
   }
 
   const freshmanEntry = maxBy(
-    allPlayers.filter((e) => e.player.classYear === 'FR' || e.player.classYear === 'SO'),
+    allPlayers.filter((e) => e.player.classYear === 'FR'),
     overall,
   );
 

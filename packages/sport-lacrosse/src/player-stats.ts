@@ -115,9 +115,16 @@ export function generateLacrossePlayerStats(
     const line = scorers[i]!.line;
     line.shots = line.goals + n;
   });
-  spread(teamStats.shotsOnGoal - teamStats.goals, scorers.map((p) => p.line.shots - p.line.goals + 0.01), random).forEach((n, i) => {
-    const line = scorers[i]!.line;
-    line.shotsOnGoal = Math.min(line.shots, line.goals + n);
+  // Shots on goal: every goal was on goal; the rest go only to players with misses to spare.
+  scorers.forEach((p) => {
+    p.line.shotsOnGoal = p.line.goals;
+  });
+  spreadWithCapacity(
+    teamStats.shotsOnGoal - teamStats.goals,
+    scorers.map((p) => p.line.shots - p.line.goals),
+    random,
+  ).forEach((n, i) => {
+    scorers[i]!.line.shotsOnGoal += n;
   });
 
   // Goalie: the starter owns every save and goal allowed.
@@ -176,13 +183,12 @@ export function generateLacrossePlayerStats(
     p.player.position === 'GK' ? 0.05 : p.minutes * (p.player.position === 'DEF' || p.player.position === 'LSM' ? 1.6 : 1),
   );
   const penaltyCounts = spread(teamStats.penalties, penaltyWeights, random);
-  let minutesLeft = teamStats.penaltyMinutes;
+  // Hand out the minutes in half-minute units so the lines sum to the team total exactly.
+  const halfMinutes = spread(Math.round(teamStats.penaltyMinutes * 2), penaltyCounts, random);
   penaltyCounts.forEach((n, i) => {
     const line = participants[i]!.line;
     line.penalties = n;
-    const share = teamStats.penalties > 0 ? Math.round((teamStats.penaltyMinutes * n) / teamStats.penalties) : 0;
-    line.penaltyMinutes = Math.min(minutesLeft, share);
-    minutesLeft -= line.penaltyMinutes;
+    line.penaltyMinutes = halfMinutes[i]! / 2;
   });
 
   return { players: participants.map((p) => p.line), scoringPlays };
@@ -253,6 +259,23 @@ function spread(total: number, weights: number[], random: RandomSource): number[
   for (let k = 0; k < Math.max(0, total); k += 1) {
     const i = weightedIndex(weights, random);
     out[i] = out[i]! + 1;
+  }
+  return out;
+}
+
+/**
+ * Like spread, but each slot can take at most `capacity[i]` units. Units beyond
+ * the total capacity are dropped rather than forced somewhere impossible.
+ */
+function spreadWithCapacity(total: number, capacity: number[], random: RandomSource): number[] {
+  const out = new Array<number>(capacity.length).fill(0);
+  const room = capacity.map((c) => Math.max(0, Math.floor(c)));
+  let left = Math.min(Math.max(0, total), room.reduce((s, c) => s + c, 0));
+  while (left > 0) {
+    const i = weightedIndex(room, random);
+    out[i] = out[i]! + 1;
+    room[i] = room[i]! - 1;
+    left -= 1;
   }
   return out;
 }
