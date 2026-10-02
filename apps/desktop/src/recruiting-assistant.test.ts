@@ -4,6 +4,7 @@ import { createScoutingState, getScoutTier } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import { simulateRemainingWeeks, type WeekSimState } from './week-sim';
+import { runOffseason } from './dynasty-helpers';
 import { applyAssistantToWeekState, runRecruitingAssistant, summarizeAssistantActions } from './recruiting-assistant';
 
 function seededRandom(seed: number): () => number {
@@ -99,6 +100,23 @@ describe('runRecruitingAssistant', () => {
     expect(result.needsOffer.map((n) => n.recruitId)).toEqual(ids);
   });
 
+  it('suggests offers within the budget for the positions losing seniors', () => {
+    const state = freshState();
+    const result = runRecruitingAssistant({ ...inputFor(state, []), scouting: { ...state.scouting, pointsAvailable: 30 }, budgetRemaining: 3.25 });
+    expect(result.suggestedOffers.length).toBeGreaterThan(0);
+    const spent = result.suggestedOffers.reduce((sum, o) => sum + o.scholarshipPercent / 100, 0);
+    expect(spent).toBeLessThanOrEqual(3.25);
+    const user = state.dynasty.season.teams.find((t) => t.id === state.dynasty.userTeamId)!;
+    const graduatingPositions = new Set(user.roster.filter((p) => p.classYear === 'SR' || p.classYear === 'GR').map((p) => p.position));
+    for (const offer of result.suggestedOffers) expect(graduatingPositions.has(offer.position as never)).toBe(true);
+    // Suggestions never change offers by themselves.
+    expect(result.recruits.every((r) => !r.scholarshipOffers.some((o) => o.teamId === user.id))).toBe(true);
+  });
+
+  it('skips offer suggestions when no budget is given', () => {
+    expect(runRecruitingAssistant(inputFor(freshState(), [])).suggestedOffers).toEqual([]);
+  });
+
   it('does nothing without hours', () => {
     const state = freshState();
     const result = runRecruitingAssistant({ ...inputFor(state, []), scouting: { ...state.scouting, pointsAvailable: 0 } });
@@ -118,3 +136,32 @@ describe('auto assistant during Sim to End', () => {
     expect(scoutedAuto).toBeGreaterThan(20);
   });
 });
+
+describe('delegated offers', () => {
+  // The three-season playtest: a coach who never offered signed nobody and
+  // ended up on the hot seat. With offers delegated, the staff lands a class.
+  it('signs a real class for a coach who delegates recruiting entirely', () => {
+    const done = simulateRemainingWeeks(freshState(), undefined, seededRandom(21), (s) =>
+      applyAssistantToWeekState(s, [], seededRandom(s.dynasty.season.currentWeek), { autoOffer: true }).state,
+    );
+    const userId = done.dynasty.userTeamId;
+    const offered = done.dynasty.recruits.filter((r) => r.scholarshipOffers.some((o) => o.teamId === userId));
+    const spent = offered.reduce((sum, r) => sum + r.scholarshipOffers.find((o) => o.teamId === userId)!.scholarshipPercent / 100, 0);
+    expect(spent).toBeLessThanOrEqual(3.25 + 1e-9);
+    const { summary } = runOffseason(done.dynasty, undefined, 'balanced', done.seasonStats);
+    expect(summary.signingClass.length).toBeGreaterThanOrEqual(5);
+  }, 60_000);
+
+  it('reports offers it made and leaves nothing to suggest', () => {
+    const state = { ...freshState(), scouting: { ...createScoutingState(), pointsAvailable: 40 } };
+    const { state: next, report } = applyAssistantToWeekState(state, [], seededRandom(2), { autoOffer: true });
+    const made = report.actions.filter((a) => a.type === 'offer');
+    expect(made.length).toBeGreaterThan(0);
+    expect(report.suggestedOffers).toEqual([]);
+    const userId = next.dynasty.userTeamId;
+    for (const action of made) {
+      expect(next.dynasty.recruits.find((r) => r.id === action.recruitId)!.scholarshipOffers.some((o) => o.teamId === userId)).toBe(true);
+    }
+  });
+});
+

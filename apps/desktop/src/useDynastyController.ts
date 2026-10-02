@@ -134,6 +134,9 @@ export function useDynastyController() {
   const [autoRecruitingAssistant, setAutoRecruitingAssistant] = useState<boolean>(
     () => loadedSave?.autoRecruitingAssistant ?? false,
   );
+  const [autoRecruitingOffers, setAutoRecruitingOffers] = useState<boolean>(
+    () => loadedSave?.autoRecruitingOffers ?? false,
+  );
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
   const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadedSave?.careerStats ?? emptyCareerStats());
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded dynasty save' : 'Choose or create a dynasty'));
@@ -176,7 +179,8 @@ export function useDynastyController() {
     recruitingActivity,
     recruitTrends,
     autoRecruitingAssistant,
-  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant]);
+    autoRecruitingOffers,
+  }), [dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -286,6 +290,7 @@ export function useDynastyController() {
     setRecruitingActivity(save.recruitingActivity ?? emptyRecruitingActivity());
     setRecruitTrends(save.recruitTrends ?? {});
     setAutoRecruitingAssistant(save.autoRecruitingAssistant ?? false);
+    setAutoRecruitingOffers(save.autoRecruitingOffers ?? false);
     setSeasonStats(save.seasonStats);
     setCareerStats(save.careerStats ?? emptyCareerStats());
     setCoachProfile(save.coachProfile ?? null);
@@ -385,9 +390,11 @@ export function useDynastyController() {
       setView('offseason');
       return;
     }
-    const start = autoRecruitingAssistant ? applyAssistantToWeekState(buildWeekSimState(), shortlistIds).state : buildWeekSimState();
+    const start = autoRecruitingAssistant
+      ? applyAssistantToWeekState(buildWeekSimState(), shortlistIds, Math.random, { autoOffer: autoRecruitingOffers }).state
+      : buildWeekSimState();
     applyWeekSimResult(simulateOneWeek(start, gamePlan));
-  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary, autoRecruitingAssistant, shortlistIds]);
+  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
 
   const simToEnd = useCallback(() => {
     if (offseasonSummary) {
@@ -395,48 +402,69 @@ export function useDynastyController() {
       return;
     }
     const beforeWeek = autoRecruitingAssistant
-      ? (state: WeekSimState) => applyAssistantToWeekState(state, shortlistIds).state
+      ? (state: WeekSimState) =>
+          applyAssistantToWeekState(state, shortlistIds, Math.random, { autoOffer: autoRecruitingOffers }).state
       : undefined;
     applyWeekSimResult(simulateRemainingWeeks(buildWeekSimState(), gamePlan, Math.random, beforeWeek));
-  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary, autoRecruitingAssistant, shortlistIds]);
+  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
 
   // The recruiting coordinator spends this week's leftover hours on pitches and scouting.
   const runRecruitingAssistant = useCallback(() => {
-    const { state, report } = applyAssistantToWeekState(buildWeekSimState(), shortlistIds);
+    const { state, report } = applyAssistantToWeekState(buildWeekSimState(), shortlistIds, Math.random, {
+      suggestOffers: true,
+      autoOffer: autoRecruitingOffers,
+    });
     if (report.actions.length > 0) {
       setDynasty(state.dynasty);
       setScouting(state.scouting);
       setRecruitingActivity(state.recruitingActivity);
+      const offeredIds = report.actions.filter((a) => a.type === 'offer').map((a) => a.recruitId);
+      if (offeredIds.length > 0) setShortlistIds((prev) => [...prev, ...offeredIds.filter((id) => !prev.includes(id))]);
     }
     setAssistantReport(report);
     setSaveStatus(summarizeAssistantActions(report.actions));
-  }, [buildWeekSimState, shortlistIds]);
+  }, [buildWeekSimState, shortlistIds, autoRecruitingOffers]);
 
-  const offerScholarship = useCallback((recruitId: string, scholarshipPercent = 100) => {
-    const recruit = dynasty.recruits.find((r) => r.id === recruitId);
+  // Offers go out one at a time against a running budget, so a batch can't overspend.
+  const offerScholarships = useCallback((offers: Array<{ recruitId: string; scholarshipPercent: number }>) => {
     const userTeamLocal = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
-    if (!recruit || !userTeamLocal) return;
-
-    const budgetUsed = classScholarshipBudgetUsed(dynasty.recruits, dynasty.userTeamId);
-    const existingOffer = recruit.scholarshipOffers.find((o) => o.teamId === dynasty.userTeamId);
-    const additionalCost = (scholarshipPercent - (existingOffer?.scholarshipPercent ?? 0)) / 100;
-    if (budgetUsed + additionalCost > LACROSSE_CLASS_SCHOLARSHIP_BUDGET + 1e-9) {
-      setSaveStatus('Not enough scholarship budget for that offer');
-      return;
+    if (!userTeamLocal) return;
+    let recruits = dynasty.recruits;
+    const offeredIds: string[] = [];
+    for (const { recruitId, scholarshipPercent } of offers) {
+      const recruit = recruits.find((r) => r.id === recruitId);
+      if (!recruit) continue;
+      const budgetUsed = classScholarshipBudgetUsed(recruits, dynasty.userTeamId);
+      const existingOffer = recruit.scholarshipOffers.find((o) => o.teamId === dynasty.userTeamId);
+      const additionalCost = (scholarshipPercent - (existingOffer?.scholarshipPercent ?? 0)) / 100;
+      if (budgetUsed + additionalCost > LACROSSE_CLASS_SCHOLARSHIP_BUDGET + 1e-9) {
+        setSaveStatus('Not enough scholarship budget for that offer');
+        continue;
+      }
+      const updated = applyScholarshipOffer(
+        recruit,
+        dynasty.userTeamId,
+        scholarshipPercent,
+        recruitPrestigeMultiplier(recruit.starRating, userTeamLocal.reputation.nationalPrestige),
+      );
+      recruits = recruits.map((r) => (r.id === recruitId ? updated : r));
+      offeredIds.push(recruitId);
     }
-
-    const updated = applyScholarshipOffer(
-      recruit,
-      dynasty.userTeamId,
-      scholarshipPercent,
-      recruitPrestigeMultiplier(recruit.starRating, userTeamLocal.reputation.nationalPrestige),
-    );
-    const recruits = dynasty.recruits.map((r) => (r.id === recruitId ? updated : r));
+    if (offeredIds.length === 0) return;
     const recruitBoard = sortRecruitBoardForTeam(userTeamLocal, recruits, dynasty.rosterTargets);
     setDynasty({ ...dynasty, recruits, recruitBoard });
     // Offering implies you're tracking them — pin to the board automatically.
-    setShortlistIds((prev) => (prev.includes(recruitId) ? prev : [...prev, recruitId]));
+    setShortlistIds((prev) => [...prev, ...offeredIds.filter((id) => !prev.includes(id))]);
+    setAssistantReport((prev) =>
+      prev ? { ...prev, suggestedOffers: prev.suggestedOffers.filter((o) => !offeredIds.includes(o.recruitId)) } : prev,
+    );
+    if (offers.length > 1) setSaveStatus(`Made ${offeredIds.length} scholarship offer${offeredIds.length === 1 ? '' : 's'}`);
   }, [dynasty]);
+
+  const offerScholarship = useCallback(
+    (recruitId: string, scholarshipPercent = 100) => offerScholarships([{ recruitId, scholarshipPercent }]),
+    [offerScholarships],
+  );
 
   const scholarshipBudget = {
     used: classScholarshipBudgetUsed(dynasty.recruits, dynasty.userTeamId),
@@ -824,6 +852,7 @@ export function useDynastyController() {
     simWeek,
     simToEnd,
     offerScholarship,
+    offerScholarships,
     doScoutRecruit,
     pitchRecruit,
     toggleVisitInvite,
@@ -833,6 +862,8 @@ export function useDynastyController() {
     assistantReport,
     autoRecruitingAssistant,
     setAutoRecruitingAssistant,
+    autoRecruitingOffers,
+    setAutoRecruitingOffers,
     hasHomeGameThisWeek,
     offerPortalPlayer,
     enterTournament,

@@ -87,6 +87,7 @@ export function App() {
     simWeek,
     simToEnd,
     offerScholarship,
+    offerScholarships,
     doScoutRecruit,
     pitchRecruit,
     toggleVisitInvite,
@@ -96,6 +97,8 @@ export function App() {
     assistantReport,
     autoRecruitingAssistant,
     setAutoRecruitingAssistant,
+    autoRecruitingOffers,
+    setAutoRecruitingOffers,
     hasHomeGameThisWeek,
     offerPortalPlayer,
     enterTournament,
@@ -532,6 +535,9 @@ export function App() {
           autoAssistant={autoRecruitingAssistant}
           onRunAssistant={runRecruitingAssistant}
           onAutoAssistantChange={setAutoRecruitingAssistant}
+          onMakeOffers={offerScholarships}
+          autoOffers={autoRecruitingOffers}
+          onAutoOffersChange={setAutoRecruitingOffers}
         />
       )}
 

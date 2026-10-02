@@ -4516,3 +4516,50 @@ li span {
   font-size: 0.75rem;
   color: #f0a07a;
 }
+.assistant-offers {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.assistant-offers-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.assistant-offers-head h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9fb0c8;
+}
+.assistant-offers-head .assistant-btn {
+  margin-left: auto;
+}
+.assistant-offers ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 6px 16px;
+}
+.assistant-offers li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+}
+.assistant-offers li .assistant-btn {
+  margin-left: auto;
+  padding: 4px 10px;
+}
+.assistant-offers-made {
+  margin: 12px 0 0;
+  font-size: 0.88rem;
+}
+.assistant-offers-made strong {
+  color: #72f2c6;
+}

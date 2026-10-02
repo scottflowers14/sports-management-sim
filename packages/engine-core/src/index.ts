@@ -10,3 +10,4 @@ export * from './season-advancement';
 export * from './signing-class';
 export * from './team-validation';
 export * from './transfer-portal';
+export * from './offer-suggestions';

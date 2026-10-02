@@ -1,11 +1,16 @@
 import {
   applyRecruitPitch,
+  applyScholarshipOffer,
+  classScholarshipBudgetUsed,
   recruitPrestigeMultiplier,
   sortRecruitBoardForTeam,
+  suggestScholarshipOffers,
+  type OfferSuggestion,
   topRecruitMotivations,
   type RecruitBoardEntry,
   type RecruitMotivation,
 } from '@sports-management-sim/engine-core';
+import { LACROSSE_CLASS_SCHOLARSHIP_BUDGET } from '@sports-management-sim/sport-lacrosse';
 import type { LacrossePlayerTraits, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { RecruitingActivity } from './recruiting-activity';
 import type { WeekSimState } from './week-sim';
@@ -16,7 +21,8 @@ type LacrosseRecruit = BoardEntry['recruit'];
 
 export type AssistantAction =
   | { type: 'pitch'; recruitId: string; name: string; motivation: RecruitMotivation; interestChange: number }
-  | { type: 'scout'; recruitId: string; name: string; tier: 'partial' | 'full' };
+  | { type: 'scout'; recruitId: string; name: string; tier: 'partial' | 'full' }
+  | { type: 'offer'; recruitId: string; name: string; scholarshipPercent: number };
 
 /** Pinned targets the staff can't land on pitches alone: the coach still has to offer. */
 export interface AssistantNeedsOffer {
@@ -27,6 +33,8 @@ export interface AssistantNeedsOffer {
 export interface AssistantReport {
   actions: AssistantAction[];
   needsOffer: AssistantNeedsOffer[];
+  /** Offers the coordinator recommends; the head coach decides. */
+  suggestedOffers: Array<OfferSuggestion & { name: string; starRating: number }>;
 }
 
 export interface AssistantInput {
@@ -38,6 +46,8 @@ export interface AssistantInput {
   activity: RecruitingActivity;
   userTeam: LacrosseTeam;
   random: () => number;
+  /** Scholarship equivalencies still free in this class; omit to skip offer suggestions. */
+  budgetRemaining?: number;
 }
 
 export interface AssistantResult {
@@ -46,6 +56,7 @@ export interface AssistantResult {
   activity: RecruitingActivity;
   actions: AssistantAction[];
   needsOffer: AssistantNeedsOffer[];
+  suggestedOffers: AssistantReport['suggestedOffers'];
 }
 
 /**
@@ -123,16 +134,34 @@ export function runRecruitingAssistant(input: AssistantInput): AssistantResult {
     scout(recruit);
   }
 
+  // Offer plan: scouting from this run counts, and nationally ranked recruits are known.
+  const updatedRecruits = input.recruits.map((r) => recruitsById.get(r.id) ?? r);
+  const updatedById = new Map(updatedRecruits.map((r) => [r.id, r]));
+  const suggestedOffers =
+    input.budgetRemaining === undefined
+      ? []
+      : suggestScholarshipOffers({
+          team: userTeam,
+          board: input.recruitBoard.map((e) => ({ ...e, recruit: updatedById.get(e.recruit.id) ?? e.recruit })),
+          budgetRemaining: input.budgetRemaining,
+          isKnown: (id) => getScoutTier(id, scouting) !== 'none' || (updatedById.get(id)?.starRating ?? 0) >= 4,
+        }).map((s) => {
+          const r = updatedById.get(s.recruitId)!;
+          return { ...s, name: nameOf(r), starRating: r.starRating };
+        });
+  const suggestedIds = new Set(suggestedOffers.map((s) => s.recruitId));
+
   const needsOffer = ordered
-    .filter((r) => isOpen(r) && shortlist.has(r.id) && !weOffered(r))
+    .filter((r) => isOpen(r) && shortlist.has(r.id) && !weOffered(r) && !suggestedIds.has(r.id))
     .map((r) => ({ recruitId: r.id, name: nameOf(r) }));
 
   return {
-    recruits: input.recruits.map((r) => recruitsById.get(r.id) ?? r),
+    recruits: updatedRecruits,
     scouting,
     activity,
     actions,
     needsOffer,
+    suggestedOffers,
   };
 }
 
@@ -140,11 +169,20 @@ export function summarizeAssistantActions(actions: AssistantAction[]): string {
   if (actions.length === 0) return 'Assistant had nothing to do this week';
   const pitches = actions.filter((a) => a.type === 'pitch').length;
   const scouts = actions.filter((a) => a.type === 'scout').length;
+  const offers = actions.filter((a) => a.type === 'offer').length;
   const parts = [
+    offers > 0 ? `${offers} offer${offers === 1 ? '' : 's'}` : null,
     pitches > 0 ? `${pitches} pitch${pitches === 1 ? '' : 'es'}` : null,
     scouts > 0 ? `${scouts} scouting report${scouts === 1 ? '' : 's'}` : null,
   ].filter(Boolean);
   return `Assistant spent the week's hours: ${parts.join(', ')}`;
+}
+
+export interface AssistantRunOptions {
+  /** Plan scholarship offers against the class budget (shown to the coach). */
+  suggestOffers?: boolean;
+  /** Delegate offers too: make the suggested offers without asking. */
+  autoOffer?: boolean;
 }
 
 /**
@@ -155,10 +193,12 @@ export function applyAssistantToWeekState<S extends WeekSimState>(
   state: S,
   shortlistIds: string[],
   random: () => number = Math.random,
+  options: AssistantRunOptions = {},
 ): { state: S; report: AssistantReport } {
   const { dynasty } = state;
   const userTeam = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
-  if (!userTeam) return { state, report: { actions: [], needsOffer: [] } };
+  if (!userTeam) return { state, report: { actions: [], needsOffer: [], suggestedOffers: [] } };
+  const planOffers = options.suggestOffers || options.autoOffer;
   const result = runRecruitingAssistant({
     recruitBoard: dynasty.recruitBoard,
     recruits: dynasty.recruits,
@@ -167,14 +207,34 @@ export function applyAssistantToWeekState<S extends WeekSimState>(
     activity: state.recruitingActivity,
     userTeam,
     random,
+    ...(planOffers
+      ? { budgetRemaining: LACROSSE_CLASS_SCHOLARSHIP_BUDGET - classScholarshipBudgetUsed(dynasty.recruits, userTeam.id) }
+      : {}),
   });
-  const report = { actions: result.actions, needsOffer: result.needsOffer };
+
+  let recruits = result.recruits;
+  let suggestedOffers = result.suggestedOffers;
+  if (options.autoOffer && suggestedOffers.length > 0) {
+    const byId = new Map(suggestedOffers.map((o) => [o.recruitId, o]));
+    recruits = recruits.map((r) => {
+      const offer = byId.get(r.id);
+      if (!offer) return r;
+      const multiplier = recruitPrestigeMultiplier(r.starRating, userTeam.reputation.nationalPrestige);
+      return applyScholarshipOffer(r, userTeam.id, offer.scholarshipPercent, multiplier);
+    });
+    for (const offer of suggestedOffers) {
+      result.actions.push({ type: 'offer', recruitId: offer.recruitId, name: offer.name, scholarshipPercent: offer.scholarshipPercent });
+    }
+    suggestedOffers = [];
+  }
+
+  const report = { actions: result.actions, needsOffer: result.needsOffer, suggestedOffers };
   if (result.actions.length === 0) return { state, report };
-  const recruitBoard = sortRecruitBoardForTeam(userTeam, result.recruits, dynasty.rosterTargets);
+  const recruitBoard = sortRecruitBoardForTeam(userTeam, recruits, dynasty.rosterTargets);
   return {
     state: {
       ...state,
-      dynasty: { ...dynasty, recruits: result.recruits, recruitBoard },
+      dynasty: { ...dynasty, recruits, recruitBoard },
       scouting: result.scouting,
       recruitingActivity: result.activity,
     },

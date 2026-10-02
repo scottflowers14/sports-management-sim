@@ -242,6 +242,9 @@ export function RecruitingScreen({
   autoAssistant,
   onRunAssistant,
   onAutoAssistantChange,
+  onMakeOffers,
+  autoOffers,
+  onAutoOffersChange,
 }: {
   recruitBoard: LacrosseBoardEntry[];
   portalEntries: LacrossePortalEntry[];
@@ -272,6 +275,9 @@ export function RecruitingScreen({
   autoAssistant?: boolean;
   onRunAssistant?: () => void;
   onAutoAssistantChange?: (on: boolean) => void;
+  onMakeOffers?: (offers: Array<{ recruitId: string; scholarshipPercent: number }>) => void;
+  autoOffers?: boolean;
+  onAutoOffersChange?: (on: boolean) => void;
 }) {
   const [boardSort, setBoardSort] = useState<BoardSort>('rank');
   const [hideCommitted, setHideCommitted] = useState(false);
@@ -332,13 +338,30 @@ export function RecruitingScreen({
                   />
                   Auto each week
                 </label>
+                {onAutoOffersChange && (
+                  <label
+                    className="assistant-auto"
+                    title="Let the assistant make its suggested scholarship offers instead of waiting for you"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={autoOffers ?? false}
+                      onChange={(e) => onAutoOffersChange(e.target.checked)}
+                    />
+                    Assistant makes offers
+                  </label>
+                )}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {recruitTab === 'board' && assistantReport && <AssistantReport report={assistantReport} onSelectRecruit={onSelectRecruit} />}
+      {recruitTab === 'board' && assistantReport && <AssistantReport
+          report={assistantReport}
+          onSelectRecruit={onSelectRecruit}
+          onMakeOffers={onMakeOffers ?? ((offers) => offers.forEach((o) => onOfferScholarship(o.recruitId, o.scholarshipPercent)))}
+        />}
 
       {recruitTab === 'board' && (
         <>
@@ -805,11 +828,15 @@ function AllRecruitsList({
 function AssistantReport({
   report,
   onSelectRecruit,
+  onMakeOffers,
 }: {
   report: AssistantReportData;
   onSelectRecruit: (recruitId: string) => void;
+  onMakeOffers: (offers: Array<{ recruitId: string; scholarshipPercent: number }>) => void;
 }) {
-  const { actions, needsOffer } = report;
+  const { actions, needsOffer, suggestedOffers } = report;
+  const offersMade = actions.filter((a) => a.type === 'offer');
+  const suggestedCost = suggestedOffers.reduce((sum, o) => sum + o.scholarshipPercent / 100, 0);
   const pitches = actions.filter((a) => a.type === 'pitch');
   const scouts = actions.filter((a) => a.type === 'scout');
   return (
@@ -850,6 +877,44 @@ function AssistantReport({
               </ul>
             )}
           </div>
+        </div>
+      )}
+      {offersMade.length > 0 && (
+        <p className="assistant-offers-made">
+          <strong>Offers made:</strong>{' '}
+          {offersMade.map((a) => (a.type === 'offer' ? `${a.name} (${a.scholarshipPercent}%)` : '')).join(', ')}
+        </p>
+      )}
+      {suggestedOffers.length > 0 && (
+        <div className="assistant-offers" aria-label="Suggested scholarship offers">
+          <div className="assistant-offers-head">
+            <h4>Suggested Offers ({suggestedOffers.length})</h4>
+            <span className="dim">Replaces this year&apos;s graduates · {suggestedCost.toFixed(2)} scholarships</span>
+            <button
+              className="offer-btn assistant-btn"
+              onClick={() => onMakeOffers(suggestedOffers.map(({ recruitId, scholarshipPercent }) => ({ recruitId, scholarshipPercent })))}
+            >
+              Make All {suggestedOffers.length} Offers
+            </button>
+          </div>
+          <ul>
+            {suggestedOffers.map((o) => (
+              <li key={o.recruitId}>
+                <button className="link-btn" onClick={() => onSelectRecruit(o.recruitId)}>
+                  {o.name}
+                </button>
+                <span className="dim">
+                  {o.position} · {'★'.repeat(o.starRating)}
+                </span>
+                <button
+                  className="offer-btn assistant-btn offer-btn-sm"
+                  onClick={() => onMakeOffers([{ recruitId: o.recruitId, scholarshipPercent: o.scholarshipPercent }])}
+                >
+                  Offer {o.scholarshipPercent}%
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {needsOffer.length > 0 && (

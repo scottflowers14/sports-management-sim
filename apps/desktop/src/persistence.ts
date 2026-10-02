@@ -53,6 +53,8 @@ export interface DynastySaveState {
   recruitTrends: Record<string, number>;
   /** When on, the recruiting assistant spends leftover hours before each simulated week. */
   autoRecruitingAssistant?: boolean;
+  /** When on, the assistant also makes its suggested scholarship offers. */
+  autoRecruitingOffers?: boolean;
 }
 
 export interface DynastySaveMetadata {

@@ -296,6 +296,12 @@ describe('Desktop App', () => {
     const report = screen.getByLabelText(/Recruiting assistant report/i);
     expect(report).toHaveTextContent(/Scouting \(\d+\)/);
     expect(screen.getByRole('button', { name: /^Run Assistant$/i })).toBeDisabled();
+
+    // Suggested offers go out in one click and come off the list.
+    const makeAll = within(report).getByRole('button', { name: /^Make All \d+ Offers$/i });
+    await userEvent.click(makeAll);
+    expect(within(report).queryByRole('button', { name: /^Make All/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Scholarships [1-3]\.\d\d \/ 3\.25/)).toBeInTheDocument();
   });
 
   it('shows the weekly hub and opens a player card from a player to watch', async () => {
