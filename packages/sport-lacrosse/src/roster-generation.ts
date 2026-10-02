@@ -162,7 +162,7 @@ function generatePlayer({
   random: () => number;
 }): LacrossePlayer {
   // Prestige 85 program averages ~mid-60s overall; prestige 50 averages ~low 50s
-  const talentBase = 34 + prestige * 0.34;
+  const talentBase = 39 + prestige * 0.34;
   const classBonus = { FR: -4, SO: 0, JR: 3, SR: 5, GR: 5 }[classYear];
   const overall = clamp(Math.round(talentBase + classBonus + (random() * 24 - 12)), 35, 92);
   const seasonsLeft = { FR: 4, SO: 3, JR: 2, SR: 1, GR: 1 }[classYear];

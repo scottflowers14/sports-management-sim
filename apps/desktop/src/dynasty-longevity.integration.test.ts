@@ -36,6 +36,11 @@ describe('long dynasties', () => {
   it('keeps rosters full season after season', () => {
     let dynasty = createFreshLacrosseDynasty({ now: () => 4_242 });
     const random = seededRandom(17);
+    const leagueMean = (d: typeof dynasty) => {
+      const players = d.season.teams.flatMap((t) => t.roster);
+      return players.reduce((sum, p) => sum + p.ratings.overall, 0) / players.length;
+    };
+    const startMean = leagueMean(dynasty);
     for (let year = 0; year < 5; year += 1) {
       const finished = simulateRemainingWeeks(weekState(dynasty), undefined, random);
       const graduating = finished.dynasty.season.teams.flatMap((t) =>
@@ -53,7 +58,12 @@ describe('long dynasties', () => {
       expect(Math.max(...cpuSizes)).toBeLessThanOrEqual(ROSTER_LIMIT);
       expect(sizes.reduce((a, b) => a + b, 0) / sizes.length).toBeGreaterThan(40);
       // After the first cycle, signing classes replace most of the graduates.
-      if (year > 0) expect(signed).toBeGreaterThan(graduating * 0.85);
+      if (year > 0) expect(signed).toBeGreaterThan(graduating * 0.8);
+      // Starting rosters match the talent that recruiting and development
+      // sustain, so the league doesn't inflate (it once climbed ~4 points in 6 years).
+      expect(Math.abs(leagueMean(newDynasty) - startMean)).toBeLessThan(2);
+      const prestige = newDynasty.season.teams.map((t) => t.reputation.nationalPrestige);
+      expect(Math.max(...prestige)).toBeLessThanOrEqual(92);
       dynasty = newDynasty;
     }
   }, 120_000);

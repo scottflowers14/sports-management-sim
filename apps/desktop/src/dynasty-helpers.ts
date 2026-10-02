@@ -6,6 +6,7 @@ import {
   recruitDecisionWeek,
   recruitPrestigeMultiplier,
   resolvePortalCommitments,
+  evolveProgramPrestige,
   runTeamOffseason,
   shouldReopenCommitment,
   signCommittedRecruit,
@@ -419,7 +420,7 @@ export function runOffseason(
   );
 
   // Evolve program prestige based on season performance
-  const teamsWithPrestige = evolvePrestige(season.teams, sortedStandings, nationalChampionId);
+  const teamsWithPrestige = evolveProgramPrestige(season.teams, sortedStandings, nationalChampionId);
 
   // Run offseason for returning players first (advances class years, graduates seniors),
   // then add the signing class as true freshmen for the upcoming season.
@@ -645,43 +646,6 @@ function seededRandom(seed: number): () => number {
     state = (state * 1664525 + 1013904223) >>> 0;
     return state / 0x100000000;
   };
-}
-
-function evolvePrestige(
-  teams: LacrosseTeam[],
-  standings: StandingsEntry[],
-  nationalChampionId?: string,
-): LacrosseTeam[] {
-  return teams.map((team) => {
-    const standing = standings.find((s) => s.teamId === team.id);
-    const wins = standing?.record.wins ?? 0;
-    const losses = standing?.record.losses ?? 0;
-    const total = wins + losses;
-    const winPct = total > 0 ? wins / total : 0.5;
-    const perfBase = Math.round(winPct * 100);
-
-    // Drift recentSuccess toward season performance
-    const gap = perfBase - team.reputation.recentSuccess;
-    const drift = Math.round(gap * 0.3);
-    let recentSuccess = Math.min(99, Math.max(40, team.reputation.recentSuccess + drift));
-    let nationalPrestige = team.reputation.nationalPrestige;
-
-    if (team.id === nationalChampionId) {
-      recentSuccess = Math.min(99, recentSuccess + 8);
-      nationalPrestige = Math.min(99, nationalPrestige + 5);
-    } else if (winPct > 0.75) {
-      nationalPrestige = Math.min(99, nationalPrestige + 2);
-    } else if (winPct > 0.6) {
-      nationalPrestige = Math.min(99, nationalPrestige + 1);
-    } else if (winPct < 0.35) {
-      nationalPrestige = Math.max(40, nationalPrestige - 1);
-    }
-
-    return {
-      ...team,
-      reputation: { ...team.reputation, recentSuccess, nationalPrestige },
-    };
-  });
 }
 
 /** Never cut a team below this many at a position. */

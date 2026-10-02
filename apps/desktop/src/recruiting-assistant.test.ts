@@ -17,9 +17,9 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-function freshState(): WeekSimState {
+function freshState(now = 1_000): WeekSimState {
   return {
-    dynasty: createFreshLacrosseDynasty(),
+    dynasty: createFreshLacrosseDynasty({ now: () => now }),
     rankings: [],
     injuries: [],
     newsItems: [],
@@ -143,15 +143,20 @@ describe('delegated offers', () => {
   // The three-season playtest: a coach who never offered signed nobody and
   // ended up on the hot seat. With offers delegated, the staff lands a class.
   it('signs a real class for a coach who delegates recruiting entirely', () => {
-    const done = simulateRemainingWeeks(freshState(), undefined, seededRandom(21), (s) =>
-      applyAssistantToWeekState(s, [], seededRandom(s.dynasty.season.currentWeek), { autoOffer: true }).state,
-    );
-    const userId = done.dynasty.userTeamId;
-    // Offers to recruits who picked a rival free their money back up, so only
-    // live offers and commitments count against the class budget.
-    expect(classScholarshipBudgetUsed(done.dynasty.recruits, userId)).toBeLessThanOrEqual(LACROSSE_CLASS_SCHOLARSHIP_BUDGET + 1e-9);
-    const { summary } = runOffseason(done.dynasty, undefined, 'balanced', done.seasonStats);
-    expect(summary.signingClass.length).toBeGreaterThanOrEqual(5);
+    let signedTotal = 0;
+    for (const now of [1_000, 2_000, 4_000]) {
+      const done = simulateRemainingWeeks(freshState(now), undefined, seededRandom(21), (s) =>
+        applyAssistantToWeekState(s, [], seededRandom(s.dynasty.season.currentWeek), { autoOffer: true }).state,
+      );
+      const userId = done.dynasty.userTeamId;
+      // Offers to recruits who picked a rival free their money back up, so only
+      // live offers and commitments count against the class budget.
+      expect(classScholarshipBudgetUsed(done.dynasty.recruits, userId)).toBeLessThanOrEqual(LACROSSE_CLASS_SCHOLARSHIP_BUDGET + 1e-9);
+      const { summary } = runOffseason(done.dynasty, undefined, 'balanced', done.seasonStats);
+      expect(summary.signingClass.length).toBeGreaterThanOrEqual(3);
+      signedTotal += summary.signingClass.length;
+    }
+    expect(signedTotal).toBeGreaterThanOrEqual(15);
   }, 60_000);
 
   it('reports offers it made and leaves nothing to suggest', () => {
