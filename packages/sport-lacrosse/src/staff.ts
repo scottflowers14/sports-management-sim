@@ -198,7 +198,16 @@ export function runStaffOffseason(
   const { staff: afterContracts, departed } = advanceStaffContracts(staff);
   const { staff: next, poached } =
     winPct === undefined ? { staff: afterContracts, poached: [] } : poachStaff(afterContracts, winPct, seededRandom(hash(`poach:${seed}`)));
-  const candidates = [...departed.map(reSigningCandidate), ...generateStaffCandidates({ seed, prestige })];
+  // A seed can repeat the opening pool's; a coach already on staff (or just
+  // released) never shows up as a clone of himself in the hiring pool.
+  const takenIds = new Set([
+    ...Object.values(next).flatMap((member) => (member ? [member.id] : [])),
+    ...departed.map((member) => member.id),
+  ]);
+  const candidates = [
+    ...departed.map(reSigningCandidate),
+    ...generateStaffCandidates({ seed, prestige }).filter((candidate) => !takenIds.has(candidate.id)),
+  ];
   return { staff: next, departed, poached, candidates };
 }
 

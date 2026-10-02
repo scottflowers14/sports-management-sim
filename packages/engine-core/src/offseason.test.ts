@@ -224,4 +224,16 @@ describe('offseason progression', () => {
     const result = runTeamOffseason(makeTeam([makePlayer('fr', 'FR')]), { developmentRandom: () => 0.5 });
     expect(result.roster[0]!.ratingHistory).toBeUndefined();
   });
+
+  it('keeps one history entry per season when a rollover is repeated', () => {
+    const team = makeTeam([makePlayer('fr', 'FR')]);
+    const once = runTeamOffseason(team, { developmentRandom: () => 0.5, completedSeason: 2028 });
+    const again = runTeamOffseason(team, { developmentRandom: () => 0.5, completedSeason: 2028 });
+    const twiceOnSameSeason = runTeamOffseason(
+      { ...team, roster: [{ ...team.roster[0]!, ratingHistory: once.roster[0]!.ratingHistory ?? [] }] },
+      { developmentRandom: () => 0.5, completedSeason: 2028 },
+    );
+    expect(again.roster[0]!.ratingHistory).toEqual(once.roster[0]!.ratingHistory);
+    expect(twiceOnSameSeason.roster[0]!.ratingHistory?.map((h) => h.season)).toEqual([2028]);
+  });
 });

@@ -52,4 +52,14 @@ describe('program prestige', () => {
     expect(low!.reputation.nationalPrestige).toBeGreaterThanOrEqual(40);
     expect(high!.reputation.nationalPrestige).toBeLessThanOrEqual(99);
   });
+
+  it('pulls programs toward the middle at the same speed from either side', () => {
+    const [blueBlood, bottom] = evolveProgramPrestige(
+      [teamWith('a', PRESTIGE_CENTER + 25), teamWith('b', PRESTIGE_CENTER - 25)],
+      [standing('a', 8, 8), standing('b', 8, 8)],
+    );
+    const fell = PRESTIGE_CENTER + 25 - blueBlood!.reputation.nationalPrestige;
+    const rose = bottom!.reputation.nationalPrestige - (PRESTIGE_CENTER - 25);
+    expect(fell).toBe(rose);
+  });
 });

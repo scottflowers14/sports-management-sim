@@ -197,4 +197,14 @@ describe('hiring and the offseason cycle', () => {
     const staff = { offense: { ...offense, rating: 95, yearsLeft: 3 } };
     expect(runStaffOffseason(staff, { seed: 1, prestige: 70 }).poached).toEqual([]);
   });
+
+  it('never offers a sitting coach as a candidate when the pool seed repeats', () => {
+    const pool = generateStaffCandidates({ seed: 2070, prestige: 70 });
+    const hired = pool.find((c) => c.role === 'offense')!;
+    const staff = { ...generateStartingStaff(team, 7), offense: { ...hired, yearsLeft: 3 } };
+    const result = runStaffOffseason(staff, { seed: 2070, prestige: 70 });
+    expect(result.staff.offense?.id).toBe(hired.id);
+    expect(result.candidates.some((c) => c.id === hired.id)).toBe(false);
+    expect(new Set(result.candidates.map((c) => c.id)).size).toBe(result.candidates.length);
+  });
 });

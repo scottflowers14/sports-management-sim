@@ -4,6 +4,7 @@ import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import { simulateOneWeek, simulateRemainingWeeks, type WeekSimState } from './week-sim';
+import { healInjuriesOneWeek } from './dynasty-helpers';
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -103,5 +104,18 @@ describe('simulateRemainingWeeks', () => {
     expect(done.dynasty.season.schedule.every((g) => g.status === 'final')).toBe(true);
     const userTeam = done.dynasty.season.teams.find((t) => t.id === done.dynasty.userTeamId)!;
     expect(userTeam.record.wins + userTeam.record.losses).toBeGreaterThan(0);
+  });
+});
+
+describe('healInjuriesOneWeek', () => {
+  it('counts a postseason weekend against every injury and returns the healed', () => {
+    const list = [
+      { playerId: 'a', teamId: 't', weeksRemaining: 1, description: 'ankle sprain' },
+      { playerId: 'b', teamId: 't', weeksRemaining: 3, description: 'broken hand' },
+    ];
+    const after = healInjuriesOneWeek(list);
+    expect(after).toEqual([{ playerId: 'b', teamId: 't', weeksRemaining: 2, description: 'broken hand' }]);
+    expect(healInjuriesOneWeek(healInjuriesOneWeek(after))).toEqual([]);
+    expect(list[0]!.weeksRemaining).toBe(1);
   });
 });

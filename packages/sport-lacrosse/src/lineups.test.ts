@@ -98,3 +98,11 @@ describe('getLacrosseParticipationMinutes', () => {
     for (const share of minutes.values()) expect(share).toBeLessThanOrEqual(1);
   });
 });
+
+describe('depth chart integrity', () => {
+  it('ignores a saved chart that lists a player under a position he does not play', () => {
+    const midfielder = team.roster.find((p) => p.position === 'MID')!;
+    const stale = { ...team, depthChart: { ATT: [midfielder.id] } };
+    expect(buildLacrosseLineup(stale).attack.map((p) => p.id)).not.toContain(midfielder.id);
+  });
+});

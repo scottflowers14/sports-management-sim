@@ -205,4 +205,32 @@ describe('topRecruitMotivations', () => {
     expect(topRecruitMotivations(preferences, 2)).toEqual(['prestige', 'proximity']);
     expect(topRecruitMotivations(preferences, 1)).toEqual(['prestige']);
   });
+
+  it('only credits new scholarship money when an offer is revised', () => {
+    const first = applyScholarshipOffer(makeRecruit(), 'team-1', 50);
+    const sameAgain = applyScholarshipOffer(first, 'team-1', 50);
+    const raised = applyScholarshipOffer(first, 'team-1', 100);
+    const cut = applyScholarshipOffer(first, 'team-1', 25);
+
+    expect(first.interestByTeamId['team-1']).toBeGreaterThan(0);
+    expect(sameAgain.interestByTeamId['team-1']).toBe(first.interestByTeamId['team-1']);
+    expect(sameAgain.scholarshipOffers).toHaveLength(1);
+    // Raising from 50 to 100 is worth exactly what a fresh 50% offer is worth.
+    expect(raised.interestByTeamId['team-1']).toBe(2 * first.interestByTeamId['team-1']!);
+    expect(cut.interestByTeamId['team-1']).toBe(first.interestByTeamId['team-1']);
+    expect(cut.scholarshipOffers[0]?.scholarshipPercent).toBe(25);
+  });
+
+  it('treats a recruit with no stated preferences as indifferent instead of NaN', () => {
+    const indifferent = makeRecruit({
+      preferences: {
+        proximityImportance: 0,
+        prestigeImportance: 0,
+        scholarshipImportance: 0,
+        playingTimeImportance: 0,
+        academicImportance: 0,
+      },
+    });
+    expect(calculateRecruitFitScore(indifferent, makeTeam())).toBe(50);
+  });
 });
