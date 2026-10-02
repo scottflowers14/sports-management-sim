@@ -10,10 +10,12 @@ import {
 import {
   DEFAULT_GAME_PLAN,
   deriveCpuGamePlan,
+  programCoachingEdge,
   simulateLacrosseGameWithLog,
   type GameLog,
   type LacrosseDynastyState,
   type LacrosseGamePlan,
+  type LacrosseStaff,
   type LacrossePlayerGameStats,
   type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
@@ -46,6 +48,8 @@ export interface WeekSimState {
   gameLogs: Map<string, GameLog>;
   bestNatRank: number | null;
   lastSimWeek: number | null;
+  /** The user's hired coordinators; CPU staff quality comes from prestige. */
+  userStaff?: LacrosseStaff;
 }
 
 export function simulateOneWeek(
@@ -72,6 +76,7 @@ export function simulateOneWeek(
   const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
   const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
     team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
+  const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
   const newSeason = advanceSeasonWeek(dynasty.season, (game, homeTeam, awayTeam) => {
     // Injured players sit: the depth chart promotes the next man up for the
     // rating, the game plan, and the box score.
@@ -83,6 +88,8 @@ export function simulateOneWeek(
       random,
       homeGamePlan: planFor(home),
       awayGamePlan: planFor(away),
+      homeCoaching: programCoachingEdge(home, staffOwner),
+      awayCoaching: programCoachingEdge(away, staffOwner),
     });
     weekLogs.set(game.id, log);
     weekPlayerLines.set(game.id, [...players.home, ...players.away]);

@@ -17,6 +17,7 @@ import { TournamentScreen } from './screens/TournamentScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { OffseasonScreen } from './screens/OffseasonScreen';
+import { StaffScreen } from './screens/StaffScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
@@ -76,6 +77,11 @@ export function App() {
     setGamePlan,
     trainingFocus,
     setTrainingFocus,
+    staff,
+    staffCandidates,
+    staffBudget,
+    hireStaff,
+    releaseStaff,
     pendingJobOffers,
     persistDynasty,
     startNewDynasty,
@@ -280,6 +286,7 @@ export function App() {
       items: [
         { view: 'team', label: 'Team' },
         { view: 'schedule', label: 'Schedule' },
+        { view: 'staff', label: 'Staff' },
         { view: 'recruiting', label: committedCount > 0 ? `Recruiting · ${committedCount}` : 'Recruiting' },
       ],
     },
@@ -581,6 +588,16 @@ export function App() {
 
       {view === 'news' && (
         <NewsScreen newsItems={newsItems} userTeamName={userTeam?.shortName} />
+      )}
+
+      {view === 'staff' && (
+        <StaffScreen
+          staff={staff}
+          candidates={staffCandidates}
+          budget={staffBudget}
+          onHire={hireStaff}
+          onRelease={releaseStaff}
+        />
       )}
 
       {view === 'history' && (

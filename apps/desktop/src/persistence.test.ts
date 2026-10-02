@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_GAME_PLAN } from '@sports-management-sim/sport-lacrosse';
+import { DEFAULT_GAME_PLAN, recruitingHoursFor, STAFF_ROLES } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
@@ -140,7 +140,11 @@ describe('multi-save persistence', () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.recruitingActivity).toEqual({ visitIds: [], pitchedIds: [] });
     expect(loaded!.recruitTrends).toEqual({});
-    expect(loaded!.scouting.pointsPerWeek).toBe(6);
+    // Pre-staff saves get a full starting staff, and the recruiting
+    // coordinator sets the weekly hours.
+    for (const role of STAFF_ROLES) expect(loaded!.staff?.[role]?.role).toBe(role);
+    expect(loaded!.staffCandidates!.length).toBeGreaterThan(0);
+    expect(loaded!.scouting.pointsPerWeek).toBe(recruitingHoursFor(loaded!.staff!.recruiting!.rating));
     expect(loaded!.scouting.pointsAvailable).toBe(2);
   });
 });

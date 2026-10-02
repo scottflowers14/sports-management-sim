@@ -3,6 +3,7 @@ import { DEFAULT_GAME_PLAN, getGamePlanModifiers, type LacrosseGamePlan } from '
 import type { LacrossePlayerGameStats, LacrosseTeam, LacrosseTeamStats } from './models';
 import { generateLacrossePlayerStats, type LacrosseScoringPlay } from './player-stats';
 import { calculateLacrosseTeamRating, type LacrosseTeamRating } from './team-rating';
+import type { CoachingEdge } from './staff';
 
 export type RandomSource = () => number;
 
@@ -14,6 +15,9 @@ export interface SimulateLacrosseGameInput {
   awayGamePlan?: LacrosseGamePlan;
   /** Championship-weekend games are played at a neutral site: no home edge. */
   neutralSite?: boolean;
+  /** Coordinator quality for each side (see coachingEdge); omitted means average. */
+  homeCoaching?: CoachingEdge;
+  awayCoaching?: CoachingEdge;
 }
 
 /**
@@ -21,6 +25,8 @@ export interface SimulateLacrosseGameInput {
  * Worth about half a goal a game, so home teams win about 57% of even matchups.
  */
 export const HOME_SCORING_EDGE = 0.012;
+
+const NO_COACHING_EDGE: CoachingEdge = { offense: 0, defense: 0 };
 
 export type LacrosseGameResult = GameResult<LacrosseTeamStats>;
 
@@ -63,8 +69,11 @@ function simulateTeamResult({
   homeGamePlan = DEFAULT_GAME_PLAN,
   awayGamePlan = DEFAULT_GAME_PLAN,
   neutralSite = false,
+  homeCoaching = NO_COACHING_EDGE,
+  awayCoaching = NO_COACHING_EDGE,
 }: SimulateLacrosseGameInput): LacrosseGameResult {
-  const homeEdge = neutralSite ? 0 : HOME_SCORING_EDGE;
+  const homeEdge = (neutralSite ? 0 : HOME_SCORING_EDGE) + homeCoaching.offense - awayCoaching.defense;
+  const awayEdge = awayCoaching.offense - homeCoaching.defense;
   const homeRating = calculateLacrosseTeamRating(homeTeam);
   const awayRating = calculateLacrosseTeamRating(awayTeam);
   const homePossessionEdge = (homeRating.faceoff - awayRating.faceoff) / 12;
@@ -81,7 +90,7 @@ function simulateTeamResult({
   );
 
   let homeScore = simulateGoals(homePossessions, homeRating, awayRating, random, homeMods.ownScoringChance + awayMods.oppScoringChance + homeEdge);
-  let awayScore = simulateGoals(awayPossessions, awayRating, homeRating, random, awayMods.ownScoringChance + homeMods.oppScoringChance);
+  let awayScore = simulateGoals(awayPossessions, awayRating, homeRating, random, awayMods.ownScoringChance + homeMods.oppScoringChance + awayEdge);
   let overtime = false;
 
   if (homeScore === awayScore) {

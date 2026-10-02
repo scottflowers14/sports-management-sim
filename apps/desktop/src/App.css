@@ -4563,3 +4563,124 @@ li span {
 .assistant-offers-made strong {
   color: #72f2c6;
 }
+
+/* ── Staff screen ───────────────────────────────────────────── */
+.staff-layout {
+  display: grid;
+  gap: 16px;
+}
+.staff-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.staff-budget {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+  font-size: 0.85rem;
+  text-align: right;
+}
+.staff-budget-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.staff-budget-fill {
+  height: 100%;
+  background: #72f2c6;
+}
+.staff-table td {
+  vertical-align: middle;
+}
+.staff-role-effect {
+  font-size: 0.75rem;
+}
+.staff-vacant td {
+  color: #f2b872;
+}
+.staff-rating {
+  display: inline-block;
+  min-width: 2.2em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+}
+.staff-rating-elite {
+  background: rgba(114, 242, 198, 0.25);
+  color: #72f2c6;
+}
+.staff-rating-good {
+  background: rgba(114, 180, 242, 0.2);
+  color: #9cc8ff;
+}
+.staff-rating-poor {
+  background: rgba(242, 114, 114, 0.18);
+  color: #ff9a9a;
+}
+.staff-release-btn {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(242, 114, 114, 0.4);
+  background: transparent;
+  color: #ff9a9a;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.staff-note {
+  margin-top: 10px;
+  font-size: 0.8rem;
+}
+.staff-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.staff-candidate-group h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+.staff-candidate-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.staff-candidate {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.85rem;
+}
+.staff-candidate span {
+  display: inline-block;
+}
+.staff-hire-btn {
+  width: auto;
+  flex-shrink: 0;
+}
+.staff-hire-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.staff-delta-up {
+  color: #72f2c6;
+  font-size: 0.8rem;
+}
+.staff-delta-down {
+  color: #ff9a9a;
+  font-size: 0.8rem;
+}
+.staff-candidate-badges {
+  white-space: nowrap;
+}

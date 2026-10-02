@@ -1,9 +1,11 @@
 import { deriveCpuGamePlan, simulateLacrosseGameWithLog } from '@sports-management-sim/sport-lacrosse';
-import type { GameLog, LacrosseGamePlan, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { CoachingEdge, GameLog, LacrosseGamePlan, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import type { Conference, ScheduledGame, StandingsEntry } from '@sports-management-sim/engine-core';
 
 /** Resolves the game plan a team uses in tournament play (defaults to CPU-derived plans). */
 export type GamePlanResolver = (team: LacrosseTeam) => LacrosseGamePlan;
+export type CoachingResolver = (team: LacrosseTeam) => CoachingEdge;
+const NO_COACHING: CoachingResolver = () => ({ offense: 0, defense: 0 });
 
 export interface TournamentGameResult {
   winnerId: string;
@@ -78,11 +80,11 @@ export function initTournament(standings: StandingsEntry[], conferences: Confere
   };
 }
 
-export function advanceTournamentSemis(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan): TournamentState {
+export function advanceTournamentSemis(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan, coachingFor: CoachingResolver = NO_COACHING): TournamentState {
   return {
     ...state,
     phase: 'conf_finals',
-    conferenceBrackets: state.conferenceBrackets.map((bracket) => simulateSemifinals(bracket, teams, planFor)),
+    conferenceBrackets: state.conferenceBrackets.map((bracket) => simulateSemifinals(bracket, teams, planFor, coachingFor)),
   };
 }
 
@@ -91,8 +93,9 @@ export function advanceTournamentFinals(
   teams: LacrosseTeam[],
   planFor: GamePlanResolver = deriveCpuGamePlan,
   schedule: ScheduledGame[] = [],
+  coachingFor: CoachingResolver = NO_COACHING,
 ): TournamentState {
-  const updatedBrackets = state.conferenceBrackets.map((bracket) => simulateFinal(bracket, teams, planFor));
+  const updatedBrackets = state.conferenceBrackets.map((bracket) => simulateFinal(bracket, teams, planFor, coachingFor));
   const champions = updatedBrackets.map((b) => b.champion!).filter(Boolean);
   const { field, firstOut } = selectNcaaField(champions, teams, schedule);
   const selected = { conferenceBrackets: updatedBrackets, ncaaField: field, ncaaFirstOut: firstOut };
@@ -136,10 +139,11 @@ export function advanceNcaaFirstRound(
   state: TournamentState,
   teams: LacrosseTeam[],
   planFor: GamePlanResolver = deriveCpuGamePlan,
+  coachingFor: CoachingResolver = NO_COACHING,
 ): TournamentState {
   if (!state.ncaaFirstRound || !state.ncaaField) return state;
   const field = state.ncaaField;
-  const played = state.ncaaFirstRound.map((g) => ({ ...g, result: playTournamentGame(g, teams, planFor) }));
+  const played = state.ncaaFirstRound.map((g) => ({ ...g, result: playTournamentGame(g, teams, planFor, false, coachingFor) }));
   const ncaaQuarterfinals = QUARTERFINAL_HOSTS.map((seed, i) =>
     ncaaGame(`ncaa-qf-${seed}`, field[seed - 1]!.teamId, played[i]!.result.winnerId),
   );
@@ -150,9 +154,10 @@ export function advanceNcaaQuarterfinals(
   state: TournamentState,
   teams: LacrosseTeam[],
   planFor: GamePlanResolver = deriveCpuGamePlan,
+  coachingFor: CoachingResolver = NO_COACHING,
 ): TournamentState {
   if (!state.ncaaQuarterfinals) return state;
-  const played = state.ncaaQuarterfinals.map((g) => ({ ...g, result: playTournamentGame(g, teams, planFor) }));
+  const played = state.ncaaQuarterfinals.map((g) => ({ ...g, result: playTournamentGame(g, teams, planFor, false, coachingFor) }));
   const seedOf = ncaaSeedLookup(state);
   // Final Four: the 1 quadrant meets the 4 quadrant, 3 meets 2. The better seed hosts.
   const pair = (id: string, a: string, b: string) => (seedOf(a) <= seedOf(b) ? ncaaGame(id, a, b) : ncaaGame(id, b, a));
@@ -236,10 +241,10 @@ export function selectNcaaField(
   return { field, firstOut };
 }
 
-export function advanceTournamentNationalSemis(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan): TournamentState {
+export function advanceTournamentNationalSemis(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan, coachingFor: CoachingResolver = NO_COACHING): TournamentState {
   if (!state.nationalSemiFinal1 || !state.nationalSemiFinal2) return state;
-  const result1 = playTournamentGame(state.nationalSemiFinal1, teams, planFor, true);
-  const result2 = playTournamentGame(state.nationalSemiFinal2, teams, planFor, true);
+  const result1 = playTournamentGame(state.nationalSemiFinal1, teams, planFor, true, coachingFor);
+  const result2 = playTournamentGame(state.nationalSemiFinal2, teams, planFor, true, coachingFor);
   const nationalGame: TournamentGame = {
     id: 'national-championship',
     homeTeamId: result1.winnerId,
@@ -255,9 +260,9 @@ export function advanceTournamentNationalSemis(state: TournamentState, teams: La
   };
 }
 
-export function advanceNationalChampionship(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan): TournamentState {
+export function advanceNationalChampionship(state: TournamentState, teams: LacrosseTeam[], planFor: GamePlanResolver = deriveCpuGamePlan, coachingFor: CoachingResolver = NO_COACHING): TournamentState {
   if (!state.nationalGame) return state;
-  const result = playTournamentGame(state.nationalGame, teams, planFor, true);
+  const result = playTournamentGame(state.nationalGame, teams, planFor, true, coachingFor);
   return {
     ...state,
     phase: 'complete',
@@ -287,15 +292,15 @@ function buildBracket(confId: string, teamIds: string[], standings: StandingsEnt
   };
 }
 
-function simulateSemifinals(bracket: ConferenceBracket, teams: LacrosseTeam[], planFor: GamePlanResolver): ConferenceBracket {
+function simulateSemifinals(bracket: ConferenceBracket, teams: LacrosseTeam[], planFor: GamePlanResolver, coachingFor: CoachingResolver): ConferenceBracket {
   return {
     ...bracket,
-    semifinal1: { ...bracket.semifinal1, result: playTournamentGame(bracket.semifinal1, teams, planFor) },
-    semifinal2: { ...bracket.semifinal2, result: playTournamentGame(bracket.semifinal2, teams, planFor) },
+    semifinal1: { ...bracket.semifinal1, result: playTournamentGame(bracket.semifinal1, teams, planFor, false, coachingFor) },
+    semifinal2: { ...bracket.semifinal2, result: playTournamentGame(bracket.semifinal2, teams, planFor, false, coachingFor) },
   };
 }
 
-function simulateFinal(bracket: ConferenceBracket, teams: LacrosseTeam[], planFor: GamePlanResolver): ConferenceBracket {
+function simulateFinal(bracket: ConferenceBracket, teams: LacrosseTeam[], planFor: GamePlanResolver, coachingFor: CoachingResolver): ConferenceBracket {
   const sf1Winner = bracket.semifinal1.result!.winnerId;
   const sf2Winner = bracket.semifinal2.result!.winnerId;
   const final: TournamentGame = {
@@ -304,7 +309,7 @@ function simulateFinal(bracket: ConferenceBracket, teams: LacrosseTeam[], planFo
     awayTeamId: sf2Winner,
     conferenceId: bracket.conferenceId,
   };
-  const result = playTournamentGame(final, teams, planFor);
+  const result = playTournamentGame(final, teams, planFor, false, coachingFor);
   return { ...bracket, final: { ...final, result }, champion: result.winnerId };
 }
 
@@ -313,6 +318,7 @@ function playTournamentGame(
   teams: LacrosseTeam[],
   planFor: GamePlanResolver,
   neutralSite = false,
+  coachingFor: CoachingResolver = NO_COACHING,
 ): TournamentGameResult {
   const homeTeam = teams.find((t) => t.id === game.homeTeamId)!;
   const awayTeam = teams.find((t) => t.id === game.awayTeamId)!;
@@ -322,6 +328,8 @@ function playTournamentGame(
     homeGamePlan: planFor(homeTeam),
     awayGamePlan: planFor(awayTeam),
     neutralSite,
+    homeCoaching: coachingFor(homeTeam),
+    awayCoaching: coachingFor(awayTeam),
   });
   const homeWon = result.winnerTeamId === homeTeam.id;
 

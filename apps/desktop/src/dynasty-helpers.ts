@@ -17,6 +17,8 @@ import {
   generateLacrosseRecruitingClass,
   generateLacrosseWalkOns,
   recruitingClassSize,
+  developmentBonusFor,
+  programStaffRating,
   rollLacrosseInjuries,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
@@ -26,6 +28,7 @@ import type {
   LacrosseDynastyState,
   LacrosseRecruit,
   LacrosseSeason,
+  LacrosseStaff,
   LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
 import { computeSeasonAwards } from './awards';
@@ -348,6 +351,7 @@ export function runOffseason(
   nationalChampionId?: string,
   trainingFocus: TrainingFocus = 'balanced',
   seasonStats?: SeasonStatsMap,
+  userStaff?: LacrosseStaff,
 ): { newDynasty: LacrosseDynastyState; summary: OffseasonSummary } {
   const { season, recruits, userTeamId, seed, rosterTargets } = dynasty;
   const newYear = season.year + 1;
@@ -420,13 +424,16 @@ export function runOffseason(
   // Run offseason for returning players first (advances class years, graduates seniors),
   // then add the signing class as true freshmen for the upcoming season.
   const focusPositions = trainingFocus !== 'balanced' ? TRAINING_FOCUS_POSITIONS[trainingFocus] : null;
+  const staffOwner = { teamId: userTeamId, ...(userStaff ? { staff: userStaff } : {}) };
   const teamsAfterOffseason = teamsWithPrestige.map((team) => {
-    const afterOffseason =
-      team.id === userTeamId && focusPositions
-        ? runTeamOffseason(team, {
-            developmentBonusFor: (player) => (focusPositions.includes(player.position) ? TRAINING_FOCUS_BONUS : 0),
-          })
-        : runTeamOffseason(team);
+    // The development coordinator lifts every player; the training focus adds
+    // a bigger push for the chosen position group.
+    const staffBonus = developmentBonusFor(programStaffRating(team, 'development', staffOwner));
+    const userFocus = team.id === userTeamId ? focusPositions : null;
+    const afterOffseason = runTeamOffseason(team, {
+      developmentBonusFor: (player) =>
+        staffBonus + (userFocus?.includes(player.position) ? TRAINING_FOCUS_BONUS : 0),
+    });
     const withClass = addSignedRecruitsToTeam(afterOffseason, signed, newYear);
     const withWalkOns = backfillWalkOns(withClass, rosterTargets, seed + newYear, newYear);
     const trimmed = team.id === userTeamId ? withWalkOns : enforceRosterLimit(withWalkOns);

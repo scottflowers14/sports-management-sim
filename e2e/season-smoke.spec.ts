@@ -20,6 +20,14 @@ test('plays a season through the title game and offseason into year two', async 
   const advance = page.locator('.advance-btn');
   await expect(advance).toContainText('Week 1');
 
+  // Hire into an empty chair on the Staff screen.
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Staff' }).click();
+  const staffCard = page.getByLabel('Coaching staff');
+  await staffCard.getByRole('button', { name: 'Release' }).first().click();
+  await expect(staffCard).toContainText('Vacant');
+  await page.getByLabel('Staff candidates').getByRole('button', { name: 'Hire' }).first().click();
+  await expect(page.getByLabel('Staff candidates').getByRole('button', { name: 'Hire' })).toHaveCount(11);
+
   // One week by hand, then the recruiting assistant.
   await advance.click();
   await expect(advance).toContainText('Week 2');

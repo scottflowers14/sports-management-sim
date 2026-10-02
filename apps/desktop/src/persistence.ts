@@ -1,13 +1,13 @@
 import { DEFAULT_GAME_PLAN } from '@sports-management-sim/sport-lacrosse';
 import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
-import type { GameLog, LacrosseDynastyState, LacrosseGamePlan } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrosseStaff, StaffMember } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
 import type { ConferenceBracket, TournamentGame, TournamentPhase, TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
 import type { ScoutingState } from './scouting';
-import { RECRUITING_HOURS_PER_WEEK } from './scouting';
+import { createProgramStaff, withStaffRecruitingHours } from './program-staff';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import type { RecruitingActivity } from './recruiting-activity';
 import type { SeasonStatsMap } from './stats';
@@ -55,6 +55,10 @@ export interface DynastySaveState {
   autoRecruitingAssistant?: boolean;
   /** When on, the assistant also makes its suggested scholarship offers. */
   autoRecruitingOffers?: boolean;
+  /** The user's assistant coaches. Older saves get a starting staff on load. */
+  staff?: LacrosseStaff;
+  /** Coaches available to hire this year. */
+  staffCandidates?: StaffMember[];
 }
 
 export interface DynastySaveMetadata {
@@ -382,10 +386,13 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
         };
       }
     }
-    // Older saves banked 3 scouting points a week; the unified recruiting-hours
-    // pool pays for pitches and visits too, so bring them up to the new rate.
-    if (parsed.scouting && parsed.scouting.pointsPerWeek < RECRUITING_HOURS_PER_WEEK) {
-      parsed.scouting = { ...parsed.scouting, pointsPerWeek: RECRUITING_HOURS_PER_WEEK };
+    // Saves from before the staff system get a starting staff; the recruiting
+    // coordinator now sets the weekly recruiting hours.
+    if (parsed.dynasty && parsed.staff === undefined) {
+      const created = createProgramStaff(parsed.dynasty);
+      parsed.staff = created.staff;
+      parsed.staffCandidates = created.staffCandidates;
+      if (parsed.scouting) parsed.scouting = withStaffRecruitingHours(parsed.scouting, created.staff);
     }
     return parsed as PersistedDynastySave;
   } catch {

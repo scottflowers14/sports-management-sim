@@ -455,4 +455,24 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
   }, 20000);
+
+  it('hires and releases assistant coaches on the Staff screen', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Staff$/ }));
+    const staffCard = screen.getByLabelText('Coaching staff');
+    expect(within(staffCard).getByText('Offensive Coordinator')).toBeInTheDocument();
+    expect(within(staffCard).queryByText('Vacant')).not.toBeInTheDocument();
+
+    await userEvent.click(within(staffCard).getAllByRole('button', { name: 'Release' })[0]!);
+    expect(within(staffCard).getByText('Vacant')).toBeInTheDocument();
+    expect(loadActiveDynastySave()).not.toBeNull();
+
+    const pool = screen.getByLabelText('Staff candidates');
+    const hireButtons = within(pool).getAllByRole('button', { name: 'Hire' }).filter((b) => !(b as HTMLButtonElement).disabled);
+    expect(hireButtons.length).toBeGreaterThan(0);
+    const before = within(pool).getAllByRole('button', { name: 'Hire' }).length;
+    await userEvent.click(hireButtons[0]!);
+    expect(within(pool).getAllByRole('button', { name: 'Hire' }).length).toBe(before - 1);
+    await waitFor(() => expect(loadActiveDynastySave()?.staffCandidates?.length).toBe(before - 1));
+  });
 });

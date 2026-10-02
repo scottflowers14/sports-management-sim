@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { classScholarshipBudgetUsed } from '@sports-management-sim/engine-core';
+import { LACROSSE_CLASS_SCHOLARSHIP_BUDGET } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState, getScoutTier } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
@@ -145,9 +147,9 @@ describe('delegated offers', () => {
       applyAssistantToWeekState(s, [], seededRandom(s.dynasty.season.currentWeek), { autoOffer: true }).state,
     );
     const userId = done.dynasty.userTeamId;
-    const offered = done.dynasty.recruits.filter((r) => r.scholarshipOffers.some((o) => o.teamId === userId));
-    const spent = offered.reduce((sum, r) => sum + r.scholarshipOffers.find((o) => o.teamId === userId)!.scholarshipPercent / 100, 0);
-    expect(spent).toBeLessThanOrEqual(3.25 + 1e-9);
+    // Offers to recruits who picked a rival free their money back up, so only
+    // live offers and commitments count against the class budget.
+    expect(classScholarshipBudgetUsed(done.dynasty.recruits, userId)).toBeLessThanOrEqual(LACROSSE_CLASS_SCHOLARSHIP_BUDGET + 1e-9);
     const { summary } = runOffseason(done.dynasty, undefined, 'balanced', done.seasonStats);
     expect(summary.signingClass.length).toBeGreaterThanOrEqual(5);
   }, 60_000);
