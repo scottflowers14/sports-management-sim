@@ -115,6 +115,7 @@ export function simulatePossessionGame(input: SimulateLacrosseGameInput): Lacros
   const events: GameEvent[] = [];
   let eventIdx = 0;
   let leadChanges = 0;
+  let lastLeader = 0;
   let biggestLead = 0;
   let overtime = false;
 
@@ -143,13 +144,16 @@ export function simulatePossessionGame(input: SimulateLacrosseGameInput): Lacros
       }
       const attacking = offense!;
       const defending = attacking === home ? away : home;
-      const prevLead = home.score - away.score;
       const outcome = playPossession(attacking, defending, context, clock, random, push, attacking === home ? homeFinishEdge : awayFinishEdge);
 
       if (outcome === 'goal') {
         const newLead = home.score - away.score;
         biggestLead = Math.max(biggestLead, Math.abs(newLead));
-        if (prevLead !== 0 && Math.sign(prevLead) !== Math.sign(newLead) && newLead !== 0) leadChanges += 1;
+        // The lead changes whenever a different team is in front than last time anyone led.
+        if (newLead !== 0) {
+          if (lastLeader !== 0 && Math.sign(newLead) !== lastLeader) leadChanges += 1;
+          lastLeader = Math.sign(newLead);
+        }
         if (suddenVictory) return true;
         needFaceoff = true;
         continue;
@@ -768,10 +772,17 @@ function line(side: Side, player: LacrossePlayer): LacrossePlayerGameStats {
   return l;
 }
 
+/**
+ * Who takes the shot. Talent draws looks, but gently: a star attackman ends up
+ * with about a quarter of his team's shots, not half, because real offenses
+ * move the ball and defenses slide to the hot hand.
+ */
 function pickShooter(attackers: LacrossePlayer[], random: RandomSource): LacrossePlayer {
   return weightedPick(
     attackers,
-    (p) => (p.position === 'ATT' ? 1 : p.position === 'MID' ? 0.8 : 0.4) * talentCurve(p.sportTraits.shooting * 0.5 + p.sportTraits.dodging * 0.3 + p.ratings.overall * 0.2),
+    (p) =>
+      (p.position === 'ATT' ? 1 : p.position === 'MID' ? 0.85 : 0.45) *
+      Math.max(0.2, (p.sportTraits.shooting * 0.5 + p.sportTraits.dodging * 0.3 + p.ratings.overall * 0.2 - 38) / 30),
     random,
   )!;
 }
