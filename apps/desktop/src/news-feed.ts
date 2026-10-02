@@ -1,5 +1,7 @@
+import type { PortalMove } from '@sports-management-sim/engine-core';
 import type { LacrosseSeason } from '@sports-management-sim/sport-lacrosse';
 import type { LacrosseRecruit } from '@sports-management-sim/sport-lacrosse';
+import { formatTeamName } from './ui/format';
 
 export type NewsCategory = 'game' | 'recruiting' | 'rankings' | 'award' | 'injury' | 'coaching';
 
@@ -186,5 +188,68 @@ export function generateRecruitingNews(params: GenerateRecruitingNewsParams): Ne
     });
   }
 
+  return items;
+}
+
+/** Transfers this high get their own headline even when they don't involve us. */
+const HEADLINE_TRANSFER_OVERALL = 70;
+
+/**
+ * Season-start portal stories: every move involving our program, the biggest
+ * transfers around the league, and one line for the rest.
+ */
+export function portalMoveNews(moves: PortalMove[], userTeamId: string, teamMap: Map<string, string>): NewsItem[] {
+  const items: NewsItem[] = [];
+  const name = (teamId: string) => formatTeamName(teamMap.get(teamId) ?? teamId);
+  let quiet = 0;
+  let departed = 0;
+  const ordered = [...moves].sort((a, b) => b.overall - a.overall);
+  for (const move of ordered) {
+    const playerName = `${move.name.first} ${move.name.last}`;
+    const who = `${move.classYear} ${move.position} ${playerName} (${move.overall} OVR)`;
+    const ours = move.fromTeamId === userTeamId || move.toTeamId === userTeamId;
+    if (move.outcome === 'transferred' && move.toTeamId !== undefined) {
+      if (!ours && move.overall < HEADLINE_TRANSFER_OVERALL) {
+        quiet += 1;
+        continue;
+      }
+      const headline =
+        move.toTeamId === userTeamId
+          ? `Transfer in: ${who} joins us from ${name(move.fromTeamId)}`
+          : move.fromTeamId === userTeamId
+            ? `Transfer out: ${who} leaves for ${name(move.toTeamId)}`
+            : `${who} transfers from ${name(move.fromTeamId)} to ${name(move.toTeamId)}`;
+      items.push({ id: `portal-${move.entryId}`, week: 1, category: 'recruiting', headline, ...(ours ? { featured: true } : {}) });
+    } else if (move.outcome === 'returned') {
+      if (!ours) {
+        quiet += 1;
+        continue;
+      }
+      items.push({
+        id: `portal-${move.entryId}`,
+        week: 1,
+        category: 'recruiting',
+        headline: `${who} withdrew from the portal and returns to our roster`,
+        featured: true,
+      });
+    } else if (ours) {
+      items.push({
+        id: `portal-${move.entryId}`,
+        week: 1,
+        category: 'recruiting',
+        headline: `${who} left the portal for a smaller program`,
+        featured: true,
+      });
+    } else {
+      departed += 1;
+    }
+  }
+  if (quiet > 0 || departed > 0) {
+    const parts = [
+      ...(quiet > 0 ? [`${quiet} more portal player${quiet === 1 ? '' : 's'} found a new home or went back`] : []),
+      ...(departed > 0 ? [`${departed} left for smaller programs`] : []),
+    ];
+    items.push({ id: 'portal-summary', week: 1, category: 'recruiting', headline: `Around the portal: ${parts.join('; ')}`, summary: true });
+  }
   return items;
 }

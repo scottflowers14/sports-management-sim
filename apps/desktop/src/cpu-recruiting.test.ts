@@ -4,7 +4,7 @@ import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import { simulateRemainingWeeks, type WeekSimState } from './week-sim';
-import { ROSTER_FLOOR, ROSTER_LIMIT, runOffseason } from './dynasty-helpers';
+import { resolveAndApplyPortal, ROSTER_FLOOR, ROSTER_LIMIT, runOffseason } from './dynasty-helpers';
 import type { LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
 
 function seededRandom(seed: number): () => number {
@@ -61,7 +61,9 @@ describe('CPU recruiting league health (idle user)', () => {
         expect(offered).toBeGreaterThan(150);
       }
 
-      const { newDynasty } = runOffseason(done.dynasty, undefined, 'balanced', done.seasonStats);
+      const offseason = runOffseason(done.dynasty, undefined, 'balanced', done.seasonStats);
+      // Rosters settle once the transfer portal resolves at the start of the season.
+      const { dynasty: newDynasty } = resolveAndApplyPortal(offseason.newDynasty);
 
       for (const team of newDynasty.season.teams) {
         // Walk-on backfill guarantees a playable roster even after a whiffed class...

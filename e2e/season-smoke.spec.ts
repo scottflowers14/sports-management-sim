@@ -52,14 +52,33 @@ test('plays a season through the title game and offseason into year two', async 
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /News/ }).click();
   await expect(page.locator('.news-week-heading').first()).toBeVisible();
 
-  // One click runs the offseason, a second starts year two.
+  // One click runs the offseason; the transfer portal opens with it.
   await advance.click();
   await expect(page.locator('.season-recap-card')).toBeVisible();
   await expect(advance).toContainText(/Season \d{4}/);
   const nextYear = (await advance.innerText()).match(/Season (\d{4})/)![1]!;
+  await page.getByRole('button', { name: /Open the full portal/ }).click();
+  const portal = page.getByLabel('Transfer portal');
+  await expect(portal).toContainText(/\d+ in the portal/);
+  // Offer the top transfer half a scholarship, then take it back, then re-offer.
+  const topRow = portal.locator('.portal-table tbody tr').first();
+  await topRow.locator('select').selectOption('50');
+  await topRow.getByRole('button', { name: 'Offer' }).click();
+  await expect(topRow).toContainText('50%');
+  await topRow.getByRole('button', { name: /Withdraw/ }).click();
+  await expect(topRow.getByRole('button', { name: 'Offer' })).toBeVisible();
+  await topRow.locator('select').selectOption('50');
+  await topRow.getByRole('button', { name: 'Offer' }).click();
+  await expect(portal.locator('.portal-stats')).toContainText('1 our offers');
+
+  // Starting the season settles the portal: every entry has an outcome.
+  await advance.click(); // back to the offseason screen
   await advance.click();
   await expect(advance).toContainText('Week 1');
   await expect(page.locator('.top-bar')).toContainText(`Season ${nextYear}`);
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Recruiting' }).click();
+  await page.getByRole('button', { name: 'Transfer Portal' }).click();
+  await expect(page.getByLabel('Transfer portal results')).toContainText(/\d+ of \d+ transferred/);
 
   // Saves survive a reload.
   await page.getByRole('button', { name: 'Save Now' }).click();

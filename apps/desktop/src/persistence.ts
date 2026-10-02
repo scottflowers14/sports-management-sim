@@ -1,6 +1,6 @@
 import { compactGameLog, normalizeGamePlan } from '@sports-management-sim/sport-lacrosse';
 import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
-import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrosseStaff, StaffMember } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, LacrossePortalEntry, LacrosseStaff, StaffMember } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
@@ -373,6 +373,9 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     }
     if (!parsed.dynasty.portalEntries) {
       parsed.dynasty = { ...parsed.dynasty, portalEntries: [] };
+    } else {
+      // Entries from before the portal carried the full player record.
+      parsed.dynasty = { ...parsed.dynasty, portalEntries: parsed.dynasty.portalEntries.map(upgradePortalEntry) };
     }
     if (!parsed.gameLogs) {
       parsed.gameLogs = {};
@@ -432,4 +435,42 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
   } catch {
     return null;
   }
+}
+
+/** Rebuild a portal entry saved before entries carried the player, reason and eligibility. */
+function upgradePortalEntry(entry: LacrossePortalEntry): LacrossePortalEntry {
+  if (entry.player !== undefined && entry.reason !== undefined) return entry;
+  const eligibilityByClass: Record<string, { played: number; remaining: number }> = {
+    FR: { played: 0, remaining: 4 },
+    SO: { played: 1, remaining: 3 },
+    JR: { played: 2, remaining: 2 },
+    SR: { played: 3, remaining: 1 },
+    GR: { played: 4, remaining: 1 },
+  };
+  const elig = eligibilityByClass[entry.classYear] ?? { played: 0, remaining: 4 };
+  const eligibility = entry.eligibility ?? { seasonsPlayed: elig.played, seasonsRemaining: elig.remaining, isEligible: elig.remaining > 0 };
+  const player: LacrossePlayer = entry.player ?? {
+    id: entry.playerId,
+    name: entry.name,
+    age: 20,
+    classYear: entry.classYear,
+    hometown: entry.regionId,
+    regionId: entry.regionId,
+    position: entry.position,
+    secondaryPositions: [],
+    ratings: entry.ratings,
+    traits: [],
+    sportTraits: entry.sportTraits ?? {
+      shooting: 50, passing: 50, dodging: 50, stickSkills: 55, offBallMovement: 50, defense: 50, checking: 45, groundBalls: 55, preferredHand: 'right',
+    },
+    scholarshipPercent: 50,
+    isWalkOn: false,
+    morale: 50,
+    health: 100,
+    fatigue: 0,
+    redshirtStatus: 'none',
+    eligibility,
+    createdSeason: 2027,
+  };
+  return { ...entry, player, eligibility, reason: entry.reason ?? 'playing_time', enteredSeason: entry.enteredSeason ?? 0 };
 }

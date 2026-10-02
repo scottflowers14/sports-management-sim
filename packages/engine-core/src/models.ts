@@ -91,6 +91,15 @@ export interface Player<Position extends string = string, SportTraits = unknown>
   createdSeason: SeasonYear;
   /** Overall rating at the end of each completed season, oldest first. */
   ratingHistory?: PlayerSeasonRating[];
+  /** Programs this player has transferred between, oldest first. */
+  transfers?: PlayerTransfer[];
+}
+
+export interface PlayerTransfer {
+  /** The season the player first suits up for the new program. */
+  season: SeasonYear;
+  fromTeamId: ID;
+  toTeamId: ID;
 }
 
 export interface PlayerSeasonRating {
