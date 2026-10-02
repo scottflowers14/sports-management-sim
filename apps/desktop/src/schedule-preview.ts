@@ -82,12 +82,14 @@ export function buildScheduleMatchupPreview(
   };
 }
 
+// Thresholds follow the calibrated win probability: an 8-point edge wins about
+// 80% of the time, a 3-point edge about 62%.
 function describeMatchupEdge(edge: number, userFavored: boolean): string {
-  if (edge >= 12) {
+  if (edge >= 8) {
     return userFavored ? 'You should control this matchup.' : 'Upset bid: opponent has a clear ratings edge.';
   }
 
-  if (edge >= 6) {
+  if (edge >= 3) {
     return userFavored ? 'You have a modest ratings edge.' : 'Opponent has a modest ratings edge.';
   }
 

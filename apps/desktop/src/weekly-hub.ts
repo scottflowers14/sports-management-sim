@@ -1,5 +1,5 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
-import type { LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import { lacrosseWinProbability, type LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { getNextUserGamePreview, type ScheduleMatchupPreview } from './schedule-preview';
 import type { RankingEntry } from './rankings';
 import type { SeasonStatsMap } from './stats';
@@ -62,16 +62,9 @@ export function buildWeeklyHub({
   };
 }
 
-/**
- * Logistic win probability from the overall rating edge, nudged by home field.
- * Calibrated so a coin-flip on paper is ~50% (≈60% at home) and a +12 edge
- * lands around 80%.
- */
+/** Pregame win probability, calibrated against the sim (see sport-lacrosse win-probability.ts). */
 export function winProbability(ratingEdge: number, userIsHome: boolean, neutral: boolean): number {
-  const homeAdjust = neutral ? 0 : userIsHome ? 3 : -3;
-  const x = (ratingEdge + homeAdjust) / 7;
-  const probability = 1 / (1 + Math.exp(-x));
-  return Math.round(probability * 100);
+  return lacrosseWinProbability(ratingEdge, userIsHome, neutral);
 }
 
 function recentForm(schedule: ScheduledGame[], userTeamId: string, count = 5): Array<'W' | 'L'> {

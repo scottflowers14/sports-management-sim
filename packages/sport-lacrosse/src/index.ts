@@ -14,3 +14,4 @@ export * from './player-stats';
 export * from './injuries';
 export * from './staff';
 export * from './polls';
+export * from './win-probability';
