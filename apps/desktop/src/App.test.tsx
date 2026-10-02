@@ -109,6 +109,8 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Finals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim NCAA First Round/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim NCAA Quarterfinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Championship/i }));
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
@@ -414,6 +416,8 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Finals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim NCAA First Round/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim NCAA Quarterfinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Championship/i }));
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));

@@ -97,6 +97,8 @@ export function App() {
     enterTournament,
     simTournamentSemis,
     simTournamentFinals,
+    simNcaaFirstRound,
+    simNcaaQuarterfinals,
     simTournamentNationalSemis,
     simTournamentNational,
     enterOffseason,
@@ -233,8 +235,10 @@ export function App() {
     if (!tournament) return { label: 'Postseason', title: 'Start the conference tournaments', run: enterTournament };
     const phaseActions = {
       conf_semis: { label: 'Conf Semis', title: 'Sim the conference semifinals', run: simTournamentSemis },
-      conf_finals: { label: 'Conf Finals', title: 'Sim the conference finals', run: simTournamentFinals },
-      national_semis: { label: 'Natl Semis', title: 'Sim the national semifinals', run: simTournamentNationalSemis },
+      conf_finals: { label: 'Conf Finals', title: 'Sim the conference finals, then the NCAA field is selected', run: simTournamentFinals },
+      ncaa_first_round: { label: 'NCAA 1st Round', title: 'Sim the NCAA first round', run: simNcaaFirstRound },
+      ncaa_quarterfinals: { label: 'NCAA Quarters', title: 'Sim the NCAA quarterfinals', run: simNcaaQuarterfinals },
+      national_semis: { label: 'Final Four', title: 'Sim the national semifinals', run: simTournamentNationalSemis },
       national_final: { label: 'Title Game', title: 'Sim the national championship', run: simTournamentNational },
       complete: { label: 'Wrap Season', title: 'Review the bracket and head to the offseason', run: () => setView('tournament') },
     } as const;
@@ -531,6 +535,8 @@ export function App() {
           seasonComplete={seasonComplete}
           onSimSemis={simTournamentSemis}
           onSimFinals={simTournamentFinals}
+          onSimNcaaFirstRound={simNcaaFirstRound}
+          onSimNcaaQuarterfinals={simNcaaQuarterfinals}
           onSimNationalSemis={simTournamentNationalSemis}
           onSimNational={simTournamentNational}
           onEnterOffseason={enterOffseason}

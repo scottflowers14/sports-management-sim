@@ -2759,6 +2759,7 @@ li span {
   color: #e6edf3;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3936,7 +3937,7 @@ li span {
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 24px;
   padding: 10px 24px;
@@ -3955,8 +3956,9 @@ li span {
   flex-wrap: nowrap;
   gap: 12px;
   min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
-  justify-content: center;
+  justify-content: safe center;
 }
 
 .top-team-name {
@@ -4312,4 +4314,85 @@ li span {
   color: #72f2c6;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── NCAA tournament ─────────────────────────────────────── */
+
+.ncaa-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ncaa-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ncaa-header h2 {
+  margin-bottom: 0;
+}
+
+.ncaa-user-line {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.ncaa-user-line.in {
+  background: rgba(114, 242, 198, 0.1);
+  color: #72f2c6;
+}
+
+.ncaa-user-line.out {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+}
+
+.ncaa-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ncaa-field {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(200px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.ncaa-bubble-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 8px;
+  font-size: 0.84rem;
+}
+
+.ncaa-bubble-row.user {
+  color: #f87171;
+  font-weight: 700;
+}
+
+.ncaa-bracket {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  overflow-x: auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.ncaa-round {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: space-around;
+  min-width: 0;
+}
+
+.tournament-section-title {
+  margin: 8px 0 0;
 }

@@ -17,7 +17,7 @@ import {
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { runOffseason, resolveAndApplyPortal } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
-import { simulateOneWeek, simulateRemainingWeeks } from './week-sim';
+import { simulateOneWeek, simulateRemainingWeeks, withoutInjured } from './week-sim';
 import type { WeekSimState } from './week-sim';
 import {
   createCoachProfile,
@@ -35,6 +35,8 @@ import type { NewsItem } from './news-feed';
 import {
   initTournament,
   advanceTournamentSemis,
+  advanceNcaaFirstRound,
+  advanceNcaaQuarterfinals,
   advanceTournamentFinals,
   advanceTournamentNationalSemis,
   advanceNationalChampionship,
@@ -508,21 +510,37 @@ export function useDynastyController() {
     [dynasty.userTeamId, gamePlan],
   );
 
+  // Injured players miss postseason games too.
+  const tournamentTeams = useMemo(() => {
+    const injuredIds = new Set(injuries.map((inj) => inj.playerId));
+    return dynasty.season.teams.map((team) => withoutInjured(team, injuredIds));
+  }, [dynasty.season.teams, injuries]);
+
   const simTournamentSemis = useCallback(() => {
-    setTournament((prev) => prev ? advanceTournamentSemis(prev, dynasty.season.teams, tournamentPlanFor) : prev);
-  }, [dynasty.season.teams, tournamentPlanFor]);
+    setTournament((prev) => prev ? advanceTournamentSemis(prev, tournamentTeams, tournamentPlanFor) : prev);
+  }, [tournamentTeams, tournamentPlanFor]);
 
   const simTournamentFinals = useCallback(() => {
-    setTournament((prev) => prev ? advanceTournamentFinals(prev, dynasty.season.teams, tournamentPlanFor) : prev);
-  }, [dynasty.season.teams, tournamentPlanFor]);
+    setTournament((prev) =>
+      prev ? advanceTournamentFinals(prev, tournamentTeams, tournamentPlanFor, dynasty.season.schedule) : prev,
+    );
+  }, [tournamentTeams, tournamentPlanFor, dynasty.season.schedule]);
+
+  const simNcaaFirstRound = useCallback(() => {
+    setTournament((prev) => prev ? advanceNcaaFirstRound(prev, tournamentTeams, tournamentPlanFor) : prev);
+  }, [tournamentTeams, tournamentPlanFor]);
+
+  const simNcaaQuarterfinals = useCallback(() => {
+    setTournament((prev) => prev ? advanceNcaaQuarterfinals(prev, tournamentTeams, tournamentPlanFor) : prev);
+  }, [tournamentTeams, tournamentPlanFor]);
 
   const simTournamentNationalSemis = useCallback(() => {
-    setTournament((prev) => prev ? advanceTournamentNationalSemis(prev, dynasty.season.teams, tournamentPlanFor) : prev);
-  }, [dynasty.season.teams, tournamentPlanFor]);
+    setTournament((prev) => prev ? advanceTournamentNationalSemis(prev, tournamentTeams, tournamentPlanFor) : prev);
+  }, [tournamentTeams, tournamentPlanFor]);
 
   const simTournamentNational = useCallback(() => {
-    setTournament((prev) => prev ? advanceNationalChampionship(prev, dynasty.season.teams, tournamentPlanFor) : prev);
-  }, [dynasty.season.teams, tournamentPlanFor]);
+    setTournament((prev) => prev ? advanceNationalChampionship(prev, tournamentTeams, tournamentPlanFor) : prev);
+  }, [tournamentTeams, tournamentPlanFor]);
 
   const enterOffseason = useCallback(() => {
     const tournamentChampion = tournament?.nationalChampion;
@@ -792,6 +810,8 @@ export function useDynastyController() {
     enterTournament,
     simTournamentSemis,
     simTournamentFinals,
+    simNcaaFirstRound,
+    simNcaaQuarterfinals,
     simTournamentNationalSemis,
     simTournamentNational,
     enterOffseason,
