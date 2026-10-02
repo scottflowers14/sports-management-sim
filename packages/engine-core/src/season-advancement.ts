@@ -89,15 +89,32 @@ function applyGameResult<Position extends string, SportTraits>(
 }
 
 function buildStandings<Position extends string, SportTraits>(teams: Team<Position, SportTraits>[]) {
-  return teams.map((team, index) => ({
+  const rankingScore = (team: Team<Position, SportTraits>) => team.record.wins * 100 - team.record.losses * 25;
+  const conferenceScore = (team: Team<Position, SportTraits>) =>
+    team.record.conferenceWins * 100 - team.record.conferenceLosses * 25;
+  // Ranks follow the record, not the order teams happen to be stored in.
+  const byRecord = [...teams].sort((a, b) => rankingScore(b) - rankingScore(a) || a.id.localeCompare(b.id));
+  const nationalRank = new Map(byRecord.map((team, index) => [team.id, index + 1]));
+  const conferenceRank = new Map<string, number>();
+  for (const conferenceId of new Set(teams.map((team) => team.conferenceId))) {
+    [...teams]
+      .filter((team) => team.conferenceId === conferenceId)
+      .sort(
+        (a, b) =>
+          conferenceScore(b) - conferenceScore(a) || rankingScore(b) - rankingScore(a) || a.id.localeCompare(b.id),
+      )
+      .forEach((team, index) => conferenceRank.set(team.id, index + 1));
+  }
+
+  return teams.map((team) => ({
     teamId: team.id,
     conferenceId: team.conferenceId,
     record: { ...team.record },
     pointsFor: 0,
     pointsAgainst: 0,
     strengthOfSchedule: 0,
-    rankingScore: team.record.wins * 100 - team.record.losses * 25,
-    nationalRank: index + 1,
-    conferenceRank: index + 1,
+    rankingScore: rankingScore(team),
+    nationalRank: nationalRank.get(team.id)!,
+    conferenceRank: conferenceRank.get(team.id)!,
   }));
 }

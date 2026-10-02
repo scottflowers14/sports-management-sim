@@ -100,7 +100,7 @@ describe('computeSeasonAwards (stat-based)', () => {
     expect(awards.defensivePlayer.statLine).toBe('30 CT, 40 GB');
   });
 
-  it('awards freshman of the year to an underclassman with production', () => {
+  it('awards freshman of the year to a true freshman with production', () => {
     const season = makeSeason();
     const stats = statsFor([
       ['player-2', { goals: 30 }],

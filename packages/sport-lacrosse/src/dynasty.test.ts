@@ -157,3 +157,18 @@ describe('createLacrosseSeasonSchedule structure', () => {
     }
   });
 });
+
+describe('CPU recruiting over a season', () => {
+  it('keeps CPU programs offering after their early targets commit elsewhere', () => {
+    let dynasty = createNewLacrosseDynasty({ seed: 42, userTeamId: 'maryland-state', seasonYear: 2027 });
+    for (let week = 0; week < 10; week += 1) dynasty = advanceLacrosseDynastyWeek(dynasty);
+    const cpuTeams = dynasty.season.teams.filter((t) => t.id !== dynasty.userTeamId);
+    const liveOffersByTeam = cpuTeams.map(
+      (t) => dynasty.recruits.filter((r) => r.status === 'open' && r.scholarshipOffers.some((o) => o.teamId === t.id)).length,
+    );
+    const commitsByTeam = cpuTeams.map((t) => dynasty.recruits.filter((r) => r.committedTeamId === t.id).length);
+    // Every board still has live offers out, and most programs have landed someone.
+    expect(Math.min(...liveOffersByTeam)).toBeGreaterThan(0);
+    expect(commitsByTeam.filter((n) => n === 0).length).toBeLessThan(cpuTeams.length / 2);
+  });
+});

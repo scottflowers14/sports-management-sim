@@ -71,11 +71,12 @@ export function runTeamOffseason<Position extends string, SportTraits>(
     const bonus = options.developmentBonusFor?.(player) ?? 0;
     const roll = Math.min(1, Math.max(0, developmentRandom() + bonus));
     const progressed = progressPlayer(player, roll);
+    // One entry per season: a repeated rollover for the same year replaces it.
     const ratingHistory =
       options.completedSeason === undefined
         ? player.ratingHistory
         : [
-            ...(player.ratingHistory ?? []),
+            ...(player.ratingHistory ?? []).filter((entry) => entry.season !== options.completedSeason),
             { season: options.completedSeason, classYear: player.classYear, overall: player.ratings.overall },
           ];
 

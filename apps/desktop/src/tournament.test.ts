@@ -14,6 +14,8 @@ import {
   advanceTournamentSemis,
   computeRpi,
   initTournament,
+  ncaaFieldSize,
+  selectNcaaField,
 } from './tournament';
 
 function seededRandom(seed: number): () => number {
@@ -102,5 +104,50 @@ describe('NCAA tournament', () => {
     const sameRecord = [...byRecord.values()].find((ids) => ids.length >= 2)!;
     const values = sameRecord.map((id) => rpi.get(id)!);
     expect(new Set(values).size).toBeGreaterThan(1);
+  });
+});
+
+describe('conference tournament seeding', () => {
+  it('seeds by conference record before overall record', () => {
+    const base = { ...finishedSeason().teams[0]!.record, wins: 0, losses: 0, conferenceWins: 0, conferenceLosses: 0 };
+    const entry = (teamId: string, conferenceWins: number, conferenceLosses: number, wins: number, losses: number) => ({
+      teamId,
+      conferenceId: 'c',
+      record: { ...base, conferenceWins, conferenceLosses, wins, losses },
+      pointsFor: 0,
+      pointsAgainst: 0,
+      strengthOfSchedule: 0,
+      rankingScore: 0,
+    });
+    const confStandings = [
+      entry('nonconf-hero', 2, 3, 7, 3), // best overall record, poor in the league
+      entry('league-champ', 5, 0, 6, 4),
+      entry('runner-up', 4, 1, 4, 6),
+      entry('third', 3, 2, 5, 5),
+      entry('fifth', 1, 4, 2, 8),
+    ];
+    const conf = { id: 'c', name: 'C', shortName: 'C', prestige: 50, teamIds: confStandings.map((e) => e.teamId), regionIds: [] };
+    const bracket = initTournament(confStandings, [conf]).conferenceBrackets[0]!;
+    expect(bracket.seeds).toEqual(['league-champ', 'runner-up', 'third', 'nonconf-hero']);
+  });
+});
+
+describe('ncaaFieldSize', () => {
+  it('sizes the field to the bracket a league can actually play', () => {
+    expect(ncaaFieldSize(36)).toBe(NCAA_FIELD_SIZE);
+    expect(ncaaFieldSize(12)).toBe(NCAA_FIELD_SIZE);
+    expect(ncaaFieldSize(8)).toBe(4);
+    expect(ncaaFieldSize(3)).toBe(3);
+  });
+
+  it('gives an eight-team league a four-team field and a real first-out list', () => {
+    const { teams, schedule } = finishedSeason();
+    const small = teams.slice(0, 8);
+    const smallIds = new Set(small.map((t) => t.id));
+    const smallSchedule = schedule.filter((g) => smallIds.has(g.homeTeamId) && smallIds.has(g.awayTeamId));
+    const { field, firstOut } = selectNcaaField([small[0]!.id, small[1]!.id], small, smallSchedule);
+    expect(field).toHaveLength(4);
+    expect(field.filter((e) => e.bid === 'auto')).toHaveLength(2);
+    expect(firstOut).toHaveLength(4);
   });
 });

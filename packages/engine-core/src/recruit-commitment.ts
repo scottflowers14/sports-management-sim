@@ -39,7 +39,12 @@ export function commitRecruit<Position extends string, SportTraits>(
     return recruit;
   }
 
-  const topCandidate = rankRecruitCandidates(recruit, teams)[0];
+  // A recruit can only sign with a program that actually offered him.
+  const offeringTeamIds = new Set(recruit.scholarshipOffers.map((offer) => offer.teamId));
+  const topCandidate = rankRecruitCandidates(
+    recruit,
+    teams.filter((team) => offeringTeamIds.has(team.id)),
+  )[0];
 
   if (topCandidate === undefined) {
     return recruit;
