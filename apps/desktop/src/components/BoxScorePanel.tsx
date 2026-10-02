@@ -7,7 +7,16 @@ import type { BoxScoreData } from '../ui/types';
 
 type PanelTab = 'box' | 'pbp';
 
-export function BoxScorePanel({ data, onClose }: { data: BoxScoreData; onClose: () => void }) {
+export function BoxScorePanel({
+  data,
+  onClose,
+  playerName,
+}: {
+  data: BoxScoreData;
+  onClose: () => void;
+  /** Resolves a player id to a display name for the scoring summary. */
+  playerName?: (playerId: string) => string | undefined;
+}) {
   const [tab, setTab] = useState<PanelTab>('box');
   const hasLog = Boolean(data.log && data.log.events.length > 0);
 
@@ -22,7 +31,7 @@ export function BoxScorePanel({ data, onClose }: { data: BoxScoreData; onClose: 
     { label: 'Turnovers', format: (s) => String(s.turnovers) },
     { label: 'Caused TOs', format: (s) => String(s.causedTurnovers) },
     { label: 'Clears', format: (s) => `${s.clears}/${s.clearAttempts}` },
-    { label: 'Penalties', format: (s) => `${s.penalties} (${s.penaltyMinutes}min)` },
+    { label: 'Penalties', format: (s) => `${s.penalties} (${s.penaltyMinutes} min)` },
   ];
 
   return (
@@ -83,6 +92,15 @@ export function BoxScorePanel({ data, onClose }: { data: BoxScoreData; onClose: 
           </table>
         )}
 
+        {tab === 'box' && data.log && playerName && (
+          <ScoringSummary
+            log={data.log}
+            homeTeamName={data.homeTeamName}
+            awayTeamName={data.awayTeamName}
+            playerName={playerName}
+          />
+        )}
+
         {tab === 'pbp' && data.log && (
           <PlayByPlay
             events={data.log.events}
@@ -94,6 +112,60 @@ export function BoxScorePanel({ data, onClose }: { data: BoxScoreData; onClose: 
           />
         )}
       </aside>
+    </div>
+  );
+}
+
+function ScoringSummary({
+  log,
+  homeTeamName,
+  awayTeamName,
+  playerName,
+}: {
+  log: NonNullable<BoxScoreData['log']>;
+  homeTeamName: string;
+  awayTeamName: string;
+  playerName: (playerId: string) => string | undefined;
+}) {
+  const tally = (teamId: string) => {
+    const byPlayer = new Map<string, { goals: number; assists: number }>();
+    const bump = (id: string, key: 'goals' | 'assists') => {
+      const row = byPlayer.get(id) ?? { goals: 0, assists: 0 };
+      row[key] += 1;
+      byPlayer.set(id, row);
+    };
+    for (const e of log.events) {
+      if (e.type !== 'goal' || e.teamId !== teamId) continue;
+      if (e.playerId) bump(e.playerId, 'goals');
+      if (e.assistPlayerId) bump(e.assistPlayerId, 'assists');
+    }
+    return [...byPlayer.entries()]
+      .map(([id, r]) => ({ id, name: playerName(id) ?? 'Unknown', ...r }))
+      .sort((a, b) => b.goals + b.assists - (a.goals + a.assists) || b.goals - a.goals);
+  };
+  const sides = [
+    { label: formatTeamShort(awayTeamName), rows: tally(log.awayTeamId) },
+    { label: formatTeamShort(homeTeamName), rows: tally(log.homeTeamId) },
+  ];
+
+  return (
+    <div className="scoring-summary" aria-label="Scoring summary">
+      {sides.map((side) => (
+        <div key={side.label} className="scoring-side">
+          <p className="pbp-period-label">{side.label} scoring</p>
+          {side.rows.length === 0 && <p className="dim">No points.</p>}
+          {side.rows.map((r) => (
+            <div key={r.id} className="scoring-line">
+              <span>{r.name}</span>
+              <span className="scoring-nums">
+                {r.goals > 0 ? `${r.goals}G` : ''}
+                {r.goals > 0 && r.assists > 0 ? ' ' : ''}
+                {r.assists > 0 ? `${r.assists}A` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

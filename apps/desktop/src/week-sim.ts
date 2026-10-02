@@ -14,6 +14,7 @@ import {
   type GameLog,
   type LacrosseDynastyState,
   type LacrosseGamePlan,
+  type LacrossePlayerGameStats,
   type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, processInjuries } from './dynasty-helpers';
@@ -66,17 +67,24 @@ export function simulateOneWeek(
   const teamMap = new Map(dynasty.season.teams.map((t) => [t.id, t.name]));
 
   const weekLogs = new Map<string, GameLog>();
+  const weekPlayerLines = new Map<string, LacrossePlayerGameStats[]>();
+  const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
   const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
     team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
   const newSeason = advanceSeasonWeek(dynasty.season, (game, homeTeam, awayTeam) => {
-    const result = simulateLacrosseGameWithLog({
-      homeTeam,
-      awayTeam,
+    // Injured players sit: the depth chart promotes the next man up for the
+    // rating, the game plan, and the box score.
+    const home = withoutInjured(homeTeam, injuredIds);
+    const away = withoutInjured(awayTeam, injuredIds);
+    const { log, players, ...result } = simulateLacrosseGameWithLog({
+      homeTeam: home,
+      awayTeam: away,
       random,
-      homeGamePlan: planFor(homeTeam),
-      awayGamePlan: planFor(awayTeam),
+      homeGamePlan: planFor(home),
+      awayGamePlan: planFor(away),
     });
-    weekLogs.set(game.id, result.log);
+    weekLogs.set(game.id, log);
+    weekPlayerLines.set(game.id, [...players.home, ...players.away]);
     return result;
   });
 
@@ -219,7 +227,7 @@ export function simulateOneWeek(
       })),
   ];
 
-  const newSeasonStats = updateSeasonStats(state.seasonStats, newSeason.schedule, newSeason.teams, weekToSim);
+  const newSeasonStats = updateSeasonStats(state.seasonStats, newSeason.schedule, newSeason.teams, weekToSim, weekPlayerLines);
   const playerOfWeekNews = buildPlayerOfWeekNews(weekToSim, state.seasonStats, newSeasonStats, newSeason.teams);
 
   const mergedLogs = new Map(state.gameLogs);
@@ -244,6 +252,11 @@ export function simulateOneWeek(
     bestNatRank,
     lastSimWeek: weekToSim,
   };
+}
+
+export function withoutInjured(team: LacrosseTeam, injuredIds: ReadonlySet<string>): LacrosseTeam {
+  if (!team.roster.some((p) => injuredIds.has(p.id))) return team;
+  return { ...team, roster: team.roster.filter((p) => !injuredIds.has(p.id)) };
 }
 
 function buildPlayerOfWeekNews(

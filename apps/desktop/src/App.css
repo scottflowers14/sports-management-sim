@@ -982,6 +982,8 @@ li span {
   width: 360px;
   height: 100vh;
   overflow-y: auto;
+  /* Opaque so the screen behind (bright sim buttons especially) can't bleed through. */
+  background: #0c182a;
   border-radius: 0;
   border-right: none;
   padding: 32px 28px;
@@ -3950,8 +3952,10 @@ li span {
 .top-team {
   display: flex;
   align-items: baseline;
-  flex-wrap: wrap;
-  gap: 14px;
+  flex-wrap: nowrap;
+  gap: 12px;
+  min-width: 0;
+  white-space: nowrap;
   justify-content: center;
 }
 
@@ -4285,4 +4289,27 @@ li span {
 .kv-value {
   font-size: 1rem;
   font-weight: 800;
+}
+
+/* ── Box score scoring summary ───────────────────────────── */
+
+.scoring-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.scoring-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.84rem;
+}
+
+.scoring-nums {
+  color: #72f2c6;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }

@@ -107,7 +107,8 @@ export function useDynastyController() {
   const teamChoices = useMemo(() => getLacrosseDynastyTeamChoices(customTeams ?? undefined), [customTeams]);
   const [selectedNewTeamId, setSelectedNewTeamId] = useState(() => teamChoices[0]?.id ?? 'maryland-state');
   const [dynasty, setDynasty] = useState<LacrosseDynastyState>(() => loadedSave?.dynasty ?? createFreshLacrosseDynasty());
-  const [view, setView] = useState<View>('week-hub');
+  // A save made mid-offseason must reopen there: the new season isn't ready until Start Season.
+  const [view, setView] = useState<View>(() => (loadedSave?.offseasonSummary ? 'offseason' : 'week-hub'));
   const [lastSimWeek, setLastSimWeek] = useState<number | null>(loadedSave?.lastSimWeek ?? null);
   const [offseasonSummary, setOffseasonSummary] = useState<OffseasonSummary | null>(loadedSave?.offseasonSummary ?? null);
   const [rankings, setRankings] = useState<RankingEntry[]>(loadedSave?.rankings ?? []);
@@ -287,7 +288,7 @@ export function useDynastyController() {
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
-    setView('week-hub');
+    setView(save.offseasonSummary ? 'offseason' : 'week-hub');
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
     saveDynastySlot({ saveId, state: save });
@@ -368,13 +369,22 @@ export function useDynastyController() {
     setLastSimWeek(result.lastSimWeek);
   }, []);
 
+  // Simming is locked while the offseason is pending; send the coach back there instead.
   const simWeek = useCallback(() => {
+    if (offseasonSummary) {
+      setView('offseason');
+      return;
+    }
     applyWeekSimResult(simulateOneWeek(buildWeekSimState(), gamePlan));
-  }, [applyWeekSimResult, buildWeekSimState, gamePlan]);
+  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary]);
 
   const simToEnd = useCallback(() => {
+    if (offseasonSummary) {
+      setView('offseason');
+      return;
+    }
     applyWeekSimResult(simulateRemainingWeeks(buildWeekSimState(), gamePlan));
-  }, [applyWeekSimResult, buildWeekSimState, gamePlan]);
+  }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary]);
 
   const offerScholarship = useCallback((recruitId: string, scholarshipPercent = 100) => {
     const recruit = dynasty.recruits.find((r) => r.id === recruitId);

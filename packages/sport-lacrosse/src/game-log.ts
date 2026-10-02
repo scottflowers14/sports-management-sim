@@ -1,6 +1,7 @@
 import type { LacrosseTeam } from './models';
-import type { LacrosseGameResult, SimulateLacrosseGameInput } from './simulate-game';
-import { simulateLacrosseGame } from './simulate-game';
+import type { LacrosseGamePlayerDetail, LacrosseGameResult, SimulateLacrosseGameInput } from './simulate-game';
+import { simulateLacrosseGameDetailed } from './simulate-game';
+import type { LacrosseScoringPlay } from './player-stats';
 
 export type GamePeriod = 1 | 2 | 3 | 4 | 'OT';
 
@@ -29,15 +30,15 @@ export interface GameLog {
   biggestLead: number;
 }
 
-export type LacrosseGameResultWithLog = LacrosseGameResult & { log: GameLog };
+export type LacrosseGameResultWithLog = LacrosseGameResult & { log: GameLog; players: LacrosseGamePlayerDetail };
 
 export function simulateLacrosseGameWithLog(
   input: SimulateLacrosseGameInput,
 ): LacrosseGameResultWithLog {
   const random = input.random ?? Math.random;
-  const result = simulateLacrosseGame({ ...input, random });
-  const log = buildGameLog(input.homeTeam, input.awayTeam, result, random);
-  return { ...result, log };
+  const { result, players } = simulateLacrosseGameDetailed({ ...input, random });
+  const log = buildGameLog(input.homeTeam, input.awayTeam, result, random, players);
+  return { ...result, log, players };
 }
 
 // ── internal ────────────────────────────────────────────────────────────────
@@ -49,7 +50,16 @@ function buildGameLog(
   awayTeam: LacrosseTeam,
   result: LacrosseGameResult,
   random: () => number,
+  players?: LacrosseGamePlayerDetail,
 ): GameLog {
+  // Goals are narrated in the order the box score attributed them, so the
+  // play-by-play and the stat lines always agree on who scored.
+  const scoringQueues = { home: [...(players?.homeScoring ?? [])], away: [...(players?.awayScoring ?? [])] };
+  const homeById = new Map(homeTeam.roster.map((p) => [p.id, p]));
+  const awayById = new Map(awayTeam.roster.map((p) => [p.id, p]));
+  const nextScoringPlay = (isHome: boolean): LacrosseScoringPlay | undefined =>
+    (isHome ? scoringQueues.home : scoringQueues.away).shift();
+
   const periods: GamePeriod[] = result.overtime ? [1, 2, 3, 4, 'OT'] : [1, 2, 3, 4];
 
   const homeWon = result.winnerTeamId === homeTeam.id;
@@ -95,8 +105,14 @@ function buildGameLog(
       if (leadFlipped) leadChanges++;
 
       const team = goal.isHome ? homeTeam : awayTeam;
-      const scorer = pickScorer(team.roster, random);
-      const assister = random() > 0.45 ? pickAssister(team.roster, scorer?.id, random) : null;
+      const play = players ? nextScoringPlay(goal.isHome) : undefined;
+      const rosterById = goal.isHome ? homeById : awayById;
+      const scorer = play
+        ? rosterById.get(play.playerId) ?? null
+        : pickScorer(team.roster, random);
+      const assister = play
+        ? (play.assistPlayerId ? rosterById.get(play.assistPlayerId) ?? null : null)
+        : random() > 0.45 ? pickAssister(team.roster, scorer?.id, random) : null;
 
       const isTying = newLead === 0;
       const isTakingLead = leadFlipped && newLead !== 0;

@@ -65,9 +65,9 @@ describe('simulateLacrosseGame with game plans', () => {
       random: seededRandom(7),
       homeGamePlan: uptempoPlan,
     });
-    // Possessions are surfaced as faceoff attempts in team stats
-    expect(uptempo.teamStats!.home.faceoffAttempts - base.teamStats!.home.faceoffAttempts).toBe(5);
-    expect(uptempo.teamStats!.away.faceoffAttempts).toBe(base.teamStats!.away.faceoffAttempts);
+    // Possessions are surfaced as clear attempts in team stats
+    expect(uptempo.teamStats!.home.clearAttempts - base.teamStats!.home.clearAttempts).toBe(5);
+    expect(uptempo.teamStats!.away.clearAttempts).toBe(base.teamStats!.away.clearAttempts);
   });
 
   it('home pressure defense reduces away possessions for the same seed', () => {
@@ -79,7 +79,7 @@ describe('simulateLacrosseGame with game plans', () => {
       random: seededRandom(7),
       homeGamePlan: pressurePlan,
     });
-    expect(pressured.teamStats!.away.faceoffAttempts - base.teamStats!.away.faceoffAttempts).toBe(-4);
+    expect(pressured.teamStats!.away.clearAttempts - base.teamStats!.away.clearAttempts).toBe(-4);
   });
 
   it('still produces valid scores and a winner under extreme plans', () => {

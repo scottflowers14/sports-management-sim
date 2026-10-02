@@ -406,4 +406,28 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
     expect(screen.getByRole('button', { name: /Advance: Week 2/i })).toBeInTheDocument();
   });
+
+  it('reopens the offseason after a reload instead of skipping into a broken season', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim to End of Season/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Conference Finals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim National Semifinals/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim National Championship/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
+    // Wait for the debounced autosave, then reload the way a player would.
+    await waitFor(() => expect(loadActiveDynastySave()?.offseasonSummary).toBeTruthy());
+    cleanup();
+
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+
+    // Simming is locked until the new season starts.
+    await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+  }, 20000);
 });

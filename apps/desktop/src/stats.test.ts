@@ -78,9 +78,39 @@ function topScorerShareByTeam(seasonStats: SeasonStatsMap, dynasty: WeekSimState
 describe('season scoring distribution', () => {
   it('spreads goals across the roster rather than one player', () => {
     const finished = simulateRemainingWeeks(freshState(), undefined, seededRandom(7));
-    // No team's leading scorer should monopolize their offense. With the old
-    // bug this hit ~30%+ on a single low-rated player.
+    // Stars should lead their teams, but no one player should monopolize the
+    // offense. Real D1 leaders take roughly 20-35% of their team's goals.
     const share = topScorerShareByTeam(finished.seasonStats, finished.dynasty);
-    expect(share).toBeLessThan(0.25);
+    expect(share).toBeLessThan(0.4);
+  });
+
+  it('produces star scorers instead of a flat league', () => {
+    const finished = simulateRemainingWeeks(freshState(), undefined, seededRandom(11));
+    const points = Object.values(finished.seasonStats).map((s) => s.goals + s.assists).sort((a, b) => b - a);
+    // The old even split capped the national leader near 18 points over 10 games.
+    expect(points[0]).toBeGreaterThan(35);
+    expect(points[0]! - points[14]!).toBeGreaterThan(5);
+  });
+
+  it('only credits games played to players who take the field', () => {
+    const state = freshState();
+    const injured = state.dynasty.season.teams[0]!.roster[0]!;
+    const finished = simulateRemainingWeeks(
+      { ...state, injuries: [{ playerId: injured.id, teamId: state.dynasty.season.teams[0]!.id, weeksRemaining: 99 }] },
+      undefined,
+      seededRandom(5),
+    );
+    expect(finished.seasonStats[injured.id]?.gamesPlayed ?? 0).toBe(0);
+    // Each team suits up its playing group, not all 42 players, and exactly
+    // one goalie plays each game.
+    for (const team of finished.dynasty.season.teams) {
+      const teamGames = team.record.wins + team.record.losses;
+      const goalieGames = team.roster
+        .filter((p) => p.position === 'GK')
+        .reduce((n, p) => n + (finished.seasonStats[p.id]?.gamesPlayed ?? 0), 0);
+      expect(goalieGames).toBe(teamGames);
+      const appeared = team.roster.filter((p) => (finished.seasonStats[p.id]?.gamesPlayed ?? 0) > 0);
+      expect(appeared.length).toBeLessThan(team.roster.length);
+    }
   });
 });

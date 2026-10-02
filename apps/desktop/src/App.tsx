@@ -223,7 +223,10 @@ export function App() {
   const selectedRecruit = selectedRecruitId ? dynasty.recruits.find((r) => r.id === selectedRecruitId) : null;
 
   const advance = (() => {
-    if (view === 'offseason') return null;
+    if (offseasonSummary) {
+      if (view === 'offseason') return null;
+      return { label: 'Offseason', title: 'Finish the offseason to start the new season', run: () => setView('offseason') };
+    }
     if (hasScheduledGames) {
       return { label: `Week ${dynasty.season.currentWeek}`, title: `Sim week ${dynasty.season.currentWeek}`, run: simWeek };
     }
@@ -248,7 +251,7 @@ export function App() {
     {
       title: 'Office',
       items: [
-        ...(view === 'offseason' ? [{ view: 'offseason' as const, label: 'Offseason' }] : []),
+        ...(offseasonSummary ? [{ view: 'offseason' as const, label: 'Offseason' }] : []),
         { view: 'week-hub', label: 'Week Hub', ...(highPriorityCount > 0 ? { badge: highPriorityCount, alert: true } : {}) },
         { view: 'season', label: 'Season' },
         { view: 'news', label: 'News', ...(unreadNewsCount > 0 ? { badge: unreadNewsCount } : {}) },
@@ -622,7 +625,11 @@ export function App() {
       )}
 
       {selectedBoxScore && (
-        <BoxScorePanel data={selectedBoxScore} onClose={() => setSelectedBoxScore(null)} />
+        <BoxScorePanel
+          data={selectedBoxScore}
+          onClose={() => setSelectedBoxScore(null)}
+          playerName={(id) => playerLookup.get(id)?.name}
+        />
       )}
     </main>
   );
