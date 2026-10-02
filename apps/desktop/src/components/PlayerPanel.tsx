@@ -35,6 +35,9 @@ export function PlayerPanel({
           {injuryData.description ? ` (${injuryData.description})` : ''}
         </p>
       )}
+      {player.ratingHistory && player.ratingHistory.length > 0 && (
+        <RatingHistorySection player={player} seasonYear={seasonYear} />
+      )}
       {liveStats && <PlayerStatsSection stats={liveStats} position={player.position} seasonYear={seasonYear} />}
       {((career && career.seasons.length > 0) || liveStats) && (
         <CareerSection
@@ -48,6 +51,41 @@ export function PlayerPanel({
   );
 
   return <PlayerCardPanel data={data} footer={footer} onClose={onClose} />;
+}
+
+/** Overall rating at the end of each season, ending with today's rating. */
+function RatingHistorySection({ player, seasonYear }: { player: LacrossePlayer; seasonYear: number }) {
+  const points = [
+    ...(player.ratingHistory ?? []).map((h) => ({ label: `${h.season}`, classYear: h.classYear, overall: h.overall })),
+    { label: `${seasonYear}`, classYear: player.classYear, overall: player.ratings.overall },
+  ];
+  const max = Math.max(...points.map((p) => p.overall));
+  const min = Math.min(...points.map((p) => p.overall)) - 8;
+  return (
+    <div className="player-stats-section" aria-label="Rating history">
+      <p className="section-label">Development · potential {player.ratings.potential}</p>
+      <div className="rating-history">
+        {points.map((p, i) => {
+          const prev = points[i - 1];
+          const delta = prev ? p.overall - prev.overall : null;
+          const height = 18 + ((p.overall - min) / Math.max(1, max - min)) * 42;
+          return (
+            <div key={p.label} className="rating-history-col">
+              <span className={`rating-history-delta${delta === null ? '' : delta > 0 ? ' positive' : delta < 0 ? ' negative' : ''}`}>
+                {delta === null ? '' : delta > 0 ? `+${delta}` : delta}
+              </span>
+              <div className="rating-history-bar" style={{ height }}>
+                <span>{p.overall}</span>
+              </div>
+              <span className="rating-history-label">
+                {p.classYear} · {p.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 type StatColumn = { label: string; value: (s: PlayerSeasonStats) => number; unit?: string };

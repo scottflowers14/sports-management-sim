@@ -62,6 +62,9 @@ describe('long dynasties', () => {
       // Starting rosters match the talent that recruiting and development
       // sustain, so the league doesn't inflate (it once climbed ~4 points in 6 years).
       expect(Math.abs(leagueMean(newDynasty) - startMean)).toBeLessThan(2);
+      // Every returning player carries an end-of-season rating for the year just played.
+      const returning = newDynasty.season.teams.flatMap((t) => t.roster.filter((p) => p.createdSeason < nextYear));
+      expect(returning.every((p) => p.ratingHistory?.at(-1)?.season === nextYear - 1)).toBe(true);
       const prestige = newDynasty.season.teams.map((t) => t.reputation.nationalPrestige);
       expect(Math.max(...prestige)).toBeLessThanOrEqual(92);
       dynasty = newDynasty;

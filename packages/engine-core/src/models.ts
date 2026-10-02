@@ -89,6 +89,14 @@ export interface Player<Position extends string = string, SportTraits = unknown>
   eligibility: EligibilityStatus;
   recruitingProfile?: RecruitingProfile;
   createdSeason: SeasonYear;
+  /** Overall rating at the end of each completed season, oldest first. */
+  ratingHistory?: PlayerSeasonRating[];
+}
+
+export interface PlayerSeasonRating {
+  season: SeasonYear;
+  classYear: PlayerClass;
+  overall: Rating;
 }
 
 export interface TeamReputation {

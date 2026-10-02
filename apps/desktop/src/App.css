@@ -4753,3 +4753,41 @@ li span {
   font-size: 0.8rem;
   color: #72f2c6;
 }
+
+/* ── Player rating history ──────────────────────────────────── */
+.rating-history {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  min-height: 90px;
+}
+.rating-history-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 48px;
+}
+.rating-history-bar {
+  width: 36px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, rgba(114, 242, 198, 0.55), rgba(114, 242, 198, 0.15));
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 2px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.rating-history-col:last-child .rating-history-bar {
+  background: linear-gradient(180deg, rgba(114, 180, 242, 0.7), rgba(114, 180, 242, 0.2));
+}
+.rating-history-delta {
+  font-size: 0.72rem;
+  min-height: 1em;
+}
+.rating-history-label {
+  font-size: 0.7rem;
+  opacity: 0.75;
+  white-space: nowrap;
+}

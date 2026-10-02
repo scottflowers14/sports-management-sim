@@ -432,6 +432,7 @@ export function runOffseason(
     const staffBonus = developmentBonusFor(programStaffRating(team, 'development', staffOwner));
     const userFocus = team.id === userTeamId ? focusPositions : null;
     const afterOffseason = runTeamOffseason(team, {
+      completedSeason: season.year,
       developmentBonusFor: (player) =>
         staffBonus + (userFocus?.includes(player.position) ? TRAINING_FOCUS_BONUS : 0),
     });
