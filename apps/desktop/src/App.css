@@ -4792,3 +4792,97 @@ li span {
   opacity: 0.75;
   white-space: nowrap;
 }
+
+/* ── Transfer portal board ───────────────────────────────────────────────────── */
+.portal-board-card .screen-toolbar { align-items: center; }
+.portal-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: #aab8ca;
+  margin-right: auto;
+}
+.portal-stats strong { color: #e6edf3; font-size: 1rem; margin-right: 4px; }
+.toolbar-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #aab8ca;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.portal-departures {
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(245, 166, 35, 0.06);
+  border: 1px solid rgba(245, 166, 35, 0.25);
+}
+.portal-departures .section-label { margin-top: 0; color: #f5a623; }
+.portal-departure-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.portal-departure-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(200px, 1.4fr) minmax(160px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  font-size: 0.84rem;
+}
+.portal-departure-name { font-weight: 600; color: #e6edf3; }
+.portal-departure-meta, .portal-departure-rivals { color: #aab8ca; }
+.portal-table td, .portal-table th { white-space: nowrap; }
+.portal-table .portal-name { font-weight: 600; color: #e6edf3; }
+.portal-table .portal-reason, .portal-table .portal-standing { font-size: 0.78rem; color: #aab8ca; }
+.portal-table .portal-offers { max-width: 220px; white-space: normal; }
+.portal-table .portal-offers .competitor-row { margin-top: 0; }
+.portal-row-offered td { background: rgba(71, 120, 255, 0.07); }
+.portal-row-ours td { background: rgba(245, 166, 35, 0.06); }
+.portal-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(245, 166, 35, 0.15);
+  color: #f5a623;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.portal-ahead-open { color: #72f2c6; font-weight: 700; }
+.portal-leading { color: #72f2c6; font-weight: 700; }
+.portal-trailing { color: #f5a623; font-weight: 600; }
+.portal-offer-state { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; }
+.portal-offer-state .badge { padding: 2px 8px; font-size: 0.7rem; }
+.portal-action .offer-control { justify-content: flex-end; }
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #aab8ca;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-btn:hover { color: #e6edf3; }
+.portal-offseason-card .portal-mini-list .section-label { margin: 8px 0 0; }
+.portal-offseason-card .hub-nav-link { margin-top: 12px; }
+
+.portal-table-wrap { overflow-x: auto; }
+.portal-table { font-size: 0.8rem; }
+.portal-table th, .portal-table td { padding: 4px 6px; }
+.portal-table .portal-offers .competitor-row { display: flex; flex-wrap: nowrap; gap: 4px; }
+.portal-table .competitor-chip { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.68rem; padding: 1px 6px; }
+.portal-table .competitor-leader { border-color: #f5a623; background: rgba(245, 166, 35, 0.22); color: #ffd27a; }
+.portal-table .portal-name { max-width: 150px; }
+.portal-table .portal-name-text { display: inline-block; max-width: 112px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.portal-table .portal-from { max-width: 108px; overflow: hidden; text-overflow: ellipsis; }
+.portal-table .portal-trailing, .portal-table .portal-leading { max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.portal-table .portal-reason { font-size: 0.76rem; }
+.portal-table .offer-pct-select { padding: 2px 4px; font-size: 0.74rem; }
+.portal-table .offer-btn-sm { padding: 3px 9px; font-size: 0.72rem; }
+.portal-table .rating-cell { font-size: 0.82rem; }
+/* Offseason card: name and meta stack, the action sits on the right. */
+.portal-offseason-card .portal-mini-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; }
+.portal-offseason-card .portal-mini-name { grid-column: 1; }
+.portal-offseason-card .portal-mini-meta { grid-column: 1; grid-row: 2; white-space: normal; font-size: 0.74rem; }
+.portal-offseason-card .portal-mini-row > :last-child { grid-column: 2; grid-row: 1 / span 2; }

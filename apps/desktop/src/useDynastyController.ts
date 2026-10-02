@@ -14,6 +14,7 @@ import {
   fillStaffVacancies,
   hireStaffCandidate,
   offerLacrossePortalPlayer,
+  withdrawLacrossePortalOffer,
   programCoachingEdge,
   releaseStaffMember,
   runStaffOffseason,
@@ -25,7 +26,7 @@ import type { StaffRole } from '@sports-management-sim/sport-lacrosse';
 import { createProgramStaff, withStaffRecruitingHours } from './program-staff';
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
-import { runOffseason, resolveAndApplyPortal } from './dynasty-helpers';
+import { runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { simulateOneWeek, simulateRemainingWeeks, withoutInjured } from './week-sim';
 import { computeNationalRankings } from './rankings';
@@ -44,6 +45,7 @@ import {
 import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
+import { portalMoveNews } from './news-feed';
 import {
   initTournament,
   advanceTournamentSemis,
@@ -579,9 +581,26 @@ export function useDynastyController() {
     setScouting((s) => scoutRecruitFn(s, recruitId, trueOvr, Math.random));
   }, []);
 
-  const offerPortalPlayer = useCallback((portalEntryId: string) => {
-    setDynasty((prev) => offerLacrossePortalPlayer(prev, portalEntryId, 100));
+  // Portal offers draw on the program's open scholarship room, not the class budget.
+  const offerPortalPlayer = useCallback((portalEntryId: string, scholarshipPercent = 100) => {
+    const team = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+    const entry = dynasty.portalEntries.find((e) => e.id === portalEntryId);
+    if (!team || !entry || entry.status !== 'available') return;
+    const existing = entry.offersByTeamId[dynasty.userTeamId] ?? 0;
+    const room = portalScholarshipRoom(team, dynasty.portalEntries) + existing / 100;
+    if (scholarshipPercent / 100 > room + 1e-9) {
+      setSaveStatus('Not enough scholarship room for that portal offer');
+      return;
+    }
+    setDynasty(offerLacrossePortalPlayer(dynasty, portalEntryId, scholarshipPercent));
+    setSaveStatus(`Offered ${entry.name.first} ${entry.name.last} a ${scholarshipPercent}% scholarship`);
+  }, [dynasty]);
+
+  const withdrawPortalOffer = useCallback((portalEntryId: string) => {
+    setDynasty((prev) => withdrawLacrossePortalOffer(prev, portalEntryId));
   }, []);
+
+  const portalScholarshipRoomLeft = userTeam ? portalScholarshipRoom(userTeam, dynasty.portalEntries) : 0;
 
   const enterTournament = useCallback(() => {
     setTournament(initTournament(dynasty.season.standings, dynasty.season.conferences));
@@ -799,8 +818,10 @@ export function useDynastyController() {
   }, [staffState]);
 
   const startNewSeason = useCallback(() => {
-    setDynasty((prev) => {
-      const nextDynasty = resolveAndApplyPortal(prev);
+    // Resolve the portal up front so its stories can seed the season's news feed.
+    const { dynasty: nextDynasty, moves } = resolveAndApplyPortal(dynasty);
+    const portalNews = portalMoveNews(moves, nextDynasty.userTeamId, new Map(nextDynasty.season.teams.map((t) => [t.id, t.name])));
+    setDynasty(() => {
       const userTeamData = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
       const prestige = userTeamData?.reputation.nationalPrestige ?? 50;
       const goals = generateSeasonGoals(
@@ -818,15 +839,16 @@ export function useDynastyController() {
     const filled = fillStaffVacancies(staffState.staff, staffState.staffCandidates, staffBudget);
     setStaffState({ staff: filled.staff, staffCandidates: filled.candidates });
     setScouting((s) => withStaffRecruitingHours(resetScoutingForNewClass(s), filled.staff));
-    setNewsItems(
-      filled.hired.map((member) => ({
+    setNewsItems([
+      ...portalNews,
+      ...filled.hired.map((member) => ({
         id: `staff-hired-${member.id}`,
         week: 1,
         category: 'coaching' as const,
         featured: true,
         headline: `The athletic department hired ${member.name.first} ${member.name.last} (${member.rating}) as ${STAFF_ROLE_LABELS[member.role].title}.`,
       })),
-    );
+    ]);
     setLastSimWeek(null);
     setTournament(null);
     setInjuries([]);
@@ -840,7 +862,7 @@ export function useDynastyController() {
     setShortlistIds([]);
     setRecruitBoardView('all');
     setView('week-hub');
-  }, [staffState, staffBudget]);
+  }, [dynasty, staffState, staffBudget]);
 
   const handleExportSave = useCallback((saveId: string) => {
     const json = exportSaveAsJson(saveId);
@@ -975,6 +997,8 @@ export function useDynastyController() {
     setAutoRecruitingOffers,
     hasHomeGameThisWeek,
     offerPortalPlayer,
+    withdrawPortalOffer,
+    portalScholarshipRoom: portalScholarshipRoomLeft,
     enterTournament,
     simTournamentSemis,
     simTournamentFinals,

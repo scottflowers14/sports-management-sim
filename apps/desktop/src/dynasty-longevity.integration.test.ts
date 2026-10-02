@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
-import { enforceRosterLimit, ROSTER_FLOOR, ROSTER_LIMIT, runOffseason } from './dynasty-helpers';
+import { enforceRosterLimit, resolveAndApplyPortal, ROSTER_FLOOR, ROSTER_LIMIT, runOffseason } from './dynasty-helpers';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { createScoutingState } from './scouting';
 import { emptySeasonStats } from './stats';
@@ -46,7 +46,9 @@ describe('long dynasties', () => {
       const graduating = finished.dynasty.season.teams.flatMap((t) =>
         t.roster.filter((p) => p.classYear === 'SR' || p.classYear === 'GR'),
       ).length;
-      const { newDynasty } = runOffseason(finished.dynasty, undefined, 'balanced', finished.seasonStats);
+      const offseason = runOffseason(finished.dynasty, undefined, 'balanced', finished.seasonStats);
+      // The season's rosters are what's left once the transfer portal settles.
+      const { dynasty: newDynasty } = resolveAndApplyPortal(offseason.newDynasty);
       const nextYear = newDynasty.season.year;
       const sizes = newDynasty.season.teams.map((t) => t.roster.length);
       const signed = newDynasty.season.teams.flatMap((t) =>

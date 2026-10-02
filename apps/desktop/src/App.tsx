@@ -113,6 +113,8 @@ export function App() {
     setAutoRecruitingOffers,
     hasHomeGameThisWeek,
     offerPortalPlayer,
+    withdrawPortalOffer,
+    portalScholarshipRoom,
     enterTournament,
     simTournamentSemis,
     simTournamentFinals,
@@ -542,6 +544,10 @@ export function App() {
           onPitchRecruit={pitchRecruit}
           onToggleVisitInvite={toggleVisitInvite}
           onOfferPortalPlayer={offerPortalPlayer}
+          onWithdrawPortalOffer={withdrawPortalOffer}
+          portalTeams={dynasty.season.teams}
+          portalScholarshipRoom={portalScholarshipRoom}
+          seasonYear={dynasty.season.year}
           onRecruitPosFilterChange={setRecruitPosFilter}
           onRecruitTabChange={setRecruitTab}
           onToggleShortlist={toggleShortlist}
@@ -627,6 +633,9 @@ export function App() {
           onAcceptJobOffer={acceptJobOffer}
           onStartNewSeason={startNewSeason}
           onOfferPortalPlayer={offerPortalPlayer}
+          portalTeams={dynasty.season.teams}
+          portalScholarshipRoom={portalScholarshipRoom}
+          onOpenPortal={() => { setRecruitTab('portal'); setView('recruiting'); }}
         />
       )}
 

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { ConfirmModal } from '../components/ConfirmModal';
-import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition } from '@sports-management-sim/sport-lacrosse';
+import { OfferControl } from '../components/OfferControl';
+import { PortalBoard } from './PortalBoard';
+import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { PositionNeed } from '@sports-management-sim/engine-core';
 import {
   finalistTeamIds,
@@ -234,6 +235,10 @@ export function RecruitingScreen({
   onPitchRecruit,
   onToggleVisitInvite,
   onOfferPortalPlayer,
+  onWithdrawPortalOffer,
+  portalTeams,
+  portalScholarshipRoom,
+  seasonYear,
   onRecruitPosFilterChange,
   onRecruitTabChange,
   onToggleShortlist,
@@ -267,7 +272,11 @@ export function RecruitingScreen({
   onScoutRecruit: (recruitId: string, trueOvr: number) => void;
   onPitchRecruit: (recruitId: string, motivation: RecruitMotivation) => void;
   onToggleVisitInvite: (recruitId: string) => void;
-  onOfferPortalPlayer: (entryId: string) => void;
+  onOfferPortalPlayer: (entryId: string, scholarshipPercent: number) => void;
+  onWithdrawPortalOffer: (entryId: string) => void;
+  portalTeams: LacrosseTeam[];
+  portalScholarshipRoom: number;
+  seasonYear: number;
   onRecruitPosFilterChange: (pos: LacrossePosition | 'ALL') => void;
   onRecruitTabChange: (tab: 'board' | 'portal') => void;
   onToggleShortlist: (recruitId: string) => void;
@@ -488,9 +497,13 @@ export function RecruitingScreen({
       {recruitTab === 'portal' && (
         <PortalBoard
           entries={portalEntries}
+          teams={portalTeams}
           userTeamId={userTeamId}
           teamMap={teamMap}
+          seasonYear={seasonYear}
+          scholarshipRoom={portalScholarshipRoom}
           onOffer={onOfferPortalPlayer}
+          onWithdraw={onWithdrawPortalOffer}
         />
       )}
     </div>
@@ -1179,166 +1192,6 @@ function ordinal(n: number): string {
   if (n === 3) return '3rd';
   return `${n}th`;
 }
-
-const OFFER_PERCENT_OPTIONS = [25, 50, 75, 100] as const;
-
-function OfferControl({
-  recruitId,
-  recruitName,
-  budgetRemaining,
-  onOffer,
-}: {
-  recruitId: string;
-  recruitName: string;
-  budgetRemaining: number;
-  onOffer: (recruitId: string, scholarshipPercent: number) => void;
-}) {
-  const affordable = OFFER_PERCENT_OPTIONS.filter((pct) => pct / 100 <= budgetRemaining + 1e-9);
-  const maxAffordable = affordable[affordable.length - 1];
-  const [percent, setPercent] = useState<number>(maxAffordable ?? 100);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const canAfford = percent / 100 <= budgetRemaining + 1e-9;
-
-  return (
-    <>
-      {showConfirm && (
-        <ConfirmModal
-          title="Full Scholarship Offer"
-          message={`Offer ${recruitName} a full scholarship (100%)? This uses a full equivalency from your budget.`}
-          confirmLabel="Yes, Offer 100%"
-          danger
-          onConfirm={() => { setShowConfirm(false); onOffer(recruitId, percent); }}
-          onCancel={() => setShowConfirm(false)}
-        />
-      )}
-      <div className="offer-control">
-        <select
-          aria-label={`Scholarship offer amount for ${recruitName}`}
-          className="offer-pct-select"
-          value={percent}
-          onChange={(e) => setPercent(Number(e.target.value))}
-        >
-          {OFFER_PERCENT_OPTIONS.map((pct) => (
-            <option key={pct} value={pct} disabled={pct / 100 > budgetRemaining + 1e-9}>
-              {pct}%
-            </option>
-          ))}
-        </select>
-        <button
-          className="offer-btn offer-btn-sm offer-btn-row"
-          disabled={!canAfford}
-          title={canAfford ? `Offer a ${percent}% scholarship` : 'Not enough scholarship budget'}
-          onClick={() => {
-            if (percent === 100) {
-              setShowConfirm(true);
-            } else {
-              onOffer(recruitId, percent);
-            }
-          }}
-        >
-          Offer
-        </button>
-      </div>
-    </>
-  );
-}
-
-function PortalBoard({
-  entries,
-  userTeamId,
-  teamMap,
-  onOffer,
-}: {
-  entries: LacrossePortalEntry[];
-  userTeamId: string;
-  teamMap: Map<string, string>;
-  onOffer: (id: string) => void;
-}) {
-  const available = entries.filter((e) => e.status === 'available');
-  const committed = entries.filter((e) => e.status === 'committed' && e.committedTeamId === userTeamId);
-
-  if (entries.length === 0) {
-    return (
-      <article className="card">
-        <h2>Transfer Portal</h2>
-        <p className="dim">Portal opens at the start of each new season. Check back after the offseason.</p>
-      </article>
-    );
-  }
-
-  return (
-    <div className="portal-layout">
-      {committed.length > 0 && (
-        <article className="card portal-committed-card">
-          <h2>Committed Transfers · {committed.length}</h2>
-          <ul className="player-list">
-            {committed.map((entry) => (
-              <li key={entry.id}>
-                <strong>{entry.name.first} {entry.name.last}</strong>
-                <span>{entry.classYear} {entry.position} · {entry.ratings.overall} OVR · from {formatTeamName(teamMap.get(entry.sourceTeamId) ?? entry.sourceTeamId)}</span>
-              </li>
-            ))}
-          </ul>
-        </article>
-      )}
-
-      <div className="recruit-grid">
-        {available.map((entry) => {
-          const hasOffer = entry.offersByTeamId[userTeamId] !== undefined;
-          const userInterest = entry.interestByTeamId[userTeamId] ?? 0;
-          const competitors = Object.entries(entry.offersByTeamId)
-            .filter(([tid]) => tid !== userTeamId)
-            .map(([tid]) => ({ teamId: tid, name: formatTeamShort(teamMap.get(tid) ?? tid) }))
-            .slice(0, 3);
-
-          return (
-            <article key={entry.id} className={`card recruit-card portal-entry-card${hasOffer ? ' has-offer' : ''}`}>
-              <div className="recruit-header">
-                <div>
-                  <strong>{entry.name.first} {entry.name.last}</strong>
-                  <p className="recruit-sub">{entry.classYear} {entry.position} · from {formatTeamShort(teamMap.get(entry.sourceTeamId) ?? entry.sourceTeamId)}</p>
-                </div>
-                <div className="recruit-ovr-block">
-                  <span className="board-score">{entry.ratings.overall}</span>
-                  <span className="recruit-score-label">OVR</span>
-                </div>
-              </div>
-
-              {hasOffer && userInterest > 0 && (
-                <>
-                  <div className="interest-bar-wrap">
-                    <div className="interest-bar" style={{ width: `${userInterest}%` }} />
-                  </div>
-                  <p className="interest-label">Interest {userInterest}/100</p>
-                </>
-              )}
-
-              {competitors.length > 0 && (
-                <div className="competitor-row">
-                  {competitors.map((c) => (
-                    <span key={c.teamId} className="competitor-chip">{c.name}</span>
-                  ))}
-                </div>
-              )}
-
-              <div className="recruit-footer">
-                {hasOffer ? (
-                  <span className="badge badge-offered">Offered</span>
-                ) : (
-                  <button className="offer-btn" onClick={() => onOffer(entry.id)}>
-                    Offer Scholarship
-                  </button>
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** Where the class stands: graduates to replace, commitments in hand, offers out. */
 function ClassNeedsBar({
   needs,
   active,

@@ -1,10 +1,13 @@
 import type { LacrossePortalEntry, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import { PORTAL_REASON_LABELS } from '@sports-management-sim/engine-core';
+import { OfferControl } from '../components/OfferControl';
+import { portalStanding } from './PortalBoard';
 import type { OffseasonSummary } from '../dynasty-helpers';
 import type { DynastySeasonRecord } from '../history';
 import type { SeasonAwards } from '../awards';
 import type { JobOffer } from '../coach-profile';
 import type { PlayerDevelopmentEntry } from '../development-report';
-import { formatTeamName } from '../ui/format';
+import { formatTeamName, formatTeamShort } from '../ui/format';
 
 export function OffseasonScreen({
   offseasonSummary,
@@ -19,6 +22,9 @@ export function OffseasonScreen({
   onAcceptJobOffer,
   onStartNewSeason,
   onOfferPortalPlayer,
+  portalTeams,
+  portalScholarshipRoom,
+  onOpenPortal,
 }: {
   offseasonSummary: OffseasonSummary;
   userTeam: LacrosseTeam;
@@ -31,9 +37,20 @@ export function OffseasonScreen({
   coachName: string | null;
   onAcceptJobOffer: (teamId: string) => void;
   onStartNewSeason: () => void;
-  onOfferPortalPlayer: (entryId: string) => void;
+  onOfferPortalPlayer: (entryId: string, scholarshipPercent: number) => void;
+  portalTeams: LacrosseTeam[];
+  portalScholarshipRoom: number;
+  onOpenPortal: () => void;
 }) {
   const availablePortal = portalEntries.filter((e) => e.status === 'available');
+  const departures = offseasonSummary.portalDepartures ?? [];
+  const ourOffers = availablePortal.filter((e) => e.offersByTeamId[userTeamId] !== undefined).length;
+  // Best fits first: the highest-rated transfers we'd actually start.
+  const targets = [...availablePortal]
+    .filter((e) => e.sourceTeamId !== userTeamId)
+    .sort((a, b) => b.ratings.overall - a.ratings.overall)
+    .slice(0, 8);
+  const teamShort = (id: string) => formatTeamShort(teamMap.get(id) ?? id);
 
   return (
     <div className="offseason-layout">
@@ -134,35 +151,69 @@ export function OffseasonScreen({
           )}
         </article>
 
-        {availablePortal.length > 0 && (
-          <article className="card portal-offseason-card">
-            <h2>Transfer Portal · {availablePortal.length} Available</h2>
-            <p className="portal-hint">Make offers before starting the season. Portal resolves when you begin.</p>
-            <div className="portal-mini-list">
-              {availablePortal.slice(0, 8).map((entry) => {
-                const hasOffer = entry.offersByTeamId[userTeamId] !== undefined;
-                return (
-                  <div key={entry.id} className="portal-mini-row">
-                    <span className="portal-mini-name">
-                      {entry.name.first} {entry.name.last}
-                    </span>
-                    <span className="portal-mini-meta">
-                      {entry.classYear} {entry.position} · {entry.ratings.overall} OVR
-                    </span>
-                    {hasOffer ? (
-                      <span className="badge badge-offered">Offered</span>
-                    ) : (
-                      <button className="offer-btn offer-btn-sm" onClick={() => onOfferPortalPlayer(entry.id)}>
-                        Offer
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-              {availablePortal.length > 8 && (
-                <p className="dim">+{availablePortal.length - 8} more in portal</p>
-              )}
-            </div>
+        {(availablePortal.length > 0 || departures.length > 0) && (
+          <article className="card portal-offseason-card" aria-label="Transfer portal summary">
+            <h2>Transfer Portal · {availablePortal.length} in the portal</h2>
+            <p className="portal-hint">
+              {ourOffers > 0 ? `${ourOffers} offer${ourOffers === 1 ? '' : 's'} out · ` : ''}
+              {portalScholarshipRoom.toFixed(2)} scholarships free · everyone picks a school when the season starts.
+            </p>
+            {departures.length > 0 && (
+              <div className="portal-departures">
+                <p className="section-label">Left our program · {departures.length}</p>
+                <ul className="player-list">
+                  {departures.map((d) => {
+                    const entry = portalEntries.find((e) => e.id === d.entryId);
+                    const reRecruited = entry?.offersByTeamId[userTeamId] !== undefined;
+                    return (
+                      <li key={d.entryId}>
+                        <strong>{d.name}</strong>
+                        <span>
+                          {d.classYear} {d.position} · {d.overall} OVR · {PORTAL_REASON_LABELS[d.reason]}
+                          {reRecruited ? ' · re-recruiting' : ''}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {targets.length > 0 && (
+              <div className="portal-mini-list">
+                <p className="section-label">Top available</p>
+                {targets.map((entry) => {
+                  const ourOffer = entry.offersByTeamId[userTeamId];
+                  const standing = portalStanding(entry, portalTeams, userTeamId);
+                  const rivals = Object.keys(entry.offersByTeamId).filter((id) => id !== userTeamId).length;
+                  return (
+                    <div key={entry.id} className="portal-mini-row">
+                      <span className="portal-mini-name">
+                        {entry.name.first} {entry.name.last}
+                      </span>
+                      <span className="portal-mini-meta">
+                        {entry.classYear} {entry.position} · {entry.ratings.overall} OVR · from {teamShort(entry.sourceTeamId)}
+                        {rivals > 0 ? ` · ${rivals} rival offer${rivals === 1 ? '' : 's'}` : ''}
+                      </span>
+                      {ourOffer !== undefined ? (
+                        <span className={`badge ${standing.ourRank === 1 ? 'badge-committed' : 'badge-offered'}`}>
+                          {standing.ourRank === 1 ? 'Leading' : 'Behind'} · {ourOffer}%
+                        </span>
+                      ) : (
+                        <OfferControl
+                          recruitId={entry.id}
+                          recruitName={`${entry.name.first} ${entry.name.last}`}
+                          budgetRemaining={portalScholarshipRoom}
+                          onOffer={onOfferPortalPlayer}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button className="hub-nav-link" onClick={onOpenPortal}>
+              Open the full portal →
+            </button>
           </article>
         )}
 

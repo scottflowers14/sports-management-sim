@@ -5,14 +5,14 @@ import {
   commitRecruit,
   recruitDecisionWeek,
   recruitPrestigeMultiplier,
-  resolvePortalCommitments,
+  portalScholarshipsPending,
   evolveProgramPrestige,
   runTeamOffseason,
   shouldReopenCommitment,
   signCommittedRecruit,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
-import type { EligibilityStatus, PlayerClass, StandingsEntry } from '@sports-management-sim/engine-core';
+import type { PortalMove, PortalReason, StandingsEntry } from '@sports-management-sim/engine-core';
 import {
   createLacrosseSeasonSchedule,
   generateLacrosseRecruitingClass,
@@ -21,10 +21,12 @@ import {
   developmentBonusFor,
   programStaffRating,
   rollLacrosseInjuries,
+  openLacrossePortal,
+  generateLacrosseCpuPortalOffers,
+  resolveLacrossePortal,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
   LacrossePlayer,
-  LacrossePlayerTraits,
   LacrossePortalEntry,
   LacrosseDynastyState,
   LacrosseRecruit,
@@ -78,6 +80,17 @@ export interface OffseasonSummary {
   /** Commitments that flipped to a rival school on signing day. */
   signingDayFlips?: SigningDayFlip[];
   awards: SeasonAwards | null;
+  /** The user's players who put their name in the transfer portal. */
+  portalDepartures?: PortalDeparture[];
+}
+
+export interface PortalDeparture {
+  entryId: string;
+  name: string;
+  position: string;
+  classYear: string;
+  overall: number;
+  reason: PortalReason;
 }
 
 export interface InjuredPlayer {
@@ -442,6 +455,23 @@ export function runOffseason(
     return pruneDepthChart(trimmed);
   });
 
+  // The portal opens on the new rosters: the depth chart decides who leaves,
+  // and every CPU program makes its offers before the user sees the board.
+  const newSeed = seed + newYear;
+  const portal = openLacrossePortal(teamsAfterOffseason, { seed: newSeed, season: newYear });
+  const portalEntries = generateLacrosseCpuPortalOffers(portal.entries, portal.teams, { seed: newSeed, userTeamId });
+  const teamsForNewSeason = portal.teams;
+  const portalDepartures: PortalDeparture[] = portalEntries
+    .filter((e) => e.sourceTeamId === userTeamId)
+    .map((e) => ({
+      entryId: e.id,
+      name: `${e.name.first} ${e.name.last}`,
+      position: e.position,
+      classYear: e.classYear,
+      overall: e.ratings.overall,
+      reason: e.reason,
+    }));
+
   // Capture user team signing class for summary
   const signingClass = signed
     .filter((r) => r.signedTeamId === userTeamId)
@@ -462,18 +492,17 @@ export function runOffseason(
     : null;
 
   // Generate new recruiting class and board
-  const newSeed = seed + newYear;
   const newRecruits = generateLacrosseRecruitingClass({
-    count: recruitingClassSize(teamsAfterOffseason.length),
+    count: recruitingClassSize(teamsForNewSeason.length),
     seed: newSeed,
   });
-  const newUserTeam = teamsAfterOffseason.find((t) => t.id === userTeamId)!;
+  const newUserTeam = teamsForNewSeason.find((t) => t.id === userTeamId)!;
   const newRecruitBoard = sortRecruitBoardForTeam(newUserTeam, newRecruits, rosterTargets);
 
   const newSeason: LacrosseSeason = {
     ...season,
     year: newYear,
-    teams: teamsAfterOffseason,
+    teams: teamsForNewSeason,
     schedule: createLacrosseSeasonSchedule(newYear, season.conferences),
     standings: [],
     currentWeek: 1,
@@ -490,6 +519,7 @@ export function runOffseason(
     signingDayFlips,
     awards,
     developmentReport,
+    portalDepartures,
   };
 
   return {
@@ -499,154 +529,45 @@ export function runOffseason(
       recruits: newRecruits,
       recruitBoard: newRecruitBoard,
       seed: newSeed,
-      portalEntries: generatePortalEntries(teamsAfterOffseason, userTeamId, newSeed),
+      portalEntries,
     },
     summary,
   };
 }
 
-export function resolveAndApplyPortal(dynasty: LacrosseDynastyState): LacrosseDynastyState {
-  const resolved = resolvePortalCommitments(dynasty.portalEntries, dynasty.season.teams);
+export interface PortalResolution {
+  dynasty: LacrosseDynastyState;
+  moves: PortalMove[];
+}
 
-  // All portal entries represent players who have left their source program
-  const removedIdsByTeam = new Map<string, Set<string>>();
-  for (const entry of resolved) {
-    const ids = removedIdsByTeam.get(entry.sourceTeamId) ?? new Set<string>();
-    ids.add(entry.playerId);
-    removedIdsByTeam.set(entry.sourceTeamId, ids);
-  }
-
-  // Remove portal players from source rosters
-  let updatedTeams = dynasty.season.teams.map((team) => {
-    const removedIds = removedIdsByTeam.get(team.id);
-    if (!removedIds) return team;
-    return { ...team, roster: team.roster.filter((p) => !removedIds.has(p.id)) };
+/**
+ * Season start: every transfer still in the portal picks a school. Commits join
+ * their new roster, scholarship players nobody wanted go back home, and CPU
+ * programs that took on too many make cuts.
+ */
+export function resolveAndApplyPortal(dynasty: LacrosseDynastyState): PortalResolution {
+  const year = dynasty.season.year;
+  const resolved = resolveLacrossePortal(dynasty.portalEntries, dynasty.season.teams, year);
+  // Programs the portal drained fill out with walk-ons; CPU programs that
+  // took on too many make cuts.
+  const teams = resolved.teams.map((team) => {
+    const filled = backfillWalkOns(team, dynasty.rosterTargets, dynasty.seed + year + 1, year);
+    return pruneDepthChart(team.id === dynasty.userTeamId ? filled : enforceRosterLimit(filled));
   });
-
-  // Add players who committed to the user team
-  const userCommits = resolved.filter((e) => e.committedTeamId === dynasty.userTeamId);
-
-  if (userCommits.length > 0) {
-    const defaultTraits: LacrossePlayerTraits = {
-      shooting: 50,
-      passing: 50,
-      dodging: 50,
-      stickSkills: 55,
-      offBallMovement: 50,
-      defense: 50,
-      checking: 45,
-      groundBalls: 55,
-      preferredHand: 'right',
-    };
-
-    const newPlayers: LacrossePlayer[] = userCommits.map((entry) => ({
-      id: `portal-player-${entry.id}`,
-      name: entry.name,
-      age: 19,
-      classYear: entry.classYear,
-      hometown: entry.regionId,
-      regionId: entry.regionId,
-      position: entry.position,
-      secondaryPositions: [],
-      ratings: entry.ratings,
-      traits: [],
-      sportTraits: (entry.sportTraits ?? defaultTraits) as LacrossePlayerTraits,
-      scholarshipPercent: entry.offersByTeamId[dynasty.userTeamId] ?? 100,
-      isWalkOn: false,
-      morale: 80,
-      health: 100,
-      fatigue: 0,
-      redshirtStatus: 'none' as const,
-      eligibility: eligibilityForClass(entry.classYear),
-      createdSeason: dynasty.season.year,
-    }));
-
-    const scholarshipDelta = newPlayers.reduce((sum, p) => sum + p.scholarshipPercent / 100, 0);
-
-    updatedTeams = updatedTeams.map((team) => {
-      if (team.id !== dynasty.userTeamId) return team;
-      return {
-        ...team,
-        roster: [...team.roster, ...newPlayers],
-        resources: {
-          ...team.resources,
-          scholarshipUsed: Math.min(
-            team.resources.scholarshipLimit,
-            team.resources.scholarshipUsed + scholarshipDelta,
-          ),
-        },
-      };
-    });
-  }
-
   return {
-    ...dynasty,
-    season: { ...dynasty.season, teams: updatedTeams },
-    portalEntries: resolved,
+    dynasty: {
+      ...dynasty,
+      season: { ...dynasty.season, teams },
+      portalEntries: resolved.entries,
+    },
+    moves: resolved.moves,
   };
 }
 
-function eligibilityForClass(classYear: PlayerClass): EligibilityStatus {
-  const map: Record<PlayerClass, { played: number; remaining: number }> = {
-    FR: { played: 0, remaining: 4 },
-    SO: { played: 1, remaining: 3 },
-    JR: { played: 2, remaining: 2 },
-    SR: { played: 3, remaining: 1 },
-    GR: { played: 4, remaining: 1 },
-  };
-  const { played, remaining } = map[classYear];
-  return { seasonsPlayed: played, seasonsRemaining: remaining, isEligible: remaining > 0 };
-}
-
-function generatePortalEntries(
-  teams: LacrosseTeam[],
-  userTeamId: string,
-  seed: number,
-): LacrossePortalEntry[] {
-  const random = seededRandom(seed + 777);
-  const PORTAL_RATE = 0.12;
-  const entries: LacrossePortalEntry[] = [];
-
-  for (const team of teams) {
-    if (team.id === userTeamId) continue;
-    for (const player of team.roster) {
-      // Only SO and JR typically transfer; FR rarely; SR/GR graduate
-      if (player.classYear === 'FR' || player.classYear === 'SR' || player.classYear === 'GR') continue;
-      if (random() >= PORTAL_RATE) continue;
-
-      entries.push({
-        id: `portal-${seed}-${player.id}`,
-        playerId: player.id,
-        name: player.name,
-        position: player.position,
-        classYear: player.classYear,
-        ratings: player.ratings,
-        sportTraits: player.sportTraits as LacrossePlayerTraits,
-        sourceTeamId: team.id,
-        regionId: player.regionId,
-        status: 'available',
-        preferences: {
-          proximityImportance: 40 + Math.round(random() * 60),
-          prestigeImportance: 40 + Math.round(random() * 60),
-          scholarshipImportance: 55 + Math.round(random() * 45),
-          playingTimeImportance: 65 + Math.round(random() * 35),
-          academicImportance: 25 + Math.round(random() * 55),
-        },
-        interestByTeamId: {},
-        offersByTeamId: {},
-      });
-    }
-  }
-
-  return entries;
-}
-
-function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 0x100000000;
-  };
+/** Scholarship equivalencies the user can still promise to portal players. */
+export function portalScholarshipRoom(team: LacrosseTeam, entries: LacrossePortalEntry[]): number {
+  const room = team.resources.scholarshipLimit - team.resources.scholarshipUsed - portalScholarshipsPending(entries, team.id);
+  return Math.max(0, Math.round(room * 100) / 100);
 }
 
 /** Never cut a team below this many at a position. */

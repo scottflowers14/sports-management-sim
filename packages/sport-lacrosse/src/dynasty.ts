@@ -1,14 +1,13 @@
 import {
   advanceSeasonWeek,
   applyPortalOffer,
+  withdrawPortalOffer,
   applyScholarshipOffer,
   calculateRecruitFitScore,
   createRoundRobinSchedule,
   recruitPrestigeMultiplier,
-  resolvePortalCommitments,
   sortRecruitBoardForTeam,
   type Conference,
-  type PortalEntry,
   type RecruitBoardEntry,
   type Region,
   type ScheduledGame,
@@ -23,8 +22,7 @@ import {
 } from './roster-generation';
 import { makeLacrosseTeam } from './test-fixtures';
 import { simulateLacrosseGame } from './simulate-game';
-
-export type LacrossePortalEntry = PortalEntry<LacrossePosition, LacrossePlayerTraits>;
+import type { LacrossePortalEntry } from './transfer-portal';
 
 export interface LacrosseDynastyState {
   id: string;
@@ -406,9 +404,11 @@ export function offerLacrossePortalPlayer(
   return { ...state, portalEntries };
 }
 
-export function resolveLacrossePortal(state: LacrosseDynastyState): LacrosseDynastyState {
-  const resolved = resolvePortalCommitments(state.portalEntries, state.season.teams);
-  return { ...state, portalEntries: resolved };
+export function withdrawLacrossePortalOffer(state: LacrosseDynastyState, portalEntryId: string): LacrosseDynastyState {
+  const portalEntries = state.portalEntries.map((entry) =>
+    entry.id === portalEntryId ? withdrawPortalOffer(entry, state.userTeamId) : entry,
+  );
+  return { ...state, portalEntries };
 }
 
 export function getLacrosseRecruitingSummary(state: LacrosseDynastyState): LacrosseRecruitingSummary {
