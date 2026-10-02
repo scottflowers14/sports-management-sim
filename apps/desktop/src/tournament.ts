@@ -176,6 +176,19 @@ export function ncaaSeedLookup(state: TournamentState): (teamId: string) => numb
   return (teamId) => seeds.get(teamId) ?? 99;
 }
 
+const EMPTY_RECORD: StandingsEntry['record'] = {
+  wins: 0,
+  losses: 0,
+  conferenceWins: 0,
+  conferenceLosses: 0,
+  homeWins: 0,
+  homeLosses: 0,
+  awayWins: 0,
+  awayLosses: 0,
+  neutralWins: 0,
+  neutralLosses: 0,
+};
+
 function ncaaGame(id: string, homeTeamId: string, awayTeamId: string): TournamentGame {
   return { id, homeTeamId, awayTeamId, conferenceId: null };
 }
@@ -281,23 +294,25 @@ export function advanceNationalChampionship(state: TournamentState, teams: Lacro
   };
 }
 
+/** Conference standings order: league record first, overall record as the tiebreak. */
+export function compareConferenceStanding(
+  a: Pick<StandingsEntry, 'record'>,
+  b: Pick<StandingsEntry, 'record'>,
+): number {
+  return (
+    b.record.conferenceWins - a.record.conferenceWins ||
+    a.record.conferenceLosses - b.record.conferenceLosses ||
+    b.record.wins - a.record.wins ||
+    a.record.losses - b.record.losses
+  );
+}
+
 function buildBracket(confId: string, teamIds: string[], standings: StandingsEntry[]): ConferenceBracket {
   // Conference tournaments seed by league record; overall record breaks ties.
   const seeded = teamIds
-    .map((id) => {
-      const s = standings.find((e) => e.teamId === id);
-      return {
-        id,
-        confWins: s?.record.conferenceWins ?? 0,
-        confLosses: s?.record.conferenceLosses ?? 0,
-        wins: s?.record.wins ?? 0,
-        losses: s?.record.losses ?? 0,
-      };
-    })
-    .sort(
-      (a, b) =>
-        b.confWins - a.confWins || a.confLosses - b.confLosses || b.wins - a.wins || a.losses - b.losses,
-    );
+    .map((id) => standings.find((e) => e.teamId === id) ?? { teamId: id, record: EMPTY_RECORD })
+    .sort(compareConferenceStanding)
+    .map((e) => ({ id: e.teamId }));
 
   const s1 = seeded[0]?.id ?? teamIds[0]!;
   const s2 = seeded[1]?.id ?? teamIds[1]!;

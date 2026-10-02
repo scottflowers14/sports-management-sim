@@ -52,6 +52,7 @@ import {
   advanceTournamentFinals,
   advanceTournamentNationalSemis,
   advanceNationalChampionship,
+  compareConferenceStanding,
 } from './tournament';
 import type { TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
@@ -663,13 +664,7 @@ export function useDynastyController() {
     const confRank =
       [...dynasty.season.standings]
         .filter((s) => confTeamIds.includes(s.teamId))
-        .sort(
-          (a, b) =>
-            b.record.conferenceWins - a.record.conferenceWins ||
-            a.record.conferenceLosses - b.record.conferenceLosses ||
-            b.record.wins - a.record.wins ||
-            a.record.losses - b.record.losses,
-        )
+        .sort(compareConferenceStanding)
         .findIndex((s) => s.teamId === dynasty.userTeamId) + 1;
 
     const userTeamThisSeason = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
