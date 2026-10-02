@@ -1,4 +1,4 @@
-import { DEFAULT_GAME_PLAN } from '@sports-management-sim/sport-lacrosse';
+import { compactGameLog, normalizeGamePlan } from '@sports-management-sim/sport-lacrosse';
 import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrosseStaff, StaffMember } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
@@ -164,13 +164,48 @@ export function compactForStorage<T extends DynastySaveState>(save: T): T {
       .map((g) => g.id),
   );
   // Logs from past seasons aren't reachable from any screen, so they go too.
-  const gameLogs = Object.fromEntries(Object.entries(save.gameLogs).filter(([id]) => keep.has(id)));
+  // Other programs' games keep only their scoring summary; the user's games
+  // keep the full play-by-play and every stat line.
+  const userGameIds = new Set(
+    schedule.filter((g) => g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId).map((g) => g.id),
+  );
+  const gameLogs = Object.fromEntries(
+    Object.entries(save.gameLogs)
+      .filter(([id]) => keep.has(id))
+      .map(([id, log]) => [id, userGameIds.has(id) ? log : compactGameLog(log)]),
+  );
+  const tournament = save.tournament ? compactTournamentLogs(save.tournament, dynasty.userTeamId) : save.tournament;
   const activeIds = new Set([
     ...dynasty.season.teams.flatMap((t) => t.roster.map((p) => p.id)),
     ...dynasty.portalEntries.map((e) => e.playerId),
   ]);
   const careerStats = Object.fromEntries(Object.entries(save.careerStats).filter(([id]) => activeIds.has(id)));
-  return { ...save, dynasty: { ...dynasty, recruitBoard: [] }, gameLogs, careerStats };
+  return { ...save, dynasty: { ...dynasty, recruitBoard: [] }, gameLogs, careerStats, tournament };
+}
+
+/** Trim the play-by-play of every tournament game the user's program wasn't in. */
+function compactTournamentLogs(tournament: TournamentState, userTeamId: string): TournamentState {
+  const trimGame = <G extends TournamentGame | undefined>(game: G): G => {
+    if (!game?.result?.log) return game;
+    if (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId) return game;
+    return { ...game, result: { ...game.result, log: compactGameLog(game.result.log) } } as G;
+  };
+  const trimBracket = (bracket: ConferenceBracket): ConferenceBracket => ({
+    ...bracket,
+    semifinal1: trimGame(bracket.semifinal1),
+    semifinal2: trimGame(bracket.semifinal2),
+    ...(bracket.final ? { final: trimGame(bracket.final) } : {}),
+  });
+  const trimList = (games: TournamentGame[]) => games.map(trimGame);
+  return {
+    ...tournament,
+    conferenceBrackets: tournament.conferenceBrackets.map(trimBracket),
+    ...(tournament.ncaaFirstRound ? { ncaaFirstRound: trimList(tournament.ncaaFirstRound) } : {}),
+    ...(tournament.ncaaQuarterfinals ? { ncaaQuarterfinals: trimList(tournament.ncaaQuarterfinals) } : {}),
+    ...(tournament.nationalSemiFinal1 ? { nationalSemiFinal1: trimGame(tournament.nationalSemiFinal1) } : {}),
+    ...(tournament.nationalSemiFinal2 ? { nationalSemiFinal2: trimGame(tournament.nationalSemiFinal2) } : {}),
+    ...(tournament.nationalGame ? { nationalGame: trimGame(tournament.nationalGame) } : {}),
+  };
 }
 
 export function setActiveDynastySave(saveId: string, storage: Storage = window.localStorage): void {
@@ -354,9 +389,8 @@ function parsePersistedSave(raw: string): PersistedDynastySave | null {
     if (parsed.bestNatRank === undefined) {
       parsed.bestNatRank = null;
     }
-    if (parsed.gamePlan === undefined) {
-      parsed.gamePlan = DEFAULT_GAME_PLAN;
-    }
+    // Older saves carried only tempo and defense; fill in the newer axes.
+    parsed.gamePlan = normalizeGamePlan(parsed.gamePlan);
     if (parsed.trainingFocus === undefined) {
       parsed.trainingFocus = 'balanced';
     }

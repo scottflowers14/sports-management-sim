@@ -131,12 +131,15 @@ describe('Desktop App', () => {
     expect(screen.getByRole('heading', { name: /^Coaching$/i })).toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByLabelText(/Offensive Tempo/i), 'uptempo');
+    await userEvent.selectOptions(screen.getByLabelText(/^Ride$/i), 'aggressive');
+    await userEvent.selectOptions(screen.getByLabelText(/Midfield Rotation/i), 'tight');
     await userEvent.selectOptions(screen.getByLabelText(/Training Focus/i), 'goalies');
 
     expect(screen.getByLabelText(/Offensive Tempo/i)).toHaveValue('uptempo');
     expect(await screen.findByText(/Push transition/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ten-man ride/i)).toBeInTheDocument();
     await waitFor(() => {
-      expect(loadActiveDynastySave()?.gamePlan?.tempo).toBe('uptempo');
+      expect(loadActiveDynastySave()?.gamePlan).toEqual({ tempo: 'uptempo', defense: 'balanced', ride: 'aggressive', rotation: 'tight' });
       expect(loadActiveDynastySave()?.trainingFocus).toBe('goalies');
     });
   });
@@ -149,6 +152,12 @@ describe('Desktop App', () => {
     expect(screen.getByText(/Current Team/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Depth Chart/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Full Roster/i })).toBeInTheDocument();
+    // The Lines card shows every unit the depth chart sends out.
+    const lines = screen.getByLabelText(/^Lines$/i);
+    for (const unit of ['Attack', 'Midfield 1', 'Midfield 2', 'Close Defense', 'Goalie', 'Faceoff', 'Man-Up', 'Man-Down']) {
+      expect(within(lines).getByText(unit)).toBeInTheDocument();
+    }
+    expect(within(lines).getAllByText(/% of shifts/i).length).toBeGreaterThan(1);
     expect(screen.getByLabelText(/Team rating summary/i)).toHaveTextContent(/DEPTH/i);
   });
 

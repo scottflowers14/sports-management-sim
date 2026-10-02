@@ -1,5 +1,7 @@
 import {
   DEFENSE_LABELS,
+  RIDE_LABELS,
+  ROTATION_LABELS,
   TEMPO_LABELS,
   describeGamePlan,
   type DefensiveStyle,
@@ -7,7 +9,9 @@ import {
   type LacrosseGamePlan,
   type LacrosseTeam,
   type LacrosseTeamRating,
+  type MidfieldRotation,
   type OffensiveTempo,
+  type RideStyle,
 } from '@sports-management-sim/sport-lacrosse';
 
 export interface OpponentScout {
@@ -192,6 +196,34 @@ export function SeasonScreen({
             </select>
           </label>
           <p className="gameplan-hint">{DEFENSE_LABELS[gamePlan.defense].hint}</p>
+          <label className="gameplan-row">
+            <span className="gameplan-label">Ride</span>
+            <select
+              value={gamePlan.ride}
+              onChange={(e) => onGamePlanChange({ ...gamePlan, ride: e.target.value as RideStyle })}
+            >
+              {(Object.keys(RIDE_LABELS) as RideStyle[]).map((ride) => (
+                <option key={ride} value={ride}>
+                  {RIDE_LABELS[ride].label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="gameplan-hint">{RIDE_LABELS[gamePlan.ride].hint}</p>
+          <label className="gameplan-row">
+            <span className="gameplan-label">Midfield Rotation</span>
+            <select
+              value={gamePlan.rotation}
+              onChange={(e) => onGamePlanChange({ ...gamePlan, rotation: e.target.value as MidfieldRotation })}
+            >
+              {(Object.keys(ROTATION_LABELS) as MidfieldRotation[]).map((rotation) => (
+                <option key={rotation} value={rotation}>
+                  {ROTATION_LABELS[rotation].label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="gameplan-hint">{ROTATION_LABELS[gamePlan.rotation].hint}</p>
           <label className="gameplan-row">
             <span className="gameplan-label">Training Focus</span>
             <select
