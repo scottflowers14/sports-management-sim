@@ -613,6 +613,23 @@ describe('Desktop App', () => {
     expect(screen.getAllByText(/^Preseason poll: /).length).toBeGreaterThan(0);
   });
 
+  it('makes a playing-time promise and calls out a broken one', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Team/ }));
+    // Start the fourth attackman in the first slot, benching a starter.
+    const slot = within(screen.getByText('Depth Chart').closest('article')!).getAllByRole('combobox')[0] as HTMLSelectElement;
+    await userEvent.selectOptions(slot, slot.options[3]!.value);
+    await userEvent.click(screen.getByRole('button', { name: /^Locker Room/ }));
+    const concerns = screen.getByLabelText('Player concerns');
+    await userEvent.click(within(concerns).getAllByRole('button', { name: 'Promise role' })[0]!);
+    expect(concerns).toHaveTextContent(/Promised a starter role by week 3/);
+    for (let week = 1; week <= 3; week += 1) {
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+    }
+    await userEvent.click(screen.getByRole('button', { name: /^News/ }));
+    expect(screen.getByText(/feels betrayed after a broken promise of playing time/)).toBeInTheDocument();
+  });
+
   it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {
     await renderStartedApp();
     const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;

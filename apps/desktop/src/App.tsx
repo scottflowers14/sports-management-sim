@@ -123,6 +123,7 @@ export function App() {
     resetDepthChart,
     setRedshirt,
     setTeamCaptain,
+    promisePlayingTime,
     redshirtsOpen,
     gamesPlayedFor,
     userTeam,
@@ -713,6 +714,8 @@ export function App() {
           onTalk={talkToPlayer}
           onTeamMeeting={holdTeamMeeting}
           onSetCaptain={setTeamCaptain}
+          promises={lockerRoom.promises ?? []}
+          onPromise={promisePlayingTime}
           onSelectPlayer={setSelectedPlayerId}
         />
       )}

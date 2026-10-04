@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { decidePortalEntry, portalMoraleMultiplier } from '@sports-management-sim/engine-core';
 import type { LacrossePlayer, LacrosseTeam } from './models';
 import {
+  canPromisePlayingTime,
+  makePlayingTimePromise,
+  PROMISE_BOOST,
+  PROMISE_BROKEN_PENALTY,
+  PROMISE_BROKEN_TEAM_PENALTY,
+  PROMISE_KEPT_BOOST,
+  resolvePlayingTimePromises,
   applyCpuCaptains,
   boostMorale,
   captainInfluence,
@@ -196,5 +203,59 @@ describe('captains', () => {
     const named = applyCpuCaptains(team);
     expect(teamCaptains(named)).toHaveLength(2);
     expect(applyCpuCaptains(named)).toBe(named);
+  });
+});
+
+describe('playing-time promises', () => {
+  const roster = attackUnit();
+  const [star, second, third, reserve] = roster;
+  // The best attackman sits behind the reserve.
+  const benched = withDepthChart(roster, [second!.id, third!.id, reserve!.id, star!.id]);
+  const fair = withDepthChart(roster, roster.map((p) => p.id));
+
+  it('can only be made to a player the depth chart shortchanges', () => {
+    expect(canPromisePlayingTime(benched, benched.roster[0]!)).toBe(true);
+    expect(canPromisePlayingTime(fair, fair.roster[0]!)).toBe(false);
+    expect(makePlayingTimePromise(fair, fair.roster[0]!, 3)).toBeNull();
+    const made = makePlayingTimePromise(benched, benched.roster[0]!, 3)!;
+    expect(made.promise).toEqual({ playerId: star!.id, role: 'starter', dueWeek: 5 });
+    expect(made.team.roster[0]!.morale).toBe(MORALE_BASELINE + PROMISE_BOOST);
+  });
+
+  it('waits until it comes due, then rewards a kept promise', () => {
+    const { promise } = makePlayingTimePromise(benched, benched.roster[0]!, 3)!;
+    expect(resolvePlayingTimePromises(benched, [promise], 4).open).toEqual([promise]);
+    const kept = resolvePlayingTimePromises(fair, [promise], 5);
+    expect(kept.kept).toEqual([promise]);
+    expect(kept.team.roster[0]!.morale).toBe(MORALE_BASELINE + PROMISE_KEPT_BOOST);
+    expect(kept.team.roster[1]!.morale).toBe(MORALE_BASELINE);
+  });
+
+  it('punishes a broken promise, and the room notices', () => {
+    const { promise } = makePlayingTimePromise(benched, benched.roster[0]!, 3)!;
+    const broken = resolvePlayingTimePromises(benched, [promise], 5);
+    expect(broken.broken).toEqual([promise]);
+    expect(broken.team.roster[0]!.morale).toBe(MORALE_BASELINE - PROMISE_BROKEN_PENALTY - PROMISE_BROKEN_TEAM_PENALTY);
+    expect(broken.team.roster[1]!.morale).toBe(MORALE_BASELINE - PROMISE_BROKEN_TEAM_PENALTY);
+    // A player who left the program drops off.
+    const gone = { ...benched, roster: benched.roster.slice(1) };
+    expect(resolvePlayingTimePromises(gone, [promise], 5)).toMatchObject({ kept: [], broken: [], open: [] });
+  });
+});
+
+describe('ties on the depth chart', () => {
+  it("doesn't count losing a tie for the last starting spot as a benching", () => {
+    // Four attackmen, the third and fourth rated the same: one of them has to sit.
+    const roster = [80, 70, 60, 60].map((overall, i) => {
+      const p = makeLacrossePlayer(i, 'ATT');
+      return { ...p, classYear: 'JR' as const, ratings: { ...p.ratings, overall } };
+    });
+    for (const order of [roster.map((p) => p.id), [roster[0]!.id, roster[1]!.id, roster[3]!.id, roster[2]!.id]]) {
+      const team = withDepthChart(roster, order);
+      for (const player of team.roster) {
+        const status = playerRoleStatus(team, player);
+        expect(['starter', 'rotation'].indexOf(status.actual)).toBeLessThanOrEqual(['starter', 'rotation'].indexOf(status.expected));
+      }
+    }
   });
 });
