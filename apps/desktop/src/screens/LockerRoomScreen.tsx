@@ -1,4 +1,5 @@
 import {
+  canPromisePlayingTime,
   captainInfluence,
   CAPTAIN_NAMED_BOOST,
   MAX_CAPTAINS,
@@ -6,6 +7,8 @@ import {
   moraleReason,
   playerRoleStatus,
   PLAYER_TALK_BOOST,
+  PROMISE_BOOST,
+  PROMISE_BROKEN_PENALTY,
   suggestCaptains,
   TEAM_MEETING_BOOST,
   teamCaptains,
@@ -13,6 +16,7 @@ import {
   type LacrossePlayer,
   type LacrosseTeam,
   type MoodLabel,
+  type PlayingTimePromise,
 } from '@sports-management-sim/sport-lacrosse';
 import { classLabel, portalMoraleMultiplier } from '@sports-management-sim/engine-core';
 
@@ -27,6 +31,8 @@ interface LockerRoomScreenProps {
   onTalk: (playerId: string) => void;
   onTeamMeeting: () => void;
   onSetCaptain: (playerId: string, captain: boolean) => void;
+  promises?: readonly PlayingTimePromise[];
+  onPromise?: (playerId: string) => void;
   onSelectPlayer: (playerId: string) => void;
 }
 
@@ -51,8 +57,11 @@ export function LockerRoomScreen({
   onTalk,
   onTeamMeeting,
   onSetCaptain,
+  promises = [],
+  onPromise,
   onSelectPlayer,
 }: LockerRoomScreenProps) {
+  const promiseFor = new Map(promises.map((p) => [p.playerId, p]));
   const captains = teamCaptains(team);
   const captainIds = new Set(captains.map((p) => p.id));
   const influence = captainInfluence(team);
@@ -62,7 +71,8 @@ export function LockerRoomScreen({
   for (const p of team.roster) counts.set(moodLabel(p.morale), (counts.get(moodLabel(p.morale)) ?? 0) + 1);
   const talked = new Set(talkedIds);
   const roster = [...team.roster].sort((a, b) => a.morale - b.morale || a.id.localeCompare(b.id));
-  const concerns = roster.filter((p) => p.morale < 50);
+  // Unhappy players, and anyone who thinks he deserves more than the depth chart gives him.
+  const concerns = roster.filter((p) => p.morale < 50 || canPromisePlayingTime(team, p));
 
   const talkButton = (player: LacrossePlayer) => (
     <button
@@ -194,7 +204,7 @@ export function LockerRoomScreen({
 
       <article className="card" aria-label="Player concerns">
         <h2>Concerns</h2>
-        {concerns.length === 0 && <p className="dim">Nobody is unhappy right now.</p>}
+        {concerns.length === 0 && <p className="dim">Nobody is unhappy or unsettled right now.</p>}
         <ul className="locker-concerns">
           {concerns.map((player) => {
             const risk = portalRisk(player);
@@ -214,7 +224,25 @@ export function LockerRoomScreen({
                   {moodLabel(player.morale)} {Math.round(player.morale)}
                 </span>
                 {risk && <span className="locker-risk">Portal risk: {risk}</span>}
-                {talkButton(player)}
+                {promiseFor.has(player.id) ? (
+                  <span className="locker-promise">
+                    Promised a {promiseFor.get(player.id)!.role} role by week {promiseFor.get(player.id)!.dueWeek}
+                  </span>
+                ) : (
+                  <span className="locker-concern-actions">
+                    {talkButton(player)}
+                    {onPromise && !talked.has(player.id) && canPromisePlayingTime(team, player) && (
+                      <button
+                        type="button"
+                        className="offer-btn locker-talk-btn"
+                        title={`Lifts his morale by ${PROMISE_BOOST} now. Give him the role within three games or he loses ${PROMISE_BROKEN_PENALTY} and the room loses faith.`}
+                        onClick={() => onPromise(player.id)}
+                      >
+                        Promise role
+                      </button>
+                    )}
+                  </span>
+                )}
               </li>
             );
           })}

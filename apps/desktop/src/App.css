@@ -5583,3 +5583,14 @@ li span {
   color: #72f2c6;
   font-weight: 800;
 }
+
+.locker-concern-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.locker-promise {
+  color: #f2c472;
+  font-size: 0.8rem;
+  font-weight: 700;
+}

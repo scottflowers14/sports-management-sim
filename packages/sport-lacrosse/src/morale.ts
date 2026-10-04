@@ -38,12 +38,17 @@ export interface PlayerRoleStatus {
  */
 export function playerRoleStatus(team: LacrosseTeam, player: LacrossePlayer): PlayerRoleStatus {
   const starters = LACROSSE_STARTER_COUNTS[player.position];
-  // Ties share a rank: nobody expects to beat out a teammate rated the same.
+  // Ties go against him: nobody expects to beat out a teammate rated the
+  // same, so only a lower-rated player ahead of him reads as a benching.
   // Redshirting teammates aren't competing for the job this year.
   const ratingRank =
     1 +
     team.roster.filter(
-      (p) => p.position === player.position && p.redshirtStatus !== 'redshirting' && p.ratings.overall > player.ratings.overall,
+      (p) =>
+        p.id !== player.id &&
+        p.position === player.position &&
+        p.redshirtStatus !== 'redshirting' &&
+        p.ratings.overall >= player.ratings.overall,
     ).length;
   const order = getLacrosseDepthChart(team)[player.position];
   const depthRank = order.indexOf(player.id) + 1 || order.length + 1;
@@ -205,4 +210,69 @@ export function moraleReason(team: LacrosseTeam, player: LacrossePlayer): string
 /** Morale keeps one decimal so small weekly nudges add up; screens round it. */
 function clampMorale(value: number): number {
   return Math.min(99, Math.max(1, Math.round(value * 10) / 10));
+}
+
+/** A promise lifts a player this much when it's made. */
+export const PROMISE_BOOST = 12;
+/** Games he gives you to deliver. */
+export const PROMISE_WEEKS = 3;
+export const PROMISE_KEPT_BOOST = 6;
+export const PROMISE_BROKEN_PENALTY = 20;
+/** The rest of the room notices a broken promise too. */
+export const PROMISE_BROKEN_TEAM_PENALTY = 2;
+
+export interface PlayingTimePromise {
+  playerId: string;
+  /** The role he was promised: the one his rating earns. */
+  role: LacrosseRole;
+  /** The week after which the promise is judged. */
+  dueWeek: number;
+}
+
+/** A benched player can be promised the role his rating earns. */
+export function canPromisePlayingTime(team: LacrosseTeam, player: LacrossePlayer): boolean {
+  if (player.redshirtStatus === 'redshirting') return false;
+  const status = playerRoleStatus(team, player);
+  return ROLE_ORDER[status.actual] > ROLE_ORDER[status.expected];
+}
+
+export function makePlayingTimePromise(team: LacrosseTeam, player: LacrossePlayer, week: number): { team: LacrosseTeam; promise: PlayingTimePromise } | null {
+  if (!canPromisePlayingTime(team, player)) return null;
+  const promise = { playerId: player.id, role: playerRoleStatus(team, player).expected, dueWeek: week + PROMISE_WEEKS - 1 };
+  return { team: boostMorale(team, new Set([player.id]), PROMISE_BOOST), promise };
+}
+
+export interface PromiseResolution {
+  team: LacrosseTeam;
+  kept: PlayingTimePromise[];
+  broken: PlayingTimePromise[];
+  open: PlayingTimePromise[];
+}
+
+/**
+ * Judge every promise that has come due after the week just played. A player
+ * who has his promised role (or better) is grateful; one who doesn't feels
+ * betrayed, and the locker room notices. A player who left drops off.
+ */
+export function resolvePlayingTimePromises(team: LacrosseTeam, promises: readonly PlayingTimePromise[], weekPlayed: number): PromiseResolution {
+  const kept: PlayingTimePromise[] = [];
+  const broken: PlayingTimePromise[] = [];
+  const open: PlayingTimePromise[] = [];
+  for (const promise of promises) {
+    const player = team.roster.find((p) => p.id === promise.playerId);
+    if (!player) continue;
+    if (weekPlayed < promise.dueWeek) {
+      open.push(promise);
+      continue;
+    }
+    const actual = playerRoleStatus(team, player).actual;
+    (ROLE_ORDER[actual] <= ROLE_ORDER[promise.role] ? kept : broken).push(promise);
+  }
+  let next = team;
+  if (kept.length > 0) next = boostMorale(next, new Set(kept.map((p) => p.playerId)), PROMISE_KEPT_BOOST);
+  if (broken.length > 0) {
+    next = boostMorale(next, new Set(broken.map((p) => p.playerId)), -PROMISE_BROKEN_PENALTY);
+    next = boostMorale(next, 'all', -PROMISE_BROKEN_TEAM_PENALTY * broken.length);
+  }
+  return { team: next, kept, broken, open };
 }

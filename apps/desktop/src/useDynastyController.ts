@@ -28,6 +28,8 @@ import {
   autoDevelopmentPlans,
   boostMorale,
   setCaptain,
+  makePlayingTimePromise,
+  resolvePlayingTimePromises,
   setLacrosseRedshirt,
   type RivalrySeriesMap,
   MAX_DEVELOPMENT_PLANS,
@@ -498,7 +500,50 @@ export function useDynastyController() {
     rivalrySeries,
   }), [staffState.staff, practicePlan, practiceGains, rivalrySeries, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
-  const applyWeekSimResult = useCallback((result: WeekSimState) => {
+  const applyWeekSimResult = useCallback((simResult: WeekSimState) => {
+    // Promises that came due are judged against the depth chart after the week.
+    let result = simResult;
+    const promiseNews: NewsItem[] = [];
+    const openPromises = lockerRoom.promises ?? [];
+    if (openPromises.length > 0 && simResult.lastSimWeek !== null) {
+      const userId = simResult.dynasty.userTeamId;
+      const before = simResult.dynasty.season.teams.find((t) => t.id === userId);
+      if (before) {
+        const resolution = resolvePlayingTimePromises(before, openPromises, simResult.lastSimWeek);
+        result = {
+          ...simResult,
+          dynasty: {
+            ...simResult.dynasty,
+            season: {
+              ...simResult.dynasty.season,
+              teams: simResult.dynasty.season.teams.map((t) => (t.id === userId ? resolution.team : t)),
+            },
+          },
+        };
+        const nameOf = (id: string) => {
+          const p = before.roster.find((r) => r.id === id);
+          return p ? `${p.position} ${p.name.first} ${p.name.last}` : 'A player';
+        };
+        resolution.kept.forEach((promise, i) =>
+          promiseNews.push({
+            id: `promise-kept-${simResult.lastSimWeek}-${i}`,
+            week: simResult.lastSimWeek!,
+            category: 'coaching',
+            headline: `${nameOf(promise.playerId)} says the coach kept his word on playing time`,
+          }),
+        );
+        resolution.broken.forEach((promise, i) =>
+          promiseNews.push({
+            id: `promise-broken-${simResult.lastSimWeek}-${i}`,
+            week: simResult.lastSimWeek!,
+            category: 'coaching',
+            featured: true,
+            headline: `${nameOf(promise.playerId)} feels betrayed after a broken promise of playing time, and the locker room noticed`,
+          }),
+        );
+        setLockerRoom((room) => ({ ...room, promises: resolution.open }));
+      }
+    }
     const programName = result.dynasty.season.teams.find((t) => t.id === result.dynasty.userTeamId)?.name;
     const recordNews: NewsItem[] = programName
       ? recordNewsForWeek({
@@ -520,7 +565,7 @@ export function useDynastyController() {
     setDynasty(result.dynasty);
     setRankings(result.rankings);
     setInjuries(result.injuries);
-    setNewsItems([...recordNews, ...result.newsItems]);
+    setNewsItems([...promiseNews, ...recordNews, ...result.newsItems]);
     setScouting(result.scouting);
     setRecruitingActivity(result.recruitingActivity);
     setRecruitTrends(result.recruitTrends);
@@ -539,7 +584,7 @@ export function useDynastyController() {
     if (offeredIds.length > 0) {
       setShortlistIds((prev) => [...prev, ...offeredIds.filter((id) => !prev.includes(id))]);
     }
-  }, [recordBook, careerStats, seasonStats, dynasty.season.teams]);
+  }, [recordBook, careerStats, seasonStats, dynasty.season.teams, lockerRoom.promises]);
 
   // Simming is locked while the offseason is pending; send the coach back there instead.
   const simWeek = useCallback(() => {
@@ -972,6 +1017,22 @@ export function useDynastyController() {
   }, [lockerRoom.talkedIds, userTeam, updateUserRoster]);
 
   const currentWeekNumber = dynasty.season.currentWeek;
+
+  /** Instead of a talk, promise a benched player the role his rating earns. */
+  const promisePlayingTime = useCallback((playerId: string) => {
+    if (lockerRoom.talkedIds.includes(playerId) || !userTeam) return;
+    const player = userTeam.roster.find((p) => p.id === playerId);
+    if (!player) return;
+    const made = makePlayingTimePromise(userTeam, player, currentWeekNumber);
+    if (!made) return;
+    updateUserRoster(() => made.team);
+    setLockerRoom((room) => ({
+      ...room,
+      talkedIds: [...room.talkedIds, playerId],
+      promises: [...(room.promises ?? []), made.promise],
+    }));
+    setSaveStatus(`Promised ${player.name.first} ${player.name.last} a ${made.promise.role} role by week ${made.promise.dueWeek}`);
+  }, [lockerRoom.talkedIds, userTeam, currentWeekNumber, updateUserRoster]);
   const meetingReadyWeek = lockerRoom.lastMeetingWeek === null ? null : lockerRoom.lastMeetingWeek + TEAM_MEETING_COOLDOWN;
   const canHoldTeamMeeting = meetingReadyWeek === null || currentWeekNumber >= meetingReadyWeek;
 
@@ -1204,6 +1265,7 @@ export function useDynastyController() {
     rivalrySeries,
     seasonPreview,
     talkToPlayer,
+    promisePlayingTime,
     holdTeamMeeting,
     setRedshirt,
     setTeamCaptain,
