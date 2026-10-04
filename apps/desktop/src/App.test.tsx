@@ -584,6 +584,22 @@ describe('Desktop App', () => {
     });
   });
 
+  it('shows the rivalry on the schedule and keeps the series after it is played', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Schedule$/ }));
+    const card = screen.getByLabelText('Rivalry');
+    expect(card).toHaveTextContent(/The \w+ \w+/);
+    expect(card).toHaveTextContent('First meeting');
+    expect(screen.getAllByText('Rivalry', { selector: '.rivalry-pill' }).length).toBeGreaterThan(0);
+
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim to End of Season/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Schedule$/ }));
+    expect(screen.getByLabelText('Rivalry')).toHaveTextContent(/(Leads|Trails) the series [01]-[01]/);
+    expect(screen.getByLabelText('Rivalry')).toHaveTextContent(/This season: (won|lost) \d+-\d+/);
+    await waitFor(() => expect(Object.keys(loadActiveDynastySave()?.rivalrySeries ?? {}).length).toBeGreaterThan(0));
+  });
+
   it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {
     await renderStartedApp();
     const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;

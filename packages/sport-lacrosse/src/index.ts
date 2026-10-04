@@ -20,3 +20,4 @@ export * from './transfer-portal';
 export * from './practice';
 export * from './morale';
 export * from './redshirts';
+export * from './rivalries';

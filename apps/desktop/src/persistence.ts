@@ -1,6 +1,6 @@
 import { compactGameLog, normalizeGamePlan } from '@sports-management-sim/sport-lacrosse';
 import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
-import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, LacrossePortalEntry, LacrossePracticePlan, LacrosseStaff, StaffMember } from '@sports-management-sim/sport-lacrosse';
+import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, LacrossePortalEntry, LacrossePracticePlan, LacrosseStaff, RivalrySeriesMap, StaffMember } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import type { PracticeLogEntry } from './week-sim';
 import type { LockerRoomState } from './locker-room';
@@ -52,6 +52,8 @@ export interface DynastySaveState {
   lockerRoom?: LockerRoomState;
   /** Program and league stat leaders, kept after their careers are pruned. */
   recordBook?: RecordBookArchive;
+  /** Every rivalry's all-time series. */
+  rivalrySeries?: RivalrySeriesMap;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */
