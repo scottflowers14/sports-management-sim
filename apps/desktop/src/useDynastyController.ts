@@ -21,6 +21,7 @@ import {
   releaseStaffMember,
   runStaffOffseason,
   carouselHeadline,
+  ordinal,
   applyInvestmentPlan,
   fundProject,
   investmentBudget,
@@ -31,7 +32,7 @@ import {
   STAFF_ROLE_LABELS,
   updateLacrosseDepthChartSlot,
 } from '@sports-management-sim/sport-lacrosse';
-import type { InvestmentPlan, InvestmentProject, StaffRole } from '@sports-management-sim/sport-lacrosse';
+import type { InvestmentPlan, InvestmentProject, ProDraftPick, StaffRole } from '@sports-management-sim/sport-lacrosse';
 import {
   autoDevelopmentPlans,
   boostMorale,
@@ -227,6 +228,7 @@ export function useDynastyController() {
   const [weeklyHonors, setWeeklyHonors] = useState<WeeklyHonor[]>(() => loadedSave?.weeklyHonors ?? []);
   const [investmentPlan, setInvestmentPlan] = useState<InvestmentPlan>(() => loadedSave?.investmentPlan ?? {});
   const [hallOfFame, setHallOfFame] = useState<HallOfFameEntry[]>(() => loadedSave?.hallOfFame ?? []);
+  const [proDraftHistory, setProDraftHistory] = useState<ProDraftPick[]>(() => loadedSave?.proDraftHistory ?? []);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
@@ -259,6 +261,7 @@ export function useDynastyController() {
     investmentPlan,
     seasonPreview,
     hallOfFame,
+    proDraftHistory,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -267,7 +270,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -306,6 +309,7 @@ export function useDynastyController() {
     setWeeklyHonors([]);
     setInvestmentPlan({});
     setHallOfFame([]);
+    setProDraftHistory([]);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
     setAutoRecruitingOffers(false);
@@ -375,6 +379,7 @@ export function useDynastyController() {
       weeklyHonors: [],
       investmentPlan: {},
       hallOfFame: [],
+      proDraftHistory: [],
       seasonPreview: preview,
       pendingJobOffers: null,
       shortlistIds: [],
@@ -434,6 +439,7 @@ export function useDynastyController() {
     setInvestmentPlan(save.investmentPlan ?? {});
     setSeasonPreview(save.seasonPreview ?? null);
     setHallOfFame(save.hallOfFame ?? []);
+    setProDraftHistory(save.proDraftHistory ?? []);
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -871,6 +877,8 @@ export function useDynastyController() {
       ? dynasty.season.teams.find((t) => t.id === tournamentChampion)
       : undefined;
     const teamLeader = deriveSeasonLeader(userTeamThisSeason, seasonStats);
+    const proDraft = summary.proDraft ?? [];
+    const userDraftPicks = proDraft.filter((p) => p.collegeTeamId === dynasty.userTeamId);
 
     const historyRecord: DynastySeasonRecord = {
       year: dynasty.season.year,
@@ -890,6 +898,7 @@ export function useDynastyController() {
         ? { predictedConfFinish: predictedFinish(seasonPreview, dynasty.userTeamId)! }
         : {}),
       ...(summary.coachOfYear?.teamId === dynasty.userTeamId ? { coachOfYear: true } : {}),
+      ...(userDraftPicks.length > 0 ? { proPicks: userDraftPicks.length } : {}),
     };
 
     // Staff contracts run down; expiring coaches re-enter the pool asking for a raise.
@@ -939,7 +948,20 @@ export function useDynastyController() {
         headline: `Coach of the Year: ${isUser ? (coachProfile?.name ?? 'Your coach') : winner.coachName} (${teamName(winner.teamId)}) after a ${winner.wins}-${winner.losses} season, ${winner.winsAboveExpected.toFixed(1)} wins better than expected`,
       });
     }
-    const offseasonNews = [...coachOfYearNews, ...staffNews, ...carouselNews];
+    const draftNews: NewsItem[] = [];
+    if (proDraft.length > 0) {
+      const top = proDraft[0]!;
+      draftNews.push({
+        id: `pro-draft-${dynasty.season.year}`,
+        week: dynasty.season.currentWeek,
+        category: 'award',
+        ...(userDraftPicks.length > 0 ? { featured: true } : {}),
+        headline: userDraftPicks.length > 0
+          ? `Pro Draft: ${userDraftPicks.length === 1 ? '' : `${userDraftPicks.length} of your players drafted, led by `}${userDraftPicks[0]!.position} ${userDraftPicks[0]!.name}${userDraftPicks.length === 1 ? ' goes' : ','} ${ordinal(userDraftPicks[0]!.overallPick)} overall to the ${userDraftPicks[0]!.proTeam}`
+          : `Pro Draft: none of your players were drafted. ${top.position} ${top.name} (${teamName(top.collegeTeamId)}) went first overall to the ${top.proTeam}`,
+      });
+    }
+    const offseasonNews = [...draftNews, ...coachOfYearNews, ...staffNews, ...carouselNews];
     if (offseasonNews.length > 0) setNewsItems((prev) => [...offseasonNews, ...prev]);
 
     setDynasty(newDynasty);
@@ -949,6 +971,7 @@ export function useDynastyController() {
     setRecruitingActivity(emptyRecruitingActivity());
     setRecruitTrends({});
     setDynastyHistory((h) => [historyRecord, ...h]);
+    if (proDraft.length > 0) setProDraftHistory((h) => [...proDraft, ...h]);
     const careersAfterSeason = recordSeasonToCareer(careerStats, seasonStats, dynasty.season.teams, dynasty.season.year);
     setCareerStats(careersAfterSeason);
     // Departed players' careers are pruned from saves, so their records are kept here.
@@ -1389,6 +1412,7 @@ export function useDynastyController() {
     unfundInvestment,
     seasonPreview,
     hallOfFame,
+    proDraftHistory,
     talkToPlayer,
     promisePlayingTime,
     holdTeamMeeting,

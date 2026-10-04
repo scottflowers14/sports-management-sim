@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import {
   applyInvestmentPlan,
+  draftSlotLabel,
   fundProject,
   INVESTMENT_PROJECT_INFO,
   INVESTMENT_PROJECTS,
@@ -12,6 +14,7 @@ import type {
   InvestmentProject,
   LacrossePortalEntry,
   LacrosseTeam,
+  ProDraftPick,
 } from '@sports-management-sim/sport-lacrosse';
 import { PORTAL_REASON_LABELS } from '@sports-management-sim/engine-core';
 import { OfferControl } from '../components/OfferControl';
@@ -186,6 +189,10 @@ export function OffseasonScreen({
             </div>
           )}
         </article>
+
+        {(offseasonSummary.proDraft?.length ?? 0) > 0 && (
+          <ProDraftCard picks={offseasonSummary.proDraft!} userTeamId={userTeam.id} teamShort={teamShort} />
+        )}
 
         {(offseasonSummary.coachingCarousel?.length ?? 0) > 0 && (
           <CoachingCarouselCard changes={offseasonSummary.coachingCarousel!} teamShort={teamShort} />
@@ -472,6 +479,47 @@ function CoachingCarouselCard({ changes, teamShort }: { changes: CarouselChange[
           </li>
         ))}
       </ul>
+    </article>
+  );
+}
+
+function ProDraftCard({ picks, userTeamId, teamShort }: { picks: ProDraftPick[]; userTeamId: string; teamShort: (id: string) => string }) {
+  const ours = picks.filter((p) => p.collegeTeamId === userTeamId);
+  const [view, setView] = useState<'ours' | 'all'>(ours.length > 0 ? 'ours' : 'all');
+  const shown = view === 'ours' ? ours : picks;
+  return (
+    <article className="card pro-draft-card" aria-label="Pro draft">
+      <div className="news-header">
+        <h2>Pro Draft · {ours.length} of yours</h2>
+        <div className="news-filters" role="group" aria-label="Draft view">
+          <button type="button" className={`pos-filter-btn${view === 'ours' ? ' active' : ''}`} aria-pressed={view === 'ours'} onClick={() => setView('ours')}>
+            Your players
+          </button>
+          <button type="button" className={`pos-filter-btn${view === 'all' ? ' active' : ''}`} aria-pressed={view === 'all'} onClick={() => setView('all')}>
+            Full draft
+          </button>
+        </div>
+      </div>
+      {shown.length === 0 ? (
+        <p className="dim">None of your players were drafted. A first-round pick lifts national prestige, and a big final season moves seniors up draft boards.</p>
+      ) : (
+        <ol className="player-list pro-draft-list">
+          {shown.map((p) => (
+            <li key={p.playerId} className={p.collegeTeamId === userTeamId ? 'pro-draft-ours' : undefined}>
+              <span className="pro-draft-slot">
+                {p.round}.{String(p.pick).padStart(2, '0')}
+              </span>
+              <strong>
+                {p.position} {p.name}
+              </strong>
+              <span>
+                {p.overall} OVR · {view === 'ours' ? '' : `${teamShort(p.collegeTeamId)} `}to the {p.proTeam}
+              </span>
+              {view === 'ours' && <span className="dim">{draftSlotLabel(p)}</span>}
+            </li>
+          ))}
+        </ol>
+      )}
     </article>
   );
 }

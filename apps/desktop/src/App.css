@@ -5788,3 +5788,32 @@ li span {
   text-align: center;
   font-weight: 800;
 }
+
+/* Pro draft */
+.pro-draft-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.pro-draft-list li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: baseline;
+}
+
+.pro-draft-list li > :not(.pro-draft-slot) {
+  grid-column: 2;
+}
+
+.pro-draft-slot {
+  grid-row: span 3;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: var(--accent, #72f2c6);
+}
+
+.pro-draft-ours strong {
+  color: #72f2c6;
+}

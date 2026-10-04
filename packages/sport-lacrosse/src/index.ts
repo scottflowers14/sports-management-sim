@@ -23,3 +23,4 @@ export * from './redshirts';
 export * from './rivalries';
 export * from './coaching-carousel';
 export * from './program-investments';
+export * from './pro-draft';

@@ -47,6 +47,8 @@ export interface DynastySeasonRecord {
   predictedConfFinish?: number;
   /** The user was named Coach of the Year. */
   coachOfYear?: boolean;
+  /** Players from the user program taken in that year's pro draft. */
+  proPicks?: number;
 }
 
 /** Flatten the computed season awards into the slim records stored in history. */
