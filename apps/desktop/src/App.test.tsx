@@ -527,6 +527,29 @@ describe('Desktop App', () => {
     expect(loadActiveDynastySave()!.scouting.pointsPerWeek).toBeGreaterThanOrEqual(hoursBefore);
   });
 
+  it('swaps a non-conference opponent on the Schedule screen until the season starts', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Schedule$/ }));
+    const card = screen.getByLabelText('Non-conference schedule');
+    const select = within(card).getAllByRole('combobox')[0]!;
+    const week = Number(select.getAttribute('aria-label')!.match(/Week (\d+)/)![1]);
+    const pick = within(select).getAllByRole('option')[1]!.getAttribute('value')!;
+    await userEvent.selectOptions(select, pick);
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      const game = save.dynasty.season.schedule.find(
+        (g) => g.week === week && (g.homeTeamId === save.dynasty.userTeamId || g.awayTeamId === save.dynasty.userTeamId),
+      )!;
+      expect([game.homeTeamId, game.awayTeamId]).toContain(pick);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /^Week Hub/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Schedule$/ }));
+    expect(within(screen.getByLabelText('Non-conference schedule')).queryAllByRole('combobox')).toHaveLength(0);
+    expect(screen.getByText(/slate is locked/)).toBeInTheDocument();
+  });
+
   it('sets practice intensity and development plans on the Practice screen', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Practice$/ }));

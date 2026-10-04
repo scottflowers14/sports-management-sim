@@ -31,6 +31,7 @@ import {
   staffBudgetFor,
   STAFF_ROLE_LABELS,
   updateLacrosseDepthChartSlot,
+  swapNonConferenceOpponent,
 } from '@sports-management-sim/sport-lacrosse';
 import type { InvestmentPlan, InvestmentProject, ProDraftPick, StaffRole } from '@sports-management-sim/sport-lacrosse';
 import {
@@ -1246,6 +1247,24 @@ export function useDynastyController() {
     setScouting((s) => withStaffRecruitingHours(s, withCoachAbilities(staffState.staff, upgraded.abilities)));
   }, [coachProfile, staffState.staff]);
 
+  // Non-conference games can be moved until the user's season kicks off.
+  const scheduleEditable =
+    tournament === null &&
+    dynasty.season.schedule.every(
+      (g) => g.status === 'scheduled' || (g.homeTeamId !== dynasty.userTeamId && g.awayTeamId !== dynasty.userTeamId),
+    );
+  const swapNonConferenceGame = useCallback((week: number, opponentId: string) => {
+    if (!scheduleEditable) return;
+    setDynasty((prev) => {
+      const schedule = swapNonConferenceOpponent(
+        { schedule: prev.season.schedule, conferences: prev.season.conferences, userTeamId: prev.userTeamId },
+        week,
+        opponentId,
+      );
+      return schedule ? { ...prev, season: { ...prev.season, schedule } } : prev;
+    });
+  }, [scheduleEditable]);
+
   const fundInvestment = useCallback((project: InvestmentProject) => {
     setInvestmentPlan((plan) => fundProject(plan, project, userInvestmentBudget));
   }, [userInvestmentBudget]);
@@ -1391,6 +1410,8 @@ export function useDynastyController() {
     staffBudget,
     hireStaff,
     releaseStaff,
+    scheduleEditable,
+    swapNonConferenceGame,
     activeSaveId,
     saves,
     customTeams,
