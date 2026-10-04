@@ -51,6 +51,7 @@ import {
   type PracticeIntensity,
 } from '@sports-management-sim/sport-lacrosse';
 import { createProgramStaff, withStaffRecruitingHours } from './program-staff';
+import { addCoachXp, availablePoints, seasonCoachXp, upgradeAbility, withCoachAbilities, type CoachAbility } from './coach-abilities';
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { healInjuriesOneWeek, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
@@ -213,6 +214,10 @@ export function useDynastyController() {
     (loadedSave?.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all',
   );
   const [coachProfile, setCoachProfile] = useState<CoachProfile | null>(() => loadedSave?.coachProfile ?? null);
+  const coachAbilities = coachProfile?.abilities;
+  // The staff as it plays: the hired assistants plus the head coach's abilities.
+  // For ratings only; staffState.staff stays the hired staff.
+  const playingStaff = useMemo(() => withCoachAbilities(staffState.staff, coachAbilities), [staffState.staff, coachAbilities]);
   const [adConfidence, setAdConfidence] = useState<number>(() => loadedSave?.adConfidence ?? 60);
   const [seasonGoals, setSeasonGoals] = useState<SeasonGoals | null>(() => loadedSave?.seasonGoals ?? null);
   const [bestNatRank, setBestNatRank] = useState<number | null>(() => loadedSave?.bestNatRank ?? null);
@@ -524,12 +529,12 @@ export function useDynastyController() {
     gameLogs,
     bestNatRank,
     lastSimWeek,
-    userStaff: staffState.staff,
+    userStaff: playingStaff,
     practicePlan,
     practiceGains,
     rivalrySeries,
     weeklyHonors,
-  }), [staffState.staff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+  }), [playingStaff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((simResult: WeekSimState) => {
     // Promises that came due are judged against the depth chart after the week.
@@ -814,8 +819,8 @@ export function useDynastyController() {
   );
 
   const tournamentCoachingFor = useCallback(
-    (team: LacrosseTeam) => programCoachingEdge(team, { teamId: dynasty.userTeamId, staff: staffState.staff }),
-    [dynasty.userTeamId, staffState.staff],
+    (team: LacrosseTeam) => programCoachingEdge(team, { teamId: dynasty.userTeamId, staff: playingStaff }),
+    [dynasty.userTeamId, playingStaff],
   );
 
   // Injured players miss postseason games too.
@@ -863,7 +868,7 @@ export function useDynastyController() {
     const isNatChamp = tournamentChampion === dynasty.userTeamId;
     const currentNatRank = rankings.find((r) => r.teamId === dynasty.userTeamId)?.rank ?? null;
 
-    const { newDynasty, summary } = runOffseason(dynasty, tournamentChampion, trainingFocus, seasonStats, staffState.staff);
+    const { newDynasty, summary } = runOffseason(dynasty, tournamentChampion, trainingFocus, seasonStats, playingStaff);
     const confId = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId)?.conferenceId;
     const confTeamIds = dynasty.season.conferences.find((c) => c.id === confId)?.teamIds ?? [];
     const confRank =
@@ -909,7 +914,7 @@ export function useDynastyController() {
       winPct: summary.userRecord.wins / Math.max(1, summary.userRecord.wins + summary.userRecord.losses),
     });
     setStaffState({ staff: staffTurnover.staff, staffCandidates: staffTurnover.candidates });
-    setScouting((s) => withStaffRecruitingHours(s, staffTurnover.staff));
+    setScouting((s) => withStaffRecruitingHours(s, withCoachAbilities(staffTurnover.staff, coachAbilities)));
     const staffNews: NewsItem[] = staffTurnover.departed.map((member) => ({
       id: `staff-departed-${dynasty.season.year}-${member.id}`,
       week: dynasty.season.currentWeek,
@@ -1033,7 +1038,33 @@ export function useDynastyController() {
         isNatChamp,
         coachProfile,
       );
-      const advancedCoach = advanceCoachTenure(coachProfile);
+      const xpAward = seasonCoachXp({
+        year: dynasty.season.year,
+        wins: userRecord.wins,
+        confChampion: isConfChamp ?? false,
+        nationalChampion: isNatChamp,
+        coachOfYear: summary.coachOfYear?.teamId === dynasty.userTeamId,
+        goalsMet: evaluated.goals.filter((g) => g.achieved).length,
+        proPicks: userDraftPicks.length,
+        firstRoundPicks: userDraftPicks.filter((p) => p.round === 1).length,
+      });
+      const advancedCoach = { ...addCoachXp(advanceCoachTenure(coachProfile), xpAward.total), lastXpAward: xpAward };
+      const pointsBefore = availablePoints(coachProfile);
+      const pointsAfter = availablePoints(advancedCoach);
+      if (xpAward.total > 0) {
+        setNewsItems((prev) => [
+          {
+            id: `coach-xp-${dynasty.season.year}`,
+            week: dynasty.season.currentWeek,
+            category: 'coaching' as const,
+            ...(pointsAfter > pointsBefore ? { featured: true } : {}),
+            headline: `Coaching XP: +${xpAward.total} for the ${dynasty.season.year} season.${
+              pointsAfter > 0 ? ` ${pointsAfter} ability point${pointsAfter === 1 ? '' : 's'} to spend on the Staff screen.` : ''
+            }`,
+          },
+          ...prev,
+        ]);
+      }
       setSeasonGoals(evaluated);
       setAdConfidence(newConfidence);
       setCoachProfile(advancedCoach);
@@ -1059,7 +1090,7 @@ export function useDynastyController() {
     }
 
     setView('offseason');
-  }, [tournament, dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, seasonPreview, recordBook, hallOfFame, dynastyHistory, staffState.staff]);
+  }, [tournament, dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, seasonPreview, recordBook, hallOfFame, dynastyHistory, staffState.staff, playingStaff, coachAbilities]);
 
   const acceptJobOffer = useCallback((teamId: string) => {
     const newTeam = dynasty.season.teams.find((t) => t.id === teamId);
@@ -1070,14 +1101,15 @@ export function useDynastyController() {
     // A new job comes with that program's assistants.
     const newStaff = createProgramStaff(nextDynasty);
     setStaffState(newStaff);
-    setScouting((s) => withStaffRecruitingHours(s, newStaff.staff));
+    setScouting((s) => withStaffRecruitingHours(s, withCoachAbilities(newStaff.staff, coachAbilities)));
     setPracticePlan((plan) => ({ ...defaultPracticePlan(nextDynasty), intensity: plan.intensity }));
     setPracticeGains([]);
-    setCoachProfile((prev) => (prev ? { name: prev.name, tenureSeasons: 0, contractYearsRemaining: 4 } : prev));
+    // Abilities and XP follow the coach to the new job.
+    setCoachProfile((prev) => (prev ? { ...prev, tenureSeasons: 0, contractYearsRemaining: 4 } : prev));
     setAdConfidence(55);
     setPendingJobOffers(null);
     setSaveStatus('Accepted a new coaching job');
-  }, [dynasty]);
+  }, [dynasty, coachAbilities]);
 
   const staffBudget = staffBudgetFor(userTeam?.reputation.nationalPrestige ?? 50);
 
@@ -1093,18 +1125,18 @@ export function useDynastyController() {
       staff: result.staff,
       staffCandidates: staffState.staffCandidates.filter((c) => c.id !== candidateId),
     });
-    setScouting((s) => withStaffRecruitingHours(s, result.staff));
+    setScouting((s) => withStaffRecruitingHours(s, withCoachAbilities(result.staff, coachAbilities)));
     setSaveStatus(`Hired ${candidate.name.first} ${candidate.name.last} as ${STAFF_ROLE_LABELS[candidate.role].title}`);
-  }, [staffState, staffBudget]);
+  }, [staffState, staffBudget, coachAbilities]);
 
   const releaseStaff = useCallback((role: StaffRole) => {
     const member = staffState.staff[role];
     if (!member) return;
     const staff = releaseStaffMember(staffState.staff, role);
     setStaffState({ staff, staffCandidates: staffState.staffCandidates });
-    setScouting((s) => withStaffRecruitingHours(s, staff));
+    setScouting((s) => withStaffRecruitingHours(s, withCoachAbilities(staff, coachAbilities)));
     setSaveStatus(`Released ${member.name.first} ${member.name.last}`);
-  }, [staffState]);
+  }, [staffState, coachAbilities]);
 
   const updateUserRoster = useCallback((change: (team: LacrosseTeam) => LacrosseTeam) => {
     setDynasty((prev) => ({
@@ -1205,6 +1237,15 @@ export function useDynastyController() {
 
   // The AD's budget is set by the program as it stands after the season.
   const userInvestmentBudget = userTeam ? investmentBudget(userTeam) : 0;
+  const upgradeCoachAbility = useCallback((ability: CoachAbility) => {
+    if (!coachProfile) return;
+    const upgraded = upgradeAbility(coachProfile, ability);
+    if (upgraded === coachProfile) return;
+    setCoachProfile(upgraded);
+    // A Recruiter tier adds weekly hours right away.
+    setScouting((s) => withStaffRecruitingHours(s, withCoachAbilities(staffState.staff, upgraded.abilities)));
+  }, [coachProfile, staffState.staff]);
+
   const fundInvestment = useCallback((project: InvestmentProject) => {
     setInvestmentPlan((plan) => fundProject(plan, project, userInvestmentBudget));
   }, [userInvestmentBudget]);
@@ -1259,7 +1300,7 @@ export function useDynastyController() {
     // Empty chairs don't stay empty into the season.
     const filled = fillStaffVacancies(staffState.staff, staffState.staffCandidates, staffBudget);
     setStaffState({ staff: filled.staff, staffCandidates: filled.candidates });
-    setScouting((s) => withStaffRecruitingHours(resetScoutingForNewClass(s), filled.staff));
+    setScouting((s) => withStaffRecruitingHours(resetScoutingForNewClass(s), withCoachAbilities(filled.staff, coachAbilities)));
     setNewsItems([
       ...investmentNews,
       ...seasonPreviewNews(preview, nextDynasty),
@@ -1286,7 +1327,7 @@ export function useDynastyController() {
     setShortlistIds([]);
     setRecruitBoardView('all');
     setView('week-hub');
-  }, [dynasty, staffState, staffBudget, investmentPlan]);
+  }, [dynasty, staffState, staffBudget, investmentPlan, coachAbilities]);
 
   const handleExportSave = useCallback((saveId: string) => {
     const json = exportSaveAsJson(saveId);
@@ -1410,6 +1451,8 @@ export function useDynastyController() {
     investmentBudget: userInvestmentBudget,
     fundInvestment,
     unfundInvestment,
+    playingStaff,
+    upgradeCoachAbility,
     seasonPreview,
     hallOfFame,
     proDraftHistory,

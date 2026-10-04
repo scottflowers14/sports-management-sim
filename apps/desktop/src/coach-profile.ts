@@ -1,7 +1,14 @@
+import type { CoachAbilities, CoachXpAward } from './coach-abilities';
+
 export interface CoachProfile {
   name: string;
   tenureSeasons: number;
   contractYearsRemaining: number;
+  /** Career coaching XP; missing on older saves, which start at one point. */
+  xp?: number;
+  abilities?: CoachAbilities;
+  /** The XP earned in the most recent season, itemized. */
+  lastXpAward?: CoachXpAward;
 }
 
 export interface SeasonGoal {

@@ -87,6 +87,7 @@ export function App() {
     seasonPreview,
     hallOfFame,
     proDraftHistory,
+    upgradeCoachAbility,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -691,6 +692,8 @@ export function App() {
       {view === 'staff' && (
         <StaffScreen
           staff={staff}
+          coach={coachProfile}
+          onUpgradeAbility={upgradeCoachAbility}
           candidates={staffCandidates}
           budget={staffBudget}
           onHire={hireStaff}

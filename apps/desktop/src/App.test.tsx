@@ -512,6 +512,21 @@ describe('Desktop App', () => {
     await waitFor(() => expect(loadActiveDynastySave()?.staffCandidates?.length).toBe(before - 1));
   });
 
+  it('spends a head coach ability point on the Staff screen', async () => {
+    await renderStartedApp();
+    const hoursBefore = loadActiveDynastySave()!.scouting.pointsPerWeek;
+    await userEvent.click(screen.getByRole('button', { name: /^Staff$/ }));
+    const card = screen.getByLabelText('Head coach abilities');
+    expect(within(card).getByText(/ability point to spend/)).toBeInTheDocument();
+    // Recruiter tier 1 costs the new coach's one point; tier 2 then costs two.
+    await userEvent.click(within(card).getByRole('button', { name: 'Upgrade Recruiter' }));
+    expect(within(card).getByText(/ability points to spend/)).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Upgrade Recruiter' })).toBeDisabled();
+    expect(within(screen.getByLabelText('Coaching staff')).getByText('+5')).toBeInTheDocument();
+    await waitFor(() => expect(loadActiveDynastySave()?.coachProfile?.abilities).toEqual({ recruiter: 1 }));
+    expect(loadActiveDynastySave()!.scouting.pointsPerWeek).toBeGreaterThanOrEqual(hoursBefore);
+  });
+
   it('sets practice intensity and development plans on the Practice screen', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Practice$/ }));

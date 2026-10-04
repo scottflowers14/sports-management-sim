@@ -5817,3 +5817,66 @@ li span {
 .pro-draft-ours strong {
   color: #72f2c6;
 }
+
+/* Head coach abilities */
+.coach-ability-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 10px;
+}
+
+.coach-ability-list li {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.coach-ability-list li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.coach-ability-list .ghost-btn {
+  flex: none;
+}
+
+.coach-ability-tiers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+}
+
+.tier-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(114, 242, 198, 0.5);
+}
+
+.tier-pip.filled {
+  background: #72f2c6;
+}
+
+.coach-ability-tiers .dim {
+  margin-left: 4px;
+}
+
+.staff-coach-bonus {
+  margin-left: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #72f2c6;
+}
