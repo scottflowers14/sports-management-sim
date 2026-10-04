@@ -86,6 +86,7 @@ export function App() {
     unfundInvestment,
     seasonPreview,
     hallOfFame,
+    proDraftHistory,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -777,6 +778,7 @@ export function App() {
           programId={viewedProgramId}
           onOpenProgram={openProgram}
           onSelectPlayer={setSelectedPlayerId}
+          proDraftHistory={proDraftHistory}
         />
       )}
 

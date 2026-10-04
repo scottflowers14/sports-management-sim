@@ -1,4 +1,4 @@
-import { advanceSeasonWeek } from '@sports-management-sim/engine-core';
+import { advanceSeasonWeek, isGraduating } from '@sports-management-sim/engine-core';
 import { createNewLacrosseDynasty, offerLacrossePortalPlayer, simulateLacrosseGame } from '@sports-management-sim/sport-lacrosse';
 import type { LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
 import { describe, expect, it } from 'vitest';
@@ -212,6 +212,20 @@ describe('multi-season dynasty rollover', () => {
 });
 
 describe('transfer portal lifecycle', () => {
+  it('drafts the departing class into the pros and credits first-round programs', () => {
+    const afterSeason = simFullSeason(createNewLacrosseDynasty({ seed: 99, userTeamId: 'maryland-state', seasonYear: 2028 }));
+    const { newDynasty, summary } = runOffseason(afterSeason);
+    const picks = summary.proDraft!;
+    expect(picks).toHaveLength(32);
+    const departing = new Set(afterSeason.season.teams.flatMap((t) => t.roster.filter((p) => isGraduating(p)).map((p) => p.id)));
+    expect(picks.every((p) => departing.has(p.playerId) && p.year === 2028)).toBe(true);
+    // Drafted players are gone from every roster next season.
+    const nextRosters = new Set(newDynasty.season.teams.flatMap((t) => t.roster.map((p) => p.id)));
+    expect(picks.some((p) => nextRosters.has(p.playerId))).toBe(false);
+    // The draft runs on the same seed every time.
+    expect(runOffseason(afterSeason).summary.proDraft).toEqual(picks);
+  });
+
   it('opens the portal after the offseason with players from every program, including ours', () => {
     const dynasty = createNewLacrosseDynasty({
       seed: 99,

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { calculateLacrosseTeamRating, coachName } from '@sports-management-sim/sport-lacrosse';
-import type { LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import type { LacrossePosition, LacrosseTeam, ProDraftPick } from '@sports-management-sim/sport-lacrosse';
 import type { Conference, ScheduledGame } from '@sports-management-sim/engine-core';
 import type { RankingEntry } from '../rankings';
 import type { SeasonStatsMap } from '../stats';
@@ -30,6 +30,7 @@ export function ProgramsScreen({
   programId,
   onOpenProgram,
   onSelectPlayer,
+  proDraftHistory = [],
 }: {
   teams: LacrosseTeam[];
   conferences: Conference[];
@@ -40,6 +41,8 @@ export function ProgramsScreen({
   programId: string | null;
   onOpenProgram: (teamId: string | null) => void;
   onSelectPlayer: (playerId: string) => void;
+  /** Every pro draft so far, newest first. */
+  proDraftHistory?: ProDraftPick[];
 }) {
   const [confFilter, setConfFilter] = useState<string>('ALL');
   const [sort, setSort] = useState<SortState<ProgramSortKey>>({ key: 'overall', direction: 'desc' });
@@ -63,6 +66,7 @@ export function ProgramsScreen({
         onBack={() => onOpenProgram(null)}
         onOpenProgram={onOpenProgram}
         onSelectPlayer={onSelectPlayer}
+        draftees={proDraftHistory.filter((p) => p.collegeTeamId === program.id)}
       />
     );
   }
@@ -165,6 +169,7 @@ function ProgramDetail({
   onBack,
   onOpenProgram,
   onSelectPlayer,
+  draftees,
 }: {
   team: LacrosseTeam;
   row: ProgramRow | undefined;
@@ -174,6 +179,8 @@ function ProgramDetail({
   onBack: () => void;
   onOpenProgram: (teamId: string) => void;
   onSelectPlayer: (playerId: string) => void;
+  /** This program's pro draft picks, newest first. */
+  draftees: ProDraftPick[];
 }) {
   const rating = calculateLacrosseTeamRating(team);
   const nameById = new Map(teams.map((t) => [t.id, formatTeamName(t.name)]));
@@ -217,6 +224,7 @@ function ProgramDetail({
           <KV label="Academics" value={rep.academicPrestige} />
           <KV label="Facilities" value={rep.facilities} />
           <KV label="Fans" value={rep.fanSupport} />
+          <KV label="Pro picks" value={draftees.length} />
           <KV label="Scholarships" value={`${team.resources.scholarshipUsed.toFixed(1)} / ${team.resources.scholarshipLimit}`} />
         </div>
       </article>
@@ -295,6 +303,28 @@ function ProgramDetail({
             </tbody>
           </table>
         </article>
+
+        {draftees.length > 0 && (
+          <article className="card dense-card" aria-label="Pro draft picks">
+            <h3 className="grid-title">In the Pros ({draftees.length})</h3>
+            <table className="data-grid">
+              <thead>
+                <tr><th>Year</th><th>Pick</th><th>Player</th><th>OVR</th><th>Pro team</th></tr>
+              </thead>
+              <tbody>
+                {draftees.map((p) => (
+                  <tr key={`${p.year}-${p.playerId}`}>
+                    <td className="num">{p.year}</td>
+                    <td className="num">{p.round}.{String(p.pick).padStart(2, '0')}</td>
+                    <td><span className="roster-pos-tag">{p.position}</span> {p.name}</td>
+                    <td className="num"><RatingCell value={p.overall} /></td>
+                    <td>{p.proTeam}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </article>
+        )}
       </div>
     </div>
   );

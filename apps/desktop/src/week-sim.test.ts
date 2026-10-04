@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
+import { describe, expect, it, vi } from 'vitest';
+import { createNewLacrosseDynasty, ensureHeadCoaches, teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
@@ -17,8 +17,18 @@ function seededRandom(seed: number): () => number {
 }
 
 function freshState(): WeekSimState {
+  return freshStateWith(createFreshLacrosseDynasty());
+}
+
+/** The same league every call: createFreshLacrosseDynasty never reuses a seed. */
+function fixedDynasty(): WeekSimState['dynasty'] {
+  const dynasty = createNewLacrosseDynasty({ seed: 42, userTeamId: 'maryland-state', seasonYear: 2028 });
+  return { ...dynasty, season: { ...dynasty.season, teams: ensureHeadCoaches(dynasty.season.teams, dynasty.userTeamId, 2028, 42) } };
+}
+
+function freshStateWith(dynasty: WeekSimState['dynasty']): WeekSimState {
   return {
-    dynasty: createFreshLacrosseDynasty(),
+    dynasty,
     rankings: [],
     injuries: [],
     newsItems: [],
@@ -166,11 +176,14 @@ describe('practice during the season', () => {
     const count = (intensity: 'light' | 'intense') => {
       let total = 0;
       for (let seed = 1; seed <= 6; seed += 1) {
-        const done = simulateRemainingWeeks(
-          { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 42 }), practicePlan: { intensity, developmentPlans: [] } },
-          undefined,
-          seededRandom(seed),
-        );
+        // Both intensities play the same league and the same box-score rolls,
+        // so the only difference is practice. The test flaked ~1 run in 12
+        // when box scores drew from an unpinned Math.random and the league
+        // came from createFreshLacrosseDynasty, whose seed never repeats.
+        const pinned = vi.spyOn(Math, 'random').mockImplementation(seededRandom(seed + 100));
+        const state: WeekSimState = { ...freshStateWith(fixedDynasty()), practicePlan: { intensity, developmentPlans: [] } };
+        const done = simulateRemainingWeeks(state, undefined, seededRandom(seed));
+        pinned.mockRestore();
         total += done.newsItems.filter((n) => n.category === 'injury' && !n.headline.includes('returned')).length;
       }
       return total;

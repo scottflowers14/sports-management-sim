@@ -31,6 +31,8 @@ import {
   ageProgram,
   applyInvestmentPlan,
   cpuInvestmentPlan,
+  runProDraft,
+  applyProDraftPrestige,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
   CarouselChange,
@@ -41,12 +43,13 @@ import type {
   LacrosseSeason,
   LacrosseStaff,
   LacrosseTeam,
+  ProDraftPick,
 } from '@sports-management-sim/sport-lacrosse';
 import { computeSeasonAwards } from './awards';
 import { computeCoachOfYear } from './coach-of-year';
 import type { CoachOfYear } from './coach-of-year';
 import type { SeasonAwards } from './awards';
-import type { SeasonStatsMap } from './stats';
+import type { PlayerSeasonStats, SeasonStatsMap } from './stats';
 import { capturePreOffseasonSnapshot, computeDevelopmentReport } from './development-report';
 import type { DevelopmentReport } from './development-report';
 
@@ -95,6 +98,45 @@ export interface OffseasonSummary {
   /** CPU head coaching changes this offseason. */
   coachingCarousel?: CarouselChange[];
   coachOfYear?: CoachOfYear | null;
+  /** The whole pro draft, every program's picks. */
+  proDraft?: ProDraftPick[];
+}
+
+/** Production needs a few games behind it before scouts trust it. */
+const DRAFT_MIN_GAMES = 4;
+
+/**
+ * Final-season production on the 0 to 10 scale the pro draft uses: points per
+ * game for scorers, caused turnovers and ground balls for defenders, and save
+ * or faceoff percentage above .450 for the specialists.
+ */
+export function draftProductionScore(position: string, stats: PlayerSeasonStats | undefined): number {
+  if (!stats || stats.gamesPlayed < DRAFT_MIN_GAMES) return 0;
+  const perGame = (n: number) => n / stats.gamesPlayed;
+  let score: number;
+  if (position === 'GK') {
+    const faced = stats.saves + stats.goalsAllowed;
+    score = faced > 0 ? (stats.saves / faced - 0.45) * 40 : 0;
+  } else if (position === 'FOGO') {
+    score = stats.faceoffAttempts > 0 ? (stats.faceoffWins / stats.faceoffAttempts - 0.45) * 40 : 0;
+  } else if (position === 'DEF' || position === 'LSM') {
+    score = perGame(stats.causedTurnovers + stats.groundBalls * 0.5) * 4;
+  } else {
+    score = perGame(stats.goals + stats.assists) * 2.5;
+  }
+  return Math.round(Math.min(10, Math.max(0, score)) * 10) / 10;
+}
+
+export function draftProductionByPlayer(teams: LacrosseTeam[], seasonStats: SeasonStatsMap | undefined): Record<string, number> {
+  const production: Record<string, number> = {};
+  if (!seasonStats) return production;
+  for (const team of teams) {
+    for (const player of team.roster) {
+      const score = draftProductionScore(player.position, seasonStats[player.id]);
+      if (score > 0) production[player.id] = score;
+    }
+  }
+  return production;
 }
 
 export interface PortalDeparture {
@@ -467,7 +509,14 @@ export function runOffseason(
   const carousel = runCoachingCarousel(evolvedTeams, { userTeamId, year: season.year, seed });
   // A year passes for every program; CPU athletic departments spend their
   // budgets now, the user spends theirs on the Offseason screen.
-  const teamsWithPrestige = carousel.teams.map((team) => {
+  // The pros draft the departing class before it graduates; programs that
+  // produce pros gain prestige for it.
+  const proDraft = runProDraft(season.teams, {
+    year: season.year,
+    seed,
+    productionByPlayerId: draftProductionByPlayer(season.teams, seasonStats),
+  });
+  const teamsWithPrestige = applyProDraftPrestige(carousel.teams, proDraft).map((team) => {
     const aged = ageProgram(team);
     return team.id === userTeamId ? aged : applyInvestmentPlan(aged, cpuInvestmentPlan(aged));
   });
@@ -569,6 +618,7 @@ export function runOffseason(
     portalDepartures,
     coachingCarousel: carousel.changes,
     coachOfYear,
+    proDraft,
   };
 
   return {

@@ -74,6 +74,7 @@ export function HistoryScreen({
               <th>Conf</th>
               <th>Natl</th>
               <th>Class</th>
+              <th title="Players taken in the pro draft">Pros</th>
             </tr>
           </thead>
           <tbody>
@@ -109,6 +110,7 @@ export function HistoryScreen({
                 <td>{record.confChampion ? <span className="champ-badge conf-champ">CHAMP</span> : '—'}</td>
                 <td>{record.nationalChampion ? <span className="champ-badge natl-champ">CHAMP</span> : '—'}</td>
                 <td>{record.signingClassSize}</td>
+                <td>{record.proPicks ?? '—'}</td>
               </tr>
             ))}
           </tbody>
