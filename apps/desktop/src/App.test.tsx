@@ -550,6 +550,29 @@ describe('Desktop App', () => {
     expect(screen.getByText(/slate is locked/)).toBeInTheDocument();
   });
 
+  it('coaches a game through halftime, and a reload returns to the locker room', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: 'Coach the Game' }));
+    const dialog = screen.getByRole('dialog', { name: /Halftime|at/ });
+    expect(within(dialog).getByText('Staff read')).toBeInTheDocument();
+    await waitFor(() => expect(loadActiveDynastySave()?.halftime?.week).toBe(1));
+    const score = within(dialog).getByRole('heading').textContent;
+    cleanup();
+
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    const again = screen.getByRole('dialog');
+    expect(within(again).getByRole('heading').textContent).toBe(score);
+    await userEvent.selectOptions(within(again).getByLabelText('Second half Offensive Tempo'), 'uptempo');
+    await userEvent.click(within(again).getByRole('button', { name: /Play Second Half \(1 adjustment\)/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      expect(save.halftime ?? null).toBeNull();
+      expect(save.dynasty.season.currentWeek).toBe(2);
+    });
+  });
+
   it('sets practice intensity and development plans on the Practice screen', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Practice$/ }));

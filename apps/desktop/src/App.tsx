@@ -34,6 +34,7 @@ import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
+import { HalftimeModal } from './components/HalftimeModal';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
@@ -157,6 +158,10 @@ export function App() {
     withdrawPortalOffer,
     portalScholarshipRoom,
     answerRealignmentInvite,
+    canCoachGame,
+    coachGame,
+    halftime,
+    playSecondHalf,
     nil,
     retainWithNil,
     signNilDeal,
@@ -510,6 +515,7 @@ export function App() {
         <section className="screen-area">
       {view === 'week-hub' && (
         <WeekHubScreen
+          onCoachGame={canCoachGame ? coachGame : undefined}
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           userTeam={userTeam}
@@ -551,6 +557,7 @@ export function App() {
 
       {view === 'season' && (
         <SeasonScreen
+          onCoachGame={canCoachGame ? coachGame : undefined}
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           tournament={tournament}
@@ -831,6 +838,17 @@ export function App() {
           teamMap={teamMap}
           onScout={doScoutRecruit}
           onClose={() => setSelectedRecruitId(null)}
+        />
+      )}
+
+      {halftime && (
+        <HalftimeModal
+          log={halftime.log}
+          week={halftime.week}
+          userTeamId={dynasty.userTeamId}
+          teamMap={teamMap}
+          gamePlan={gamePlan}
+          onPlaySecondHalf={playSecondHalf}
         />
       )}
 

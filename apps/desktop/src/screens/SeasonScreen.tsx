@@ -54,6 +54,7 @@ export function SeasonScreen({
   onGamePlanChange,
   onTrainingFocusChange,
   onSimWeek,
+  onCoachGame,
   onSimToEnd,
   onEnterTournament,
   onViewTournament,
@@ -82,6 +83,8 @@ export function SeasonScreen({
   onGamePlanChange: (plan: LacrosseGamePlan) => void;
   onTrainingFocusChange: (focus: TrainingFocus) => void;
   onSimWeek: () => void;
+  /** Play the user's game to halftime and adjust; absent when there's no game to coach. */
+  onCoachGame?: (() => void) | undefined;
   onSimToEnd: () => void;
   onEnterTournament: () => void;
   onViewTournament: () => void;
@@ -101,6 +104,11 @@ export function SeasonScreen({
               <button className="sim-btn" onClick={onSimWeek}>
                 Sim Week {currentWeek}
               </button>
+              {onCoachGame && (
+                <button className="sim-btn sim-btn-secondary" onClick={onCoachGame}>
+                  Coach the Game
+                </button>
+              )}
               <button className="sim-btn sim-btn-secondary" onClick={onSimToEnd}>
                 Sim to End of Season ⏩
               </button>

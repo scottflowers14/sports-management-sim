@@ -215,6 +215,7 @@ export function WeekHubScreen({
   lastWeekGames,
   gameLogs,
   onSimWeek,
+  onCoachGame,
   onBoxScore,
   onNavigate,
   classNeeds,
@@ -242,6 +243,8 @@ export function WeekHubScreen({
   lastWeekGames: ScheduledGame[];
   gameLogs: Map<string, GameLog>;
   onSimWeek: () => void;
+  /** Play the user's game to halftime and adjust; absent when there's no game to coach. */
+  onCoachGame?: (() => void) | undefined;
   onBoxScore: (data: BoxScoreData) => void;
   onNavigate: (view: string) => void;
   classNeeds?: PositionNeed[];
@@ -324,9 +327,16 @@ export function WeekHubScreen({
           </div>
         </div>
         {!seasonComplete && (
-          <button className="hub-sim-btn" onClick={onSimWeek}>
-            Sim Week {currentWeek} →
-          </button>
+          <div className="hub-sim-actions">
+            {onCoachGame && (
+              <button className="hub-sim-btn hub-coach-btn" onClick={onCoachGame}>
+                Coach the Game
+              </button>
+            )}
+            <button className="hub-sim-btn" onClick={onSimWeek}>
+              Sim Week {currentWeek} →
+            </button>
+          </div>
         )}
       </div>
 

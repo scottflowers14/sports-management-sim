@@ -5957,3 +5957,60 @@ li span {
   gap: 10px;
   margin-top: 10px;
 }
+
+.halftime-panel {
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.halftime-score {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.halftime-score strong {
+  font-size: 1.6rem;
+}
+
+.halftime-stats td:not(:first-child),
+.halftime-stats th:not(:first-child) {
+  text-align: center;
+}
+
+.halftime-goals ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: #aab8ca;
+}
+
+.halftime-tip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  padding: 4px 0;
+}
+
+.halftime-tip button {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+}
+
+.hub-sim-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.hub-coach-btn {
+  background: transparent;
+  border: 1px solid #3d7fff;
+  color: #8fb4ff;
+}

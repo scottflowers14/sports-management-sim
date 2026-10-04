@@ -1,3 +1,4 @@
+import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import {
   advanceSeasonWeek,
   applyCampusVisit,
@@ -89,10 +90,81 @@ export interface PracticeLogEntry extends PracticeGain {
 /** Keeps a season of practice gains for the Practice screen. */
 const MAX_PRACTICE_LOG = 80;
 
+/** The user's game this week, played with a halftime adjustment. */
+export interface CoachedGame {
+  /** Seeds the game's dice, so the first half replays exactly as previewed. */
+  seed: number;
+  secondHalfPlan: LacrosseGamePlan;
+}
+
+/** The dice for a coached game: the same seed always rolls the same game. */
+export function seededGameRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** CPU staffs name captains and make their redshirt calls before the opener. */
+function seasonReadyForWeek(dynasty: WeekSimState['dynasty']): WeekSimState['dynasty']['season'] {
+  const firstWeek = dynasty.season.schedule.reduce((min, game) => Math.min(min, game.week), Infinity);
+  if (dynasty.season.currentWeek !== firstWeek) return dynasty.season;
+  return {
+    ...dynasty.season,
+    teams: dynasty.season.teams.map((t) => (t.id === dynasty.userTeamId ? t : applyCpuCaptains(applyCpuRedshirts(t)))),
+  };
+}
+
+/** Everything a game this week is played with, except the dice. */
+function weekGameInput(state: WeekSimState, homeTeam: LacrosseTeam, awayTeam: LacrosseTeam, userGamePlan: LacrosseGamePlan) {
+  const { dynasty } = state;
+  const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
+  const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
+  const planFor = (team: LacrosseTeam): LacrosseGamePlan => (team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team));
+  // Injured and redshirting players sit: the depth chart promotes the next man up for the
+  // rating, the game plan, and the box score.
+  const home = withoutUnavailable(homeTeam, injuredIds);
+  const away = withoutUnavailable(awayTeam, injuredIds);
+  return {
+    homeTeam: home,
+    awayTeam: away,
+    homeGamePlan: planFor(home),
+    awayGamePlan: planFor(away),
+    homeCoaching: programCoachingEdge(home, staffOwner),
+    awayCoaching: programCoachingEdge(away, staffOwner),
+  };
+}
+
+/**
+ * Plays the user's game this week with a fixed seed and returns its log, so
+ * the first half can be shown at halftime before the week is simmed. Null when
+ * the user has no game this week.
+ */
+export function previewUserGame(state: WeekSimState, userGamePlan: LacrosseGamePlan, seed: number): { game: ScheduledGame; log: GameLog } | null {
+  const { dynasty } = state;
+  const season = seasonReadyForWeek(dynasty);
+  const game = season.schedule.find(
+    (g) =>
+      g.week === season.currentWeek &&
+      g.status === 'scheduled' &&
+      (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
+  );
+  if (!game) return null;
+  const homeTeam = season.teams.find((t) => t.id === game.homeTeamId)!;
+  const awayTeam = season.teams.find((t) => t.id === game.awayTeamId)!;
+  const { log } = simulateLacrosseGameWithLog({ ...weekGameInput(state, homeTeam, awayTeam, userGamePlan), random: seededGameRandom(seed) });
+  return { game, log };
+}
+
 export function simulateOneWeek(
   state: WeekSimState,
   userGamePlan: LacrosseGamePlan = DEFAULT_GAME_PLAN,
   random: () => number = Math.random,
+  coached?: CoachedGame,
 ): WeekSimState {
   const { dynasty } = state;
   const weekToSim = dynasty.season.currentWeek;
@@ -111,31 +183,19 @@ export function simulateOneWeek(
   const weekLogs = new Map<string, GameLog>();
   const weekPlayerLines = new Map<string, LacrossePlayerGameStats[]>();
   const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
-  const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
-    team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
-  // CPU staffs name captains and make their redshirt calls before the opener.
-  const firstWeek = dynasty.season.schedule.reduce((min, game) => Math.min(min, game.week), Infinity);
-  const seasonBeforeGames =
-    weekToSim === firstWeek
-      ? {
-          ...dynasty.season,
-          teams: dynasty.season.teams.map((t) => (t.id === dynasty.userTeamId ? t : applyCpuCaptains(applyCpuRedshirts(t)))),
-        }
-      : dynasty.season;
+  const seasonBeforeGames = seasonReadyForWeek(dynasty);
   const seasonAfterGames = advanceSeasonWeek(seasonBeforeGames, (game, homeTeam, awayTeam) => {
-    // Injured and redshirting players sit: the depth chart promotes the next man up for the
-    // rating, the game plan, and the box score.
-    const home = withoutUnavailable(homeTeam, injuredIds);
-    const away = withoutUnavailable(awayTeam, injuredIds);
+    const input = weekGameInput(state, homeTeam, awayTeam, userGamePlan);
+    const coachedHere = coached && (homeTeam.id === dynasty.userTeamId || awayTeam.id === dynasty.userTeamId);
     const { log, players, ...result } = simulateLacrosseGameWithLog({
-      homeTeam: home,
-      awayTeam: away,
-      random,
-      homeGamePlan: planFor(home),
-      awayGamePlan: planFor(away),
-      homeCoaching: programCoachingEdge(home, staffOwner),
-      awayCoaching: programCoachingEdge(away, staffOwner),
+      ...input,
+      random: coachedHere ? seededGameRandom(coached.seed) : random,
+      ...(coachedHere
+        ? homeTeam.id === dynasty.userTeamId
+          ? { homeSecondHalfPlan: coached.secondHalfPlan }
+          : { awaySecondHalfPlan: coached.secondHalfPlan }
+        : {}),
     });
     weekLogs.set(game.id, log);
     weekPlayerLines.set(game.id, [...players.home, ...players.away]);
