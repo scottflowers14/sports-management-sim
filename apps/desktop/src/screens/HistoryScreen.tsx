@@ -1,10 +1,20 @@
+import { buildCoachCareer } from '../coach-of-year';
+import type { CoachCareer } from '../coach-of-year';
 import type { DynastySeasonRecord, SeasonAwardRecord } from '../history';
 import { buildRecordBook } from '../history';
 import { versusPrediction } from '../preseason';
 import type { HallOfFameEntry } from '../records';
 import { formatTeamName } from '../ui/format';
 
-export function HistoryScreen({ history, hallOfFame = [] }: { history: DynastySeasonRecord[]; hallOfFame?: HallOfFameEntry[] }) {
+export function HistoryScreen({
+  history,
+  hallOfFame = [],
+  coachName = null,
+}: {
+  history: DynastySeasonRecord[];
+  hallOfFame?: HallOfFameEntry[];
+  coachName?: string | null;
+}) {
   if (history.length === 0) {
     return (
       <article className="card">
@@ -47,6 +57,8 @@ export function HistoryScreen({ history, hallOfFame = [] }: { history: DynastySe
         </article>
       </div>
 
+      {coachName && <CoachCareerCard career={buildCoachCareer(history, coachName)} name={coachName} />}
+
       <article className="card">
         <h2>Season Log</h2>
         <table className="standings-table history-table">
@@ -68,7 +80,10 @@ export function HistoryScreen({ history, hallOfFame = [] }: { history: DynastySe
             {history.map((record) => (
               <tr key={record.year}>
                 <td className="rank">{record.year}</td>
-                <td className="dim">{record.coachName ?? '—'}</td>
+                <td className="dim">
+                  {record.coachName ?? '—'}
+                  {record.coachOfYear && <span className="honor-pill coy-pill" title="Coach of the Year">COY</span>}
+                </td>
                 <td className="record-cell">{record.wins}–{record.losses}</td>
                 <td>#{record.confStanding}</td>
                 <td
@@ -109,6 +124,40 @@ export function HistoryScreen({ history, hallOfFame = [] }: { history: DynastySe
 
       <AwardsHistoryCard history={history} />
     </div>
+  );
+}
+
+function CoachCareerCard({ career, name }: { career: CoachCareer; name: string }) {
+  const pct = career.wins + career.losses > 0 ? career.wins / (career.wins + career.losses) : 0;
+  const best = career.bestSeason;
+  return (
+    <article className="card coach-career-card" aria-label="Coach career">
+      <h2>Coach {name}</h2>
+      <div className="kv-strip">
+        <div className="kv"><span className="kv-label">Seasons</span><span className="kv-value">{career.seasons}</span></div>
+        <div className="kv"><span className="kv-label">Record</span><span className="kv-value">{career.wins}–{career.losses}</span></div>
+        <div className="kv"><span className="kv-label">Win %</span><span className="kv-value">{pct.toFixed(3).replace(/^0/, '')}</span></div>
+        <div className="kv"><span className="kv-label">Conf Titles</span><span className="kv-value">{career.confTitles}</span></div>
+        <div className="kv"><span className="kv-label">Natl Titles</span><span className="kv-value">{career.nationalTitles}</span></div>
+        <div className="kv"><span className="kv-label">Coach of Year</span><span className="kv-value">{career.coachOfYearYears.length}</span></div>
+      </div>
+      <ul className="coach-career-stints">
+        {career.stints.map((stint) => (
+          <li key={`${stint.teamName}-${stint.firstYear}`}>
+            <strong>{formatTeamName(stint.teamName)}</strong>
+            <span className="dim">
+              {stint.firstYear === stint.lastYear ? stint.firstYear : `${stint.firstYear}–${stint.lastYear}`} · {stint.wins}–{stint.losses}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {(best || career.coachOfYearYears.length > 0) && (
+        <p className="dim coach-career-note">
+          {best && <>Best season: {best.year}, {best.wins}–{best.losses}{best.nationalChampion ? ', national champions' : best.confChampion ? ', conference champions' : ''}. </>}
+          {career.coachOfYearYears.length > 0 && <>Coach of the Year {career.coachOfYearYears.join(', ')}.</>}
+        </p>
+      )}
+    </article>
   );
 }
 

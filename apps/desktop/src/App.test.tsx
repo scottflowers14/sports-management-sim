@@ -614,6 +614,21 @@ describe('Desktop App', () => {
     expect(screen.getAllByText(/^Preseason poll: /).length).toBeGreaterThan(0);
   });
 
+  it('tracks the awards race and weekly honors on the Stats screen', async () => {
+    await renderStartedApp();
+    for (let week = 1; week <= 2; week += 1) {
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+    }
+    await userEvent.click(screen.getByRole('button', { name: /^Stats/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Awards Race' }));
+    const mvp = screen.getByLabelText('Player of the Year race');
+    expect(within(mvp).getAllByRole('listitem').length).toBe(5);
+    expect(within(mvp).getAllByRole('listitem')[0]).toHaveTextContent(/^Leader/);
+    const honors = screen.getByLabelText('Weekly honors');
+    expect(within(honors).getAllByRole('row')).toHaveLength(5);
+    expect(honors).toHaveTextContent(/Defensive Player of the Week/);
+  });
+
   it('makes a playing-time promise and calls out a broken one', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Team/ }));

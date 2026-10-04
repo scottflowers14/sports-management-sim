@@ -79,6 +79,11 @@ export function App() {
     careerStats,
     recordBook,
     rivalrySeries,
+    weeklyHonors,
+    investmentPlan,
+    investmentBudget,
+    fundInvestment,
+    unfundInvestment,
     seasonPreview,
     hallOfFame,
     saveStatus,
@@ -673,6 +678,8 @@ export function App() {
           seasonStats={seasonStats}
           playerLookup={playerLookup}
           userTeamId={dynasty.userTeamId}
+          season={dynasty.season}
+          weeklyHonors={weeklyHonors}
         />
       )}
 
@@ -735,7 +742,7 @@ export function App() {
       )}
 
       {view === 'history' && (
-        <HistoryScreen history={dynastyHistory} hallOfFame={hallOfFame} />
+        <HistoryScreen history={dynastyHistory} hallOfFame={hallOfFame} coachName={coachProfile?.name ?? null} />
       )}
 
       {view === 'offseason' && offseasonSummary && (
@@ -755,6 +762,7 @@ export function App() {
           portalTeams={dynasty.season.teams}
           portalScholarshipRoom={portalScholarshipRoom}
           onOpenPortal={() => { setRecruitTab('portal'); setView('recruiting'); }}
+          investments={{ budget: investmentBudget, plan: investmentPlan, onFund: fundInvestment, onUnfund: unfundInvestment }}
         />
       )}
 

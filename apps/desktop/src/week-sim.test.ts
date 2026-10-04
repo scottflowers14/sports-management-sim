@@ -52,12 +52,16 @@ describe('simulateOneWeek', () => {
     expect(state.gameLogs.size).toBe(0);
   });
 
-  it('publishes a player of the week news item once goals are scored', () => {
+  it('names an offensive and a defensive player of the week', () => {
     const next = simulateOneWeek(freshState(), undefined, seededRandom(5));
     const potw = next.newsItems.find((n) => n.headline.startsWith('Player of the Week:'));
     expect(potw).toBeDefined();
     expect(potw!.category).toBe('award');
-    expect(potw!.headline).toMatch(/—\s\d+G, \d+A$/);
+    expect(potw!.headline).toMatch(/, \d+G, \d+A$/);
+    expect(next.newsItems.some((n) => n.headline.startsWith('Defensive Player of the Week:'))).toBe(true);
+    expect(next.weeklyHonors?.map((h) => h.kind)).toEqual(['offense', 'defense']);
+    const again = simulateOneWeek(next, undefined, seededRandom(6));
+    expect(again.weeklyHonors).toHaveLength(4);
   });
 
   it('tracks the best national rank achieved by the user team', () => {

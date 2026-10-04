@@ -1,4 +1,18 @@
-import type { LacrossePortalEntry, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import {
+  applyInvestmentPlan,
+  fundProject,
+  INVESTMENT_PROJECT_INFO,
+  INVESTMENT_PROJECTS,
+  planCost,
+} from '@sports-management-sim/sport-lacrosse';
+import type {
+  CarouselChange,
+  CoachDepartureReason,
+  InvestmentPlan,
+  InvestmentProject,
+  LacrossePortalEntry,
+  LacrosseTeam,
+} from '@sports-management-sim/sport-lacrosse';
 import { PORTAL_REASON_LABELS } from '@sports-management-sim/engine-core';
 import { OfferControl } from '../components/OfferControl';
 import { portalStanding } from './PortalBoard';
@@ -25,6 +39,7 @@ export function OffseasonScreen({
   portalTeams,
   portalScholarshipRoom,
   onOpenPortal,
+  investments,
 }: {
   offseasonSummary: OffseasonSummary;
   userTeam: LacrosseTeam;
@@ -41,6 +56,12 @@ export function OffseasonScreen({
   portalTeams: LacrosseTeam[];
   portalScholarshipRoom: number;
   onOpenPortal: () => void;
+  investments?: {
+    budget: number;
+    plan: InvestmentPlan;
+    onFund: (project: InvestmentProject) => void;
+    onUnfund: (project: InvestmentProject) => void;
+  };
 }) {
   const availablePortal = portalEntries.filter((e) => e.status === 'available');
   const departures = offseasonSummary.portalDepartures ?? [];
@@ -87,7 +108,18 @@ export function OffseasonScreen({
         </article>
 
         {offseasonSummary.awards && (
-          <AwardsSection awards={offseasonSummary.awards} />
+          <AwardsSection
+            awards={offseasonSummary.awards}
+            coachOfYear={
+              offseasonSummary.coachOfYear
+                ? {
+                    name: offseasonSummary.coachOfYear.teamId === userTeamId ? (coachName ?? 'You') : (offseasonSummary.coachOfYear.coachName ?? ''),
+                    teamName: teamMap.get(offseasonSummary.coachOfYear.teamId) ?? offseasonSummary.coachOfYear.teamId,
+                    detail: `${offseasonSummary.coachOfYear.wins}-${offseasonSummary.coachOfYear.losses} · +${offseasonSummary.coachOfYear.winsAboveExpected.toFixed(1)} wins vs expected`,
+                  }
+                : null
+            }
+          />
         )}
 
         {offseasonSummary.developmentReport && offseasonSummary.developmentReport.entries.length > 0 && (
@@ -101,6 +133,10 @@ export function OffseasonScreen({
             <h2>Program Prestige</h2>
             <PrestigeSection reputation={userTeam.reputation} />
           </article>
+        )}
+
+        {!(jobOffers && jobOffers.length > 0) && investments && (
+          <InvestmentsCard team={userTeam} {...investments} />
         )}
 
         <article className="card">
@@ -150,6 +186,10 @@ export function OffseasonScreen({
             </div>
           )}
         </article>
+
+        {(offseasonSummary.coachingCarousel?.length ?? 0) > 0 && (
+          <CoachingCarouselCard changes={offseasonSummary.coachingCarousel!} teamShort={teamShort} />
+        )}
 
         {(availablePortal.length > 0 || departures.length > 0) && (
           <article className="card portal-offseason-card" aria-label="Transfer portal summary">
@@ -251,11 +291,26 @@ export function OffseasonScreen({
   );
 }
 
-function AwardsSection({ awards }: { awards: SeasonAwards }) {
+function AwardsSection({
+  awards,
+  coachOfYear,
+}: {
+  awards: SeasonAwards;
+  coachOfYear: { name: string; teamName: string; detail: string } | null;
+}) {
   return (
     <article className="card">
       <h2>Season Awards</h2>
       <div className="awards-grid">
+        {coachOfYear && (
+          <div className="award-item" aria-label="Coach of the Year">
+            <div className="award-label">Coach of the Year</div>
+            <div className="award-player">{coachOfYear.name}</div>
+            <div className="award-detail">
+              {formatTeamName(coachOfYear.teamName)} · {coachOfYear.detail}
+            </div>
+          </div>
+        )}
         {[
           { label: 'MVP', winner: awards.mvp },
           { label: 'Offensive Player', winner: awards.offensivePlayer },
@@ -390,5 +445,99 @@ function PrestigeSection({ reputation }: {
         </div>
       ))}
     </div>
+  );
+}
+
+const DEPARTURE_VERBS: Record<CoachDepartureReason, string> = {
+  fired: 'Fired',
+  retired: 'Retired:',
+  poached: 'Lost',
+};
+
+function CoachingCarouselCard({ changes, teamShort }: { changes: CarouselChange[]; teamShort: (id: string) => string }) {
+  return (
+    <article className="card" aria-label="Coaching carousel">
+      <h2>Coaching Carousel · {changes.length} change{changes.length === 1 ? '' : 's'}</h2>
+      <ul className="player-list">
+        {changes.map(({ teamId, outgoing, incoming }) => (
+          <li key={teamId}>
+            <strong>{teamShort(teamId)}</strong>
+            <span>
+              {DEPARTURE_VERBS[outgoing.reason]} {outgoing.name} ({outgoing.wins}-{outgoing.losses} in {outgoing.seasons}{' '}
+              season{outgoing.seasons === 1 ? '' : 's'}){outgoing.reason === 'poached' ? ' to a bigger job' : ''}
+            </span>
+            <span>
+              Hired {incoming.name} ({incoming.rating}){incoming.fromTeamId ? ` from ${teamShort(incoming.fromTeamId)}` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
+const PROJECT_RATING: Record<InvestmentProject, (team: LacrosseTeam) => number> = {
+  facilities: (team) => team.reputation.facilities,
+  fans: (team) => team.reputation.fanSupport,
+  academics: (team) => team.reputation.academicPrestige,
+};
+
+function InvestmentsCard({
+  team,
+  budget,
+  plan,
+  onFund,
+  onUnfund,
+}: {
+  team: LacrosseTeam;
+  budget: number;
+  plan: InvestmentPlan;
+  onFund: (project: InvestmentProject) => void;
+  onUnfund: (project: InvestmentProject) => void;
+}) {
+  const spent = planCost(plan);
+  const after = applyInvestmentPlan(team, plan);
+  return (
+    <article className="card investments-card" aria-label="Program investments">
+      <h2>Program Investments</h2>
+      <p className="dim">
+        The athletic department has {budget} points for the program this year. Spend them before the season starts; unspent
+        points don&apos;t carry over.
+      </p>
+      <p className="investments-budget">
+        <strong>{budget - spent}</strong> of {budget} points left
+      </p>
+      <ul className="investments-list">
+        {INVESTMENT_PROJECTS.map((project) => {
+          const info = INVESTMENT_PROJECT_INFO[project];
+          const funded = plan[project] ?? 0;
+          const canFund = fundProject(plan, project, budget) !== plan;
+          const now = PROJECT_RATING[project](team);
+          const next = PROJECT_RATING[project](after);
+          return (
+            <li key={project} aria-label={info.title}>
+              <div className="investments-info">
+                <strong>{info.title}</strong>
+                <span className="dim">{info.effect}</span>
+                <span className="investments-rating">
+                  {now}
+                  {next !== now && <span className="mood-happy"> → {next}</span>}
+                  <span className="dim"> · {info.cost} pts for +{info.gain}</span>
+                </span>
+              </div>
+              <div className="investments-controls">
+                <button type="button" className="ghost-btn" onClick={() => onUnfund(project)} disabled={funded === 0} aria-label={`Remove ${info.title}`}>
+                  −
+                </button>
+                <span className="investments-count">{funded}</span>
+                <button type="button" className="ghost-btn" onClick={() => onFund(project)} disabled={!canFund} aria-label={`Fund ${info.title}`}>
+                  +
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </article>
   );
 }

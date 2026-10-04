@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LacrosseSeason } from '@sports-management-sim/sport-lacrosse';
-import { computeSeasonAwards } from './awards';
+import { computeAwardsRace, computeSeasonAwards } from './awards';
 import { emptySeasonStats } from './stats';
 import type { SeasonStatsMap } from './stats';
 
@@ -142,5 +142,43 @@ describe('computeSeasonAwards (stat-based)', () => {
     expect(withEmpty.mvp.playerName).toBe(withUndefined.mvp.playerName);
     // Rating-based MVP comes from the winningest team
     expect(withEmpty.mvp.teamName).toBe('Alpha University');
+  });
+});
+
+describe('computeAwardsRace', () => {
+  const stats = () => statsFor([
+    ['player-2', { goals: 40, assists: 18 }],
+    ['player-12', { goals: 41, assists: 19 }],
+    ['player-3', { goals: 10, assists: 5 }],
+    ['player-14', { goals: 3, assists: 1, causedTurnovers: 12, groundBalls: 20 }],
+    ['player-4', { causedTurnovers: 30, groundBalls: 40 }],
+  ]);
+
+  it('ranks each race by the measure that decides the award', () => {
+    const season = makeSeason();
+    const race = computeAwardsRace(season, stats());
+    const awards = computeSeasonAwards(season, 'alpha', stats());
+
+    expect(race.mvp[0]!.playerName).toBe(awards.mvp.playerName);
+    expect(race.offensive[0]!.playerName).toBe(awards.offensivePlayer.playerName);
+    expect(race.defensive[0]!.playerName).toBe(awards.defensivePlayer.playerName);
+    expect(race.freshman[0]!.playerName).toBe(awards.freshmanOfYear!.playerName);
+    expect(race.offensive.map((e) => e.playerId)).toEqual(['player-12', 'player-2', 'player-3']);
+    expect(race.defensive[0]!.statLine).toBe('30 CT, 40 GB');
+  });
+
+  it('leaves out players with no games or no production, and caps the list', () => {
+    const season = makeSeason();
+    const map = stats();
+    map['player-13'] = { ...map['player-3']!, playerId: 'player-13', gamesPlayed: 0, goals: 50 };
+    const race = computeAwardsRace(season, map, {}, 2);
+    expect(race.offensive.map((e) => e.playerId)).toEqual(['player-12', 'player-2']);
+    expect(race.mvp.some((e) => e.playerId === 'player-13')).toBe(false);
+  });
+
+  it('shows weekly honors next to each candidate', () => {
+    const race = computeAwardsRace(makeSeason(), stats(), { 'player-12': 3 });
+    expect(race.offensive[0]!.weeklyHonors).toBe(3);
+    expect(race.offensive[1]!.weeklyHonors).toBe(0);
   });
 });

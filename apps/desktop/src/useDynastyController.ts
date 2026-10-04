@@ -20,11 +20,18 @@ import {
   programCoachingEdge,
   releaseStaffMember,
   runStaffOffseason,
+  carouselHeadline,
+  applyInvestmentPlan,
+  fundProject,
+  investmentBudget,
+  investmentSummary,
+  planCost,
+  unfundProject,
   staffBudgetFor,
   STAFF_ROLE_LABELS,
   updateLacrosseDepthChartSlot,
 } from '@sports-management-sim/sport-lacrosse';
-import type { StaffRole } from '@sports-management-sim/sport-lacrosse';
+import type { InvestmentPlan, InvestmentProject, StaffRole } from '@sports-management-sim/sport-lacrosse';
 import {
   autoDevelopmentPlans,
   boostMorale,
@@ -51,6 +58,7 @@ import { simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './w
 import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, WeekSimState } from './week-sim';
+import type { WeeklyHonor } from './weekly-honors';
 import { EMPTY_LOCKER_ROOM, type LockerRoomState } from './locker-room';
 import { archiveRecords, hallOfFameInductees, recordNewsForWeek, scopeRecords, type HallOfFameEntry, type RecordBookArchive } from './records';
 import { buildSeasonPreview, predictedFinish, previewHeadlines, type SeasonPreview } from './preseason';
@@ -216,6 +224,8 @@ export function useDynastyController() {
   const [lockerRoom, setLockerRoom] = useState<LockerRoomState>(() => loadedSave?.lockerRoom ?? EMPTY_LOCKER_ROOM);
   const [recordBook, setRecordBook] = useState<RecordBookArchive>(() => loadedSave?.recordBook ?? {});
   const [rivalrySeries, setRivalrySeries] = useState<RivalrySeriesMap>(() => loadedSave?.rivalrySeries ?? {});
+  const [weeklyHonors, setWeeklyHonors] = useState<WeeklyHonor[]>(() => loadedSave?.weeklyHonors ?? []);
+  const [investmentPlan, setInvestmentPlan] = useState<InvestmentPlan>(() => loadedSave?.investmentPlan ?? {});
   const [hallOfFame, setHallOfFame] = useState<HallOfFameEntry[]>(() => loadedSave?.hallOfFame ?? []);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
@@ -245,6 +255,8 @@ export function useDynastyController() {
     lockerRoom,
     recordBook,
     rivalrySeries,
+    weeklyHonors,
+    investmentPlan,
     seasonPreview,
     hallOfFame,
     pendingJobOffers,
@@ -255,7 +267,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, seasonPreview, hallOfFame, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -291,6 +303,8 @@ export function useDynastyController() {
     setLockerRoom(EMPTY_LOCKER_ROOM);
     setRecordBook({});
     setRivalrySeries({});
+    setWeeklyHonors([]);
+    setInvestmentPlan({});
     setHallOfFame([]);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
@@ -358,6 +372,8 @@ export function useDynastyController() {
       lockerRoom: EMPTY_LOCKER_ROOM,
       recordBook: {},
       rivalrySeries: {},
+      weeklyHonors: [],
+      investmentPlan: {},
       hallOfFame: [],
       seasonPreview: preview,
       pendingJobOffers: null,
@@ -414,6 +430,8 @@ export function useDynastyController() {
     setLockerRoom(save.lockerRoom ?? EMPTY_LOCKER_ROOM);
     setRecordBook(save.recordBook ?? {});
     setRivalrySeries(save.rivalrySeries ?? {});
+    setWeeklyHonors(save.weeklyHonors ?? []);
+    setInvestmentPlan(save.investmentPlan ?? {});
     setSeasonPreview(save.seasonPreview ?? null);
     setHallOfFame(save.hallOfFame ?? []);
     setPendingJobOffers(save.pendingJobOffers ?? null);
@@ -504,7 +522,8 @@ export function useDynastyController() {
     practicePlan,
     practiceGains,
     rivalrySeries,
-  }), [staffState.staff, practicePlan, practiceGains, rivalrySeries, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+    weeklyHonors,
+  }), [staffState.staff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((simResult: WeekSimState) => {
     // Promises that came due are judged against the depth chart after the week.
@@ -581,6 +600,7 @@ export function useDynastyController() {
     setLastSimWeek(result.lastSimWeek);
     setPracticeGains(result.practiceGains ?? []);
     if (result.rivalrySeries) setRivalrySeries(result.rivalrySeries);
+    setWeeklyHonors(result.weeklyHonors ?? []);
     setAssistantReport(null);
     // Offers the assistant made during the sim pin those recruits, as manual offers do.
     const userId = result.dynasty.userTeamId;
@@ -869,6 +889,7 @@ export function useDynastyController() {
       ...(seasonPreview?.year === dynasty.season.year && predictedFinish(seasonPreview, dynasty.userTeamId) !== null
         ? { predictedConfFinish: predictedFinish(seasonPreview, dynasty.userTeamId)! }
         : {}),
+      ...(summary.coachOfYear?.teamId === dynasty.userTeamId ? { coachOfYear: true } : {}),
     };
 
     // Staff contracts run down; expiring coaches re-enter the pool asking for a raise.
@@ -896,7 +917,30 @@ export function useDynastyController() {
         headline: `${STAFF_ROLE_LABELS[member.role].title} ${member.name.first} ${member.name.last} (${member.rating}) was hired away as a head coach. Find a replacement on the Staff screen.`,
       });
     }
-    if (staffNews.length > 0) setNewsItems((prev) => [...staffNews, ...prev]);
+    // Rival programs' head coaching changes; ones in the user's conference lead.
+    const userConferenceId = newUserTeam?.conferenceId;
+    const teamName = (id: string) => formatTeamName(newDynasty.season.teams.find((t) => t.id === id)?.name ?? id);
+    const carouselNews: NewsItem[] = (summary.coachingCarousel ?? []).map((change) => ({
+      id: `carousel-${dynasty.season.year}-${change.teamId}`,
+      week: dynasty.season.currentWeek,
+      category: 'coaching' as const,
+      ...(newDynasty.season.teams.find((t) => t.id === change.teamId)?.conferenceId === userConferenceId ? { featured: true } : {}),
+      headline: carouselHeadline(change, teamName),
+    }));
+    const coachOfYearNews: NewsItem[] = [];
+    if (summary.coachOfYear) {
+      const winner = summary.coachOfYear;
+      const isUser = winner.teamId === dynasty.userTeamId;
+      coachOfYearNews.push({
+        id: `coach-of-year-${dynasty.season.year}`,
+        week: dynasty.season.currentWeek,
+        category: 'award',
+        ...(isUser ? { featured: true } : {}),
+        headline: `Coach of the Year: ${isUser ? (coachProfile?.name ?? 'Your coach') : winner.coachName} (${teamName(winner.teamId)}) after a ${winner.wins}-${winner.losses} season, ${winner.winsAboveExpected.toFixed(1)} wins better than expected`,
+      });
+    }
+    const offseasonNews = [...coachOfYearNews, ...staffNews, ...carouselNews];
+    if (offseasonNews.length > 0) setNewsItems((prev) => [...offseasonNews, ...prev]);
 
     setDynasty(newDynasty);
     setOffseasonSummary(summary);
@@ -1136,10 +1180,40 @@ export function useDynastyController() {
     });
   }, [userTeam]);
 
+  // The AD's budget is set by the program as it stands after the season.
+  const userInvestmentBudget = userTeam ? investmentBudget(userTeam) : 0;
+  const fundInvestment = useCallback((project: InvestmentProject) => {
+    setInvestmentPlan((plan) => fundProject(plan, project, userInvestmentBudget));
+  }, [userInvestmentBudget]);
+  const unfundInvestment = useCallback((project: InvestmentProject) => {
+    setInvestmentPlan((plan) => unfundProject(plan, project));
+  }, []);
+
   const startNewSeason = useCallback(() => {
     // Resolve the portal once, outside the state updater: updaters must be pure,
     // and this one feeds the news feed and several other pieces of state.
-    const { dynasty: nextDynasty, moves } = resolveAndApplyPortal(dynasty);
+    const { dynasty: afterPortal, moves } = resolveAndApplyPortal(dynasty);
+    // The user's program investments land as the new season opens.
+    const nextDynasty = {
+      ...afterPortal,
+      season: {
+        ...afterPortal.season,
+        teams: afterPortal.season.teams.map((t) => (t.id === afterPortal.userTeamId ? applyInvestmentPlan(t, investmentPlan) : t)),
+      },
+    };
+    const investedBefore = afterPortal.season.teams.find((t) => t.id === afterPortal.userTeamId);
+    const investedAfter = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
+    const investmentNews: NewsItem[] =
+      investedBefore && investedAfter && planCost(investmentPlan) > 0
+        ? [{
+            id: `investments-${nextDynasty.season.year}`,
+            week: 1,
+            category: 'coaching',
+            featured: true,
+            headline: `Program investments are done: ${investmentSummary(investedBefore, investedAfter)}`,
+          }]
+        : [];
+    setInvestmentPlan({});
     const portalNews = portalMoveNews(moves, nextDynasty.userTeamId, new Map(nextDynasty.season.teams.map((t) => [t.id, t.name])));
     const userTeamData = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
     const prestige = userTeamData?.reputation.nationalPrestige ?? 50;
@@ -1164,6 +1238,7 @@ export function useDynastyController() {
     setStaffState({ staff: filled.staff, staffCandidates: filled.candidates });
     setScouting((s) => withStaffRecruitingHours(resetScoutingForNewClass(s), filled.staff));
     setNewsItems([
+      ...investmentNews,
       ...seasonPreviewNews(preview, nextDynasty),
       ...portalNews,
       ...filled.hired.map((member) => ({
@@ -1182,12 +1257,13 @@ export function useDynastyController() {
     setSelectedRecruitId(null);
     setGameLogs(new Map());
     setSeasonStats(emptySeasonStats());
+    setWeeklyHonors([]);
     setRecruitingActivity(emptyRecruitingActivity());
     setRecruitTrends({});
     setShortlistIds([]);
     setRecruitBoardView('all');
     setView('week-hub');
-  }, [dynasty, staffState, staffBudget]);
+  }, [dynasty, staffState, staffBudget, investmentPlan]);
 
   const handleExportSave = useCallback((saveId: string) => {
     const json = exportSaveAsJson(saveId);
@@ -1306,6 +1382,11 @@ export function useDynastyController() {
     lockerRoom,
     recordBook,
     rivalrySeries,
+    weeklyHonors,
+    investmentPlan,
+    investmentBudget: userInvestmentBudget,
+    fundInvestment,
+    unfundInvestment,
     seasonPreview,
     hallOfFame,
     talkToPlayer,

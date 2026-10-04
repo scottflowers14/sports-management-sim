@@ -52,12 +52,23 @@ function points(entry: PlayerWithTeam): number {
 
 function defensiveScore(entry: PlayerWithTeam): number {
   if (!entry.stats) return 0;
-  if (entry.player.position === 'GK') {
-    const { saves, goalsAllowed } = entry.stats;
-    const savePct = saves + goalsAllowed > 0 ? saves / (saves + goalsAllowed) : 0;
-    return saves * (0.5 + savePct);
+  return defensiveProduction(entry.player.position, entry.stats);
+}
+
+/**
+ * One scale for defensemen and goalies. A goalie makes saves every game, so
+ * only his save rate above the norm counts; raw saves alone would hand every
+ * defensive award to a goalie.
+ */
+export function defensiveProduction(
+  position: string,
+  stats: Pick<PlayerSeasonStats, 'saves' | 'goalsAllowed' | 'causedTurnovers' | 'groundBalls'>,
+): number {
+  if (position === 'GK') {
+    const faced = stats.saves + stats.goalsAllowed;
+    return faced > 0 ? stats.saves * Math.max(0, stats.saves / faced - 0.45) * 2.6 : 0;
   }
-  return entry.stats.causedTurnovers * 3 + entry.stats.groundBalls * 0.5;
+  return stats.causedTurnovers * 3 + stats.groundBalls * 0.5;
 }
 
 function scoringLine(entry: PlayerWithTeam): string {
@@ -84,26 +95,11 @@ function computeStatBasedAwards(season: LacrosseSeason, allPlayers: PlayerWithTe
     }),
   );
 
-  // MVP: production weighted toward players who carried winning teams
-  const mvpEntry = maxBy(
-    allPlayers.filter((e) => points(e) > 0),
-    (e) => points(e) + (winPctByTeam.get(e.team.id) ?? 0) * 10,
-  );
-
-  const offEntry = maxBy(
-    allPlayers.filter((e) => e.player.position === 'ATT' || e.player.position === 'MID'),
-    points,
-  );
-
-  const defEntry = maxBy(
-    allPlayers.filter((e) => ['DEF', 'LSM', 'GK'].includes(e.player.position)),
-    defensiveScore,
-  );
-
-  const freshmanEntry = maxBy(
-    allPlayers.filter((e) => e.player.classYear === 'FR' && points(e) > 0),
-    points,
-  );
+  const races = raceDefinitions(winPctByTeam);
+  const mvpEntry = maxBy(allPlayers.filter(races.mvp.eligible), races.mvp.score);
+  const offEntry = maxBy(allPlayers.filter(races.offensive.eligible), races.offensive.score);
+  const defEntry = maxBy(allPlayers.filter(races.defensive.eligible), races.defensive.score);
+  const freshmanEntry = maxBy(allPlayers.filter(races.freshman.eligible), races.freshman.score);
 
   if (!mvpEntry || !offEntry || !defEntry) {
     // Stats exist but nobody qualifies (shouldn't happen in practice) — fall back
@@ -132,6 +128,113 @@ function computeStatBasedAwards(season: LacrosseSeason, allPlayers: PlayerWithTe
     freshmanOfYear: freshmanEntry ? buildAwardWinner(freshmanEntry, scoringLine(freshmanEntry)) : null,
     allConference,
   };
+}
+
+type AwardRaceKey = 'mvp' | 'offensive' | 'defensive' | 'freshman';
+
+interface RaceDefinition {
+  eligible: (entry: PlayerWithTeam) => boolean;
+  score: (entry: PlayerWithTeam) => number;
+  line: (entry: PlayerWithTeam) => string;
+}
+
+/**
+ * How each award is decided. The season-end winners and the in-season race
+ * share these, so whoever leads the race on the last week wins the award.
+ */
+function raceDefinitions(winPctByTeam: ReadonlyMap<string, number>): Record<AwardRaceKey, RaceDefinition> {
+  return {
+    // MVP: production weighted toward players who carried winning teams
+    mvp: {
+      eligible: (e) => points(e) > 0,
+      score: (e) => points(e) + (winPctByTeam.get(e.team.id) ?? 0) * 10,
+      line: scoringLine,
+    },
+    offensive: {
+      eligible: (e) => e.player.position === 'ATT' || e.player.position === 'MID',
+      score: points,
+      line: scoringLine,
+    },
+    defensive: {
+      eligible: (e) => ['DEF', 'LSM', 'GK'].includes(e.player.position),
+      score: defensiveScore,
+      line: defensiveLine,
+    },
+    freshman: {
+      eligible: (e) => e.player.classYear === 'FR' && points(e) > 0,
+      score: points,
+      line: scoringLine,
+    },
+  };
+}
+
+export const AWARD_RACE_LABELS: Record<AwardRaceKey, string> = {
+  mvp: 'Player of the Year',
+  offensive: 'Offensive Player',
+  defensive: 'Defensive Player',
+  freshman: 'Freshman of the Year',
+};
+
+export const AWARD_RACE_KEYS: AwardRaceKey[] = ['mvp', 'offensive', 'defensive', 'freshman'];
+
+export interface AwardRaceEntry {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  position: string;
+  statLine: string;
+  /** Weekly honors (Player of the Week) won this season. */
+  weeklyHonors: number;
+  score: number;
+}
+
+export type AwardsRace = Record<AwardRaceKey, AwardRaceEntry[]>;
+
+/**
+ * The OOTP-style awards race: the current leaders for each season award, by
+ * the same measure that decides the winners at season's end.
+ */
+export function computeAwardsRace(
+  season: LacrosseSeason,
+  seasonStats: SeasonStatsMap,
+  weeklyHonorsByPlayer: Readonly<Record<string, number>> = {},
+  limit = 5,
+): AwardsRace {
+  const allPlayers: PlayerWithTeam[] = [];
+  for (const team of season.teams) {
+    for (const player of team.roster) {
+      const stats = seasonStats[player.id];
+      if (stats && stats.gamesPlayed > 0) allPlayers.push({ player, team, stats });
+    }
+  }
+  const winPctByTeam = new Map(
+    season.teams.map((team) => {
+      const games = team.record.wins + team.record.losses;
+      return [team.id, games > 0 ? team.record.wins / games : 0];
+    }),
+  );
+  const races = raceDefinitions(winPctByTeam);
+  const race = (key: AwardRaceKey): AwardRaceEntry[] => {
+    const { eligible, score, line } = races[key];
+    return allPlayers
+      .filter(eligible)
+      .map((entry) => ({ entry, score: score(entry) }))
+      .filter(({ score: s }) => s > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ entry, score: s }) => ({
+        playerId: entry.player.id,
+        playerName: `${entry.player.name.first} ${entry.player.name.last}`,
+        teamId: entry.team.id,
+        teamName: entry.team.name,
+        position: entry.player.position,
+        statLine: line(entry),
+        weeklyHonors: weeklyHonorsByPlayer[entry.player.id] ?? 0,
+        score: s,
+      }));
+  };
+  return { mvp: race('mvp'), offensive: race('offensive'), defensive: race('defensive'), freshman: race('freshman') };
 }
 
 // ── ratings fallback (no stats available) ───────────────────────────────────

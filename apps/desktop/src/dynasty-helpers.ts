@@ -27,8 +27,13 @@ import {
   openLacrossePortal,
   generateLacrosseCpuPortalOffers,
   resolveLacrossePortal,
+  runCoachingCarousel,
+  ageProgram,
+  applyInvestmentPlan,
+  cpuInvestmentPlan,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
+  CarouselChange,
   LacrossePlayer,
   LacrossePortalEntry,
   LacrosseDynastyState,
@@ -38,6 +43,8 @@ import type {
   LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
 import { computeSeasonAwards } from './awards';
+import { computeCoachOfYear } from './coach-of-year';
+import type { CoachOfYear } from './coach-of-year';
 import type { SeasonAwards } from './awards';
 import type { SeasonStatsMap } from './stats';
 import { capturePreOffseasonSnapshot, computeDevelopmentReport } from './development-report';
@@ -85,6 +92,9 @@ export interface OffseasonSummary {
   awards: SeasonAwards | null;
   /** The user's players who put their name in the transfer portal. */
   portalDepartures?: PortalDeparture[];
+  /** CPU head coaching changes this offseason. */
+  coachingCarousel?: CarouselChange[];
+  coachOfYear?: CoachOfYear | null;
 }
 
 export interface PortalDeparture {
@@ -450,7 +460,17 @@ export function runOffseason(
   );
 
   // Evolve program prestige based on season performance
-  const teamsWithPrestige = evolveProgramPrestige(season.teams, sortedStandings, nationalChampionId);
+  // Coach of the Year is voted on before anyone is fired or hired.
+  const coachOfYear = computeCoachOfYear(season.teams, { userTeamId, nationalChampionId });
+  const evolvedTeams = evolveProgramPrestige(season.teams, sortedStandings, nationalChampionId);
+  // CPU programs fire, hire and lose coaches on the finished season's records.
+  const carousel = runCoachingCarousel(evolvedTeams, { userTeamId, year: season.year, seed });
+  // A year passes for every program; CPU athletic departments spend their
+  // budgets now, the user spends theirs on the Offseason screen.
+  const teamsWithPrestige = carousel.teams.map((team) => {
+    const aged = ageProgram(team);
+    return team.id === userTeamId ? aged : applyInvestmentPlan(aged, cpuInvestmentPlan(aged));
+  });
 
   // Run offseason for returning players first (advances class years, graduates seniors),
   // then add the signing class as true freshmen for the upcoming season.
@@ -547,6 +567,8 @@ export function runOffseason(
     awards,
     developmentReport,
     portalDepartures,
+    coachingCarousel: carousel.changes,
+    coachOfYear,
   };
 
   return {

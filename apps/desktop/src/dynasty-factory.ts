@@ -1,4 +1,4 @@
-import { createNewLacrosseDynasty, validateCustomTeamsFile } from '@sports-management-sim/sport-lacrosse';
+import { createNewLacrosseDynasty, ensureHeadCoaches, validateCustomTeamsFile } from '@sports-management-sim/sport-lacrosse';
 import type { CustomTeamsFile, CustomTeamsValidationError } from '@sports-management-sim/sport-lacrosse';
 import type { LacrosseDynastyState } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName } from './ui/format';
@@ -48,7 +48,10 @@ export function createFreshLacrosseDynasty({
     ?? resolvedCustomTeams?.teams[0]?.id
     ?? DEFAULT_USER_TEAM_ID;
   const seed = nextDynastySeed(now);
-  return createNewLacrosseDynasty({ seed, userTeamId: resolvedUserTeamId, seasonYear, ...(resolvedCustomTeams ? { customTeams: resolvedCustomTeams } : {}) });
+  const dynasty = createNewLacrosseDynasty({ seed, userTeamId: resolvedUserTeamId, seasonYear, ...(resolvedCustomTeams ? { customTeams: resolvedCustomTeams } : {}) });
+  // Every rival program starts with a head coach on its sideline.
+  const teams = ensureHeadCoaches(dynasty.season.teams, dynasty.userTeamId, dynasty.season.year, seed);
+  return { ...dynasty, season: { ...dynasty.season, teams } };
 }
 
 // ── Custom teams config persistence ──────────────────────────────────────────

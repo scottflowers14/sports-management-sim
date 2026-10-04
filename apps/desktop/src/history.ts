@@ -45,6 +45,8 @@ export interface DynastySeasonRecord {
   teamLeader?: SeasonLeaderRecord;
   /** Where the preseason poll picked the program to finish in its conference. */
   predictedConfFinish?: number;
+  /** The user was named Coach of the Year. */
+  coachOfYear?: boolean;
 }
 
 /** Flatten the computed season awards into the slim records stored in history. */
