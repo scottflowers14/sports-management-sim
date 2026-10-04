@@ -54,6 +54,11 @@ describe('cardFromPlayer', () => {
     expect(card.traits).toContain('gym rat');
     expect(card.badges.map((b) => b.label)).toContain('INJ');
   });
+
+  it('marks redshirts in the class and the badges', () => {
+    expect(cardFromPlayer({ ...player, redshirtStatus: 'redshirt_used' }).subtitle).toBe('ATT · RS-JR · Baltimore, MD');
+    expect(cardFromPlayer({ ...player, redshirtStatus: 'redshirting' }).badges.map((b) => b.label)).toContain('RS');
+  });
 });
 
 describe('cardFromRecruit', () => {

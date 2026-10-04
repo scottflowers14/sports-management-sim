@@ -1,3 +1,4 @@
+import { classLabel } from '@sports-management-sim/engine-core';
 import {
   DEVELOPMENT_FOCUS_AREAS,
   focusAreasFor,
@@ -170,7 +171,7 @@ export function PracticeScreen({
                   {playerName(player)}
                 </button>
                 <span className="dim">
-                  {player.position} · {player.classYear} · {player.ratings.overall} / {player.ratings.potential} POT
+                  {player.position} · {classLabel(player)} · {player.ratings.overall} / {player.ratings.potential} POT
                   {injuredIds.has(player.id) ? ' · injured' : ''}
                 </span>
                 <ProgressBar player={player} />
@@ -229,7 +230,7 @@ export function PracticeScreen({
                     {injuredIds.has(player.id) && <span className="practice-injured"> INJ</span>}
                   </td>
                   <td>{player.position}</td>
-                  <td>{player.classYear}</td>
+                  <td>{classLabel(player)}</td>
                   <td>{player.ratings.overall}</td>
                   <td>{player.ratings.potential}</td>
                   <td>

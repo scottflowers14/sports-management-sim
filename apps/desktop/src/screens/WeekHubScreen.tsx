@@ -30,12 +30,14 @@ function computeActionItems({
   vacantStaffRoles = [],
   openPlanSlots = 0,
   unhappyCount = 0,
+  redshirtSuggestions = 0,
 }: {
   currentWeek: number;
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
   openPlanSlots?: number;
   unhappyCount?: number;
+  redshirtSuggestions?: number;
   injuries: InjuredPlayer[];
   userTeam: LacrosseTeam;
   scouting: ScoutingState;
@@ -128,6 +130,16 @@ function computeActionItems({
     });
   }
 
+  if (!seasonComplete && redshirtSuggestions > 0) {
+    items.push({
+      id: 'redshirts',
+      priority: 'medium',
+      icon: '🎽',
+      text: `${redshirtSuggestions} young player${redshirtSuggestions === 1 ? ' is' : 's are'} buried on the depth chart. Redshirt them to save a year of eligibility.`,
+      nav: 'team',
+    });
+  }
+
   if (!seasonComplete && openPlanSlots > 0) {
     items.push({
       id: 'development-plans',
@@ -190,6 +202,7 @@ export function WeekHubScreen({
   vacantStaffRoles,
   openPlanSlots,
   unhappyCount,
+  redshirtSuggestions,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -213,6 +226,7 @@ export function WeekHubScreen({
   vacantStaffRoles?: string[];
   openPlanSlots?: number;
   unhappyCount?: number;
+  redshirtSuggestions?: number;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -232,6 +246,7 @@ export function WeekHubScreen({
     ...(vacantStaffRoles ? { vacantStaffRoles } : {}),
     ...(openPlanSlots !== undefined ? { openPlanSlots } : {}),
     ...(unhappyCount !== undefined ? { unhappyCount } : {}),
+    ...(redshirtSuggestions !== undefined ? { redshirtSuggestions } : {}),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
 

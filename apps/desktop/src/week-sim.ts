@@ -8,6 +8,7 @@ import {
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import {
+  applyCpuRedshirts,
   autoDevelopmentPlans,
   moodLabel,
   moraleReason,
@@ -27,6 +28,7 @@ import {
   type MoraleChange,
   type PracticeGain,
   type LacrosseStaff,
+  type LacrossePlayer,
   type LacrossePlayerGameStats,
   type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
@@ -99,11 +101,20 @@ export function simulateOneWeek(
   const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
     team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
-  const seasonAfterGames = advanceSeasonWeek(dynasty.season, (game, homeTeam, awayTeam) => {
-    // Injured players sit: the depth chart promotes the next man up for the
+  // CPU staffs make their redshirt calls before the opener.
+  const firstWeek = dynasty.season.schedule.reduce((min, game) => Math.min(min, game.week), Infinity);
+  const seasonBeforeGames =
+    weekToSim === firstWeek
+      ? {
+          ...dynasty.season,
+          teams: dynasty.season.teams.map((t) => (t.id === dynasty.userTeamId ? t : applyCpuRedshirts(t))),
+        }
+      : dynasty.season;
+  const seasonAfterGames = advanceSeasonWeek(seasonBeforeGames, (game, homeTeam, awayTeam) => {
+    // Injured and redshirting players sit: the depth chart promotes the next man up for the
     // rating, the game plan, and the box score.
-    const home = withoutInjured(homeTeam, injuredIds);
-    const away = withoutInjured(awayTeam, injuredIds);
+    const home = withoutUnavailable(homeTeam, injuredIds);
+    const away = withoutUnavailable(awayTeam, injuredIds);
     const { log, players, ...result } = simulateLacrosseGameWithLog({
       homeTeam: home,
       awayTeam: away,
@@ -365,9 +376,11 @@ export function simulateOneWeek(
   };
 }
 
-export function withoutInjured(team: LacrosseTeam, injuredIds: ReadonlySet<string>): LacrosseTeam {
-  if (!team.roster.some((p) => injuredIds.has(p.id))) return team;
-  return { ...team, roster: team.roster.filter((p) => !injuredIds.has(p.id)) };
+/** The roster that can dress for a game: no injured or redshirting players. */
+export function withoutUnavailable(team: LacrosseTeam, injuredIds: ReadonlySet<string>): LacrosseTeam {
+  const sitsOut = (p: LacrossePlayer) => injuredIds.has(p.id) || p.redshirtStatus === 'redshirting';
+  if (!team.roster.some(sitsOut)) return team;
+  return { ...team, roster: team.roster.filter((p) => !sitsOut(p)) };
 }
 
 function buildPlayerOfWeekNews(

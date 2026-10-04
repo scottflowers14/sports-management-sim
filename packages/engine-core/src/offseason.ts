@@ -1,4 +1,5 @@
 import type { Player, PlayerClass, Team, TeamRecord } from './models';
+import { REDSHIRT_DEVELOPMENT_BONUS } from './redshirt';
 
 export interface RunTeamOffseasonOptions<Position extends string = string, SportTraits = unknown> {
   developmentRandom?: () => number;
@@ -62,13 +63,16 @@ export function runTeamOffseason<Position extends string, SportTraits>(
 ): Team<Position, SportTraits> {
   const developmentRandom = options.developmentRandom ?? Math.random;
   const returningPlayers = team.roster.flatMap((player) => {
-    const nextClass = advancePlayerClass(player.classYear);
+    // A redshirt year doesn't count: he keeps his class and his eligibility,
+    // and the year of practice without games pays off in development.
+    const redshirted = player.redshirtStatus === 'redshirting';
+    const nextClass = redshirted ? player.classYear : advancePlayerClass(player.classYear);
 
     if (nextClass === null) {
       return [];
     }
 
-    const bonus = options.developmentBonusFor?.(player) ?? 0;
+    const bonus = (options.developmentBonusFor?.(player) ?? 0) + (redshirted ? REDSHIRT_DEVELOPMENT_BONUS : 0);
     const roll = Math.min(1, Math.max(0, developmentRandom() + bonus));
     const progressed = progressPlayer(player, roll);
     // One entry per season: a repeated rollover for the same year replaces it.
@@ -87,12 +91,15 @@ export function runTeamOffseason<Position extends string, SportTraits>(
         classYear: nextClass,
         fatigue: 0,
         ...(ratingHistory ? { ratingHistory } : {}),
-        eligibility: {
-          ...progressed.eligibility,
-          seasonsPlayed: progressed.eligibility.seasonsPlayed + 1,
-          seasonsRemaining: Math.max(0, progressed.eligibility.seasonsRemaining - 1),
-          isEligible: progressed.eligibility.seasonsRemaining - 1 > 0,
-        },
+        ...(redshirted ? { redshirtStatus: 'redshirt_used' as const } : {}),
+        eligibility: redshirted
+          ? progressed.eligibility
+          : {
+              ...progressed.eligibility,
+              seasonsPlayed: progressed.eligibility.seasonsPlayed + 1,
+              seasonsRemaining: Math.max(0, progressed.eligibility.seasonsRemaining - 1),
+              isEligible: progressed.eligibility.seasonsRemaining - 1 > 0,
+            },
       },
     ];
   });

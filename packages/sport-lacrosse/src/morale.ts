@@ -39,8 +39,12 @@ export interface PlayerRoleStatus {
 export function playerRoleStatus(team: LacrosseTeam, player: LacrossePlayer): PlayerRoleStatus {
   const starters = LACROSSE_STARTER_COUNTS[player.position];
   // Ties share a rank: nobody expects to beat out a teammate rated the same.
+  // Redshirting teammates aren't competing for the job this year.
   const ratingRank =
-    1 + team.roster.filter((p) => p.position === player.position && p.ratings.overall > player.ratings.overall).length;
+    1 +
+    team.roster.filter(
+      (p) => p.position === player.position && p.redshirtStatus !== 'redshirting' && p.ratings.overall > player.ratings.overall,
+    ).length;
   const order = getLacrosseDepthChart(team)[player.position];
   const depthRank = order.indexOf(player.id) + 1 || order.length + 1;
   return { expected: roleForRank(ratingRank, starters), actual: roleForRank(depthRank, starters) };
@@ -56,7 +60,10 @@ export interface MoraleWeekInput {
 export function weeklyMoraleChange(player: LacrossePlayer, status: PlayerRoleStatus, input: MoraleWeekInput): number {
   let change = 0;
   const benchedBy = ROLE_ORDER[status.actual] - ROLE_ORDER[status.expected];
-  if (benchedBy > 0) {
+  if (player.redshirtStatus === 'redshirting') {
+    // A redshirt is a plan he signed up for, not a benching.
+    change += 0.6;
+  } else if (benchedBy > 0) {
     // Seniors take a benching harder than freshmen.
     change -= 3 * benchedBy * (player.classYear === 'SR' || player.classYear === 'GR' ? 1.3 : 1);
   } else if (status.actual === 'starter') {
@@ -126,6 +133,7 @@ export function teamChemistry(team: LacrosseTeam): number {
 
 /** Why a player feels the way he does, in a few words. */
 export function moraleReason(team: LacrosseTeam, player: LacrossePlayer): string {
+  if (player.redshirtStatus === 'redshirting') return 'Redshirting this season';
   const status = playerRoleStatus(team, player);
   const benchedBy = ROLE_ORDER[status.actual] - ROLE_ORDER[status.expected];
   if (benchedBy > 0) return status.expected === 'starter' ? 'Thinks he should be starting' : 'Wants more playing time';

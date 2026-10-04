@@ -3,6 +3,7 @@ import {
   deriveCpuGamePlan,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
+  suggestRedshirts,
   STAFF_ROLES,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
@@ -110,6 +111,9 @@ export function App() {
     resetDynasty,
     updateDepthChartSlot,
     resetDepthChart,
+    setRedshirt,
+    redshirtsOpen,
+    gamesPlayedFor,
     userTeam,
     simWeek,
     simToEnd,
@@ -223,6 +227,11 @@ export function App() {
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
 
   const unhappyCount = userTeam.roster.filter((p) => p.morale < 50).length;
+  // Only nudge before the opener, and only until the coach has made a call.
+  const redshirtSuggestions =
+    redshirtsOpen && !userTeam.roster.some((p) => p.redshirtStatus === 'redshirting') && dynasty.season.currentWeek <= 1
+      ? suggestRedshirts(userTeam, gamesPlayedFor).length
+      : 0;
 
   const keyPositions = new Set(['GK', 'FOGO']);
   const highPriorityCount = injuries.filter((inj) => {
@@ -484,6 +493,7 @@ export function App() {
           vacantStaffRoles={STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase())}
           openPlanSlots={Math.max(0, MAX_DEVELOPMENT_PLANS - practicePlan.developmentPlans.length)}
           unhappyCount={unhappyCount}
+          redshirtSuggestions={redshirtSuggestions}
         />
       )}
 
@@ -529,6 +539,7 @@ export function App() {
           onSelectPlayer={setSelectedPlayerId}
           onDepthChartChange={updateDepthChartSlot}
           onResetDepthChart={resetDepthChart}
+          redshirts={{ open: redshirtsOpen, gamesPlayedFor, onSetRedshirt: setRedshirt }}
         />
       )}
 

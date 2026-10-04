@@ -1,4 +1,5 @@
 import type { ID, Team } from './models';
+import { isGraduating } from './redshirt';
 import type { Recruit } from './recruiting';
 
 export interface PositionNeed {
@@ -36,7 +37,7 @@ export function classNeedsByPosition<Position extends string, SportTraits>(
   for (const position of positions ?? []) entry(position);
   for (const player of team.roster) {
     const need = entry(player.position);
-    if (player.classYear === 'SR' || player.classYear === 'GR') need.graduating += 1;
+    if (isGraduating(player)) need.graduating += 1;
     else need.returning += 1;
   }
   for (const recruit of recruits) {

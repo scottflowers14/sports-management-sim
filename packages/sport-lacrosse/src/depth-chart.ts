@@ -31,7 +31,10 @@ export function createDefaultLacrosseDepthChart(team: LacrosseDepthChartTeamShap
 
 export function getLacrosseDepthChart(team: LacrosseDepthChartTeamShape): LacrosseDepthChart {
   const defaults = createDefaultLacrosseDepthChart(team);
-  const positionById = new Map(team.roster.map((player) => [player.id, player.position]));
+  // Redshirting players sit out the season, so they're off the chart.
+  const positionById = new Map(
+    team.roster.filter((player) => player.redshirtStatus !== 'redshirting').map((player) => [player.id, player.position]),
+  );
 
   return Object.fromEntries(
     (Object.keys(LACROSSE_STARTER_COUNTS) as LacrossePosition[]).map((position) => {
@@ -88,6 +91,6 @@ export function getLacrosseStarters(
 
 function sortedPositionPlayers(roster: LacrossePlayer[], position: LacrossePosition): LacrossePlayer[] {
   return [...roster]
-    .filter((player) => player.position === position)
+    .filter((player) => player.position === position && player.redshirtStatus !== 'redshirting')
     .sort((a, b) => b.ratings.overall - a.ratings.overall || a.name.last.localeCompare(b.name.last));
 }

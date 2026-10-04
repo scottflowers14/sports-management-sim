@@ -9,7 +9,7 @@ import {
   type LacrosseTeam,
   type MoodLabel,
 } from '@sports-management-sim/sport-lacrosse';
-import { portalMoraleMultiplier } from '@sports-management-sim/engine-core';
+import { classLabel, portalMoraleMultiplier } from '@sports-management-sim/engine-core';
 
 const MOODS: MoodLabel[] = ['Delighted', 'Happy', 'Content', 'Unhappy', 'Furious'];
 const ROLE_LABEL = { starter: 'Starter', rotation: 'Rotation', reserve: 'Reserve' } as const;
@@ -131,7 +131,7 @@ export function LockerRoomScreen({
                   </button>
                   <span className="dim">
                     {' '}
-                    {player.position} · {player.classYear} · {player.ratings.overall} OVR
+                    {player.position} · {classLabel(player)} · {player.ratings.overall} OVR
                   </span>
                   <div className="dim">{moraleReason(team, player)}</div>
                 </div>
@@ -173,7 +173,7 @@ export function LockerRoomScreen({
                     </button>
                   </td>
                   <td>{player.position}</td>
-                  <td>{player.classYear}</td>
+                  <td>{classLabel(player)}</td>
                   <td>{player.ratings.overall}</td>
                   <td>
                     {ROLE_LABEL[status.actual]}

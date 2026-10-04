@@ -5384,3 +5384,52 @@ li span {
   width: auto;
   padding: 4px 12px;
 }
+
+/* ── Redshirts ────────────────────────────────────────────── */
+
+.rs-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(196, 30, 58, 0.22);
+  color: #ff8a9a;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.redshirt-subhead {
+  margin: 16px 0 8px;
+  font-size: 0.9rem;
+}
+
+.redshirt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.redshirt-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.redshirt-btn {
+  display: inline-block;
+  width: auto;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.redshirt-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
