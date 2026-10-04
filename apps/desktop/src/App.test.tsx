@@ -617,9 +617,19 @@ describe('Desktop App', () => {
   it('makes a playing-time promise and calls out a broken one', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Team/ }));
-    // Start the fourth attackman in the first slot, benching a starter.
-    const slot = within(screen.getByText('Depth Chart').closest('article')!).getAllByRole('combobox')[0] as HTMLSelectElement;
-    await userEvent.selectOptions(slot, slot.options[3]!.value);
+    // Start a backup in a position's first slot, pushing its last starter to
+    // the bench. Ties go against the benched player, so use a position whose
+    // last starter is rated strictly above every backup.
+    const slots = within(screen.getByText('Depth Chart').closest('article')!).getAllByRole('combobox') as HTMLSelectElement[];
+    const overall = (option: HTMLOptionElement) => Number(/· (\d+)/.exec(option.text)![1]);
+    const slot = slots.find((candidate, index) => {
+      if (index > 0 && slots[index - 1]!.options[0]!.value === candidate.options[0]!.value) return false;
+      const starters = slots.filter((other) => other.options[0]!.value === candidate.options[0]!.value).length;
+      const options = Array.from(candidate.options);
+      return options.length > starters && options.slice(starters).every((option) => overall(option) < overall(options[starters - 1]!));
+    })!;
+    const starterCount = slots.filter((other) => other.options[0]!.value === slot.options[0]!.value).length;
+    await userEvent.selectOptions(slot, slot.options[starterCount]!.value);
     await userEvent.click(screen.getByRole('button', { name: /^Locker Room/ }));
     const concerns = screen.getByLabelText('Player concerns');
     await userEvent.click(within(concerns).getAllByRole('button', { name: 'Promise role' })[0]!);
