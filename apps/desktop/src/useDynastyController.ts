@@ -29,6 +29,7 @@ import {
   boostMorale,
   setCaptain,
   setLacrosseRedshirt,
+  type RivalrySeriesMap,
   MAX_DEVELOPMENT_PLANS,
   PLAYER_TALK_BOOST,
   TEAM_MEETING_BOOST,
@@ -198,6 +199,7 @@ export function useDynastyController() {
   const [practiceGains, setPracticeGains] = useState<PracticeLogEntry[]>(() => loadedSave?.practiceGains ?? []);
   const [lockerRoom, setLockerRoom] = useState<LockerRoomState>(() => loadedSave?.lockerRoom ?? EMPTY_LOCKER_ROOM);
   const [recordBook, setRecordBook] = useState<RecordBookArchive>(() => loadedSave?.recordBook ?? {});
+  const [rivalrySeries, setRivalrySeries] = useState<RivalrySeriesMap>(() => loadedSave?.rivalrySeries ?? {});
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
 
@@ -224,6 +226,7 @@ export function useDynastyController() {
     practiceGains,
     lockerRoom,
     recordBook,
+    rivalrySeries,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -232,7 +235,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -267,6 +270,7 @@ export function useDynastyController() {
     setPracticeGains([]);
     setLockerRoom(EMPTY_LOCKER_ROOM);
     setRecordBook({});
+    setRivalrySeries({});
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
     setAutoRecruitingOffers(false);
@@ -328,6 +332,7 @@ export function useDynastyController() {
       practiceGains: [],
       lockerRoom: EMPTY_LOCKER_ROOM,
       recordBook: {},
+      rivalrySeries: {},
       pendingJobOffers: null,
       shortlistIds: [],
       recruitingActivity: emptyRecruitingActivity(),
@@ -381,6 +386,7 @@ export function useDynastyController() {
     setPracticeGains(save.practiceGains ?? []);
     setLockerRoom(save.lockerRoom ?? EMPTY_LOCKER_ROOM);
     setRecordBook(save.recordBook ?? {});
+    setRivalrySeries(save.rivalrySeries ?? {});
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -468,7 +474,8 @@ export function useDynastyController() {
     userStaff: staffState.staff,
     practicePlan,
     practiceGains,
-  }), [staffState.staff, practicePlan, practiceGains, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+    rivalrySeries,
+  }), [staffState.staff, practicePlan, practiceGains, rivalrySeries, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((result: WeekSimState) => {
     const programName = result.dynasty.season.teams.find((t) => t.id === result.dynasty.userTeamId)?.name;
@@ -501,6 +508,7 @@ export function useDynastyController() {
     setBestNatRank(result.bestNatRank);
     setLastSimWeek(result.lastSimWeek);
     setPracticeGains(result.practiceGains ?? []);
+    if (result.rivalrySeries) setRivalrySeries(result.rivalrySeries);
     setAssistantReport(null);
     // Offers the assistant made during the sim pin those recruits, as manual offers do.
     const userId = result.dynasty.userTeamId;
@@ -1166,6 +1174,7 @@ export function useDynastyController() {
     autoFillDevelopmentPlans,
     lockerRoom,
     recordBook,
+    rivalrySeries,
     talkToPlayer,
     holdTeamMeeting,
     setRedshirt,

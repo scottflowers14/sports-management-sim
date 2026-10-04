@@ -32,6 +32,7 @@ function computeActionItems({
   unhappyCount = 0,
   redshirtSuggestions = 0,
   captainCount,
+  rivalryWeek,
 }: {
   currentWeek: number;
   classNeeds?: PositionNeed[];
@@ -40,6 +41,7 @@ function computeActionItems({
   unhappyCount?: number;
   redshirtSuggestions?: number;
   captainCount?: number;
+  rivalryWeek?: string;
   injuries: InjuredPlayer[];
   userTeam: LacrosseTeam;
   scouting: ScoutingState;
@@ -132,6 +134,10 @@ function computeActionItems({
     });
   }
 
+  if (!seasonComplete && rivalryWeek) {
+    items.push({ id: 'rivalry-week', priority: 'high', icon: '🏆', text: rivalryWeek, nav: 'schedule' });
+  }
+
   if (!seasonComplete && captainCount === 0) {
     items.push({
       id: 'captains',
@@ -216,6 +222,7 @@ export function WeekHubScreen({
   unhappyCount,
   redshirtSuggestions,
   captainCount,
+  rivalryWeek,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -241,6 +248,7 @@ export function WeekHubScreen({
   unhappyCount?: number;
   redshirtSuggestions?: number;
   captainCount?: number;
+  rivalryWeek?: string;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -262,6 +270,7 @@ export function WeekHubScreen({
     ...(unhappyCount !== undefined ? { unhappyCount } : {}),
     ...(redshirtSuggestions !== undefined ? { redshirtSuggestions } : {}),
     ...(captainCount !== undefined ? { captainCount } : {}),
+    ...(rivalryWeek !== undefined ? { rivalryWeek } : {}),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
 

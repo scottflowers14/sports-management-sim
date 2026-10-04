@@ -3,6 +3,10 @@ import {
   deriveCpuGamePlan,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
+  buildRivalries,
+  rivalryFor,
+  rivalryForGame,
+  seriesSummary,
   suggestRedshirts,
   teamCaptains,
   STAFF_ROLES,
@@ -73,6 +77,7 @@ export function App() {
     seasonStats,
     careerStats,
     recordBook,
+    rivalrySeries,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -231,6 +236,18 @@ export function App() {
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
 
   const unhappyCount = userTeam.roster.filter((p) => p.morale < 50).length;
+  const rivalries = buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+  const userRivalry = rivalryFor(rivalries, userTeam.id);
+  const rivalGameThisWeek = userRivalry
+    ? dynasty.season.schedule.find(
+        (g) => g.week === dynasty.season.currentWeek && g.status !== 'final' && rivalryForGame([userRivalry], g) !== null,
+      )
+    : undefined;
+  const rivalId = userRivalry?.teamIds.find((id) => id !== userTeam.id);
+  const rivalryWeek =
+    rivalGameThisWeek && userRivalry && rivalId
+      ? `Rivalry week: ${userRivalry.trophy} is on the line against ${formatTeamName(teamMap.get(rivalId) ?? rivalId)} (${seriesSummary(rivalrySeries[userRivalry.key], userTeam.id, rivalId).toLowerCase()}). The result hits morale three times as hard.`
+      : undefined;
   // Only nudge before the opener, and only until the coach has made a call.
   const redshirtSuggestions =
     redshirtsOpen && !userTeam.roster.some((p) => p.redshirtStatus === 'redshirting') && dynasty.season.currentWeek <= 1
@@ -500,6 +517,7 @@ export function App() {
           unhappyCount={unhappyCount}
           redshirtSuggestions={redshirtSuggestions}
           captainCount={teamCaptains(userTeam).length}
+          {...(rivalryWeek ? { rivalryWeek } : {})}
         />
       )}
 
@@ -558,6 +576,8 @@ export function App() {
           currentWeek={dynasty.season.currentWeek}
           gameLogs={gameLogs}
           onBoxScore={setSelectedBoxScore}
+          rivalries={rivalries}
+          rivalrySeries={rivalrySeries}
         />
       )}
 

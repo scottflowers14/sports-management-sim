@@ -1,5 +1,14 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
-import type { GameLog, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import {
+  rivalryFor,
+  rivalryForGame,
+  seriesSummary,
+  type GameLog,
+  type LacrosseTeam,
+  type LacrosseTeamStats,
+  type Rivalry,
+  type RivalrySeriesMap,
+} from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName } from '../ui/format';
 import type { BoxScoreData } from '../ui/types';
 import { getNextUserGamePreview } from '../schedule-preview';
@@ -12,6 +21,8 @@ export function ScheduleScreen({
   currentWeek,
   gameLogs,
   onBoxScore,
+  rivalries = [],
+  rivalrySeries = {},
 }: {
   schedule: ScheduledGame[];
   teams: LacrosseTeam[];
@@ -20,7 +31,15 @@ export function ScheduleScreen({
   currentWeek: number;
   gameLogs: Map<string, GameLog>;
   onBoxScore: (data: BoxScoreData) => void;
+  rivalries?: Rivalry[];
+  rivalrySeries?: RivalrySeriesMap;
 }) {
+  const rivalry = rivalryFor(rivalries, userTeamId);
+  const rivalId = rivalry?.teamIds.find((id) => id !== userTeamId) ?? null;
+  const series = rivalry ? rivalrySeries[rivalry.key] : undefined;
+  const rivalGame = rivalId
+    ? schedule.find((g) => (g.homeTeamId === rivalId && g.awayTeamId === userTeamId) || (g.awayTeamId === rivalId && g.homeTeamId === userTeamId))
+    : undefined;
   const weeks = [...new Set(schedule.map((game) => game.week))].sort((a, b) => a - b);
   const nextPreview = getNextUserGamePreview({ schedule, teams, userTeamId, currentWeek });
 
@@ -31,6 +50,38 @@ export function ScheduleScreen({
         <h2>Full Schedule</h2>
         <p className="dim">Review every matchup, result, and completed box score for the season.</p>
       </article>
+
+      {rivalry && rivalId && (
+        <article className="card rivalry-card" aria-label="Rivalry">
+          <p className="eyebrow">Rivalry</p>
+          <h2>{rivalry.trophy}</h2>
+          <p>
+            vs <strong>{formatTeamName(teamMap.get(rivalId) ?? rivalId)}</strong> · {seriesSummary(series, userTeamId, rivalId)}
+            {series?.holderId && (
+              <span className="dim">
+                {' '}
+                · {series.holderId === userTeamId ? 'You hold the trophy' : `${formatTeamName(teamMap.get(series.holderId) ?? series.holderId)} holds the trophy`}
+              </span>
+            )}
+          </p>
+          {rivalGame && (
+            <p className="dim">
+              {rivalGame.result
+                ? `This season: ${rivalGame.result.winnerTeamId === userTeamId ? 'won' : 'lost'} ${Math.max(rivalGame.result.homeScore, rivalGame.result.awayScore)}-${Math.min(rivalGame.result.homeScore, rivalGame.result.awayScore)} in week ${rivalGame.week}.`
+                : `This season: week ${rivalGame.week}, ${rivalGame.homeTeamId === userTeamId ? 'at home' : 'on the road'}. Rivalry results hit morale three times as hard.`}
+            </p>
+          )}
+          {series && series.recent.length > 0 && (
+            <ul className="rivalry-recent">
+              {series.recent.map((r) => (
+                <li key={`${r.year}-${r.score}`} className={r.winnerId === userTeamId ? 'mood-happy' : 'mood-unhappy'}>
+                  {r.year}: {r.winnerId === userTeamId ? 'W' : 'L'} {r.score}
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+      )}
 
       {nextPreview && (
         <article className="card matchup-preview-card" aria-label="Next game preview">
@@ -111,6 +162,11 @@ export function ScheduleScreen({
                         <strong>{formatTeamName(teamMap.get(game.awayTeamId) ?? game.awayTeamId)}</strong>
                         <span className="schedule-at"> at </span>
                         <strong>{formatTeamName(teamMap.get(game.homeTeamId) ?? game.homeTeamId)}</strong>
+                        {rivalryForGame(rivalries, game) && (
+                          <span className="rivalry-pill" title={rivalryForGame(rivalries, game)!.trophy}>
+                            Rivalry
+                          </span>
+                        )}
                       </td>
                       <td>{result ? `Final${result.overtime ? ' OT' : ''}` : 'Scheduled'}</td>
                       <td>{result ? `${result.awayScore}–${result.homeScore}` : '—'}</td>

@@ -9,6 +9,10 @@ import {
 } from '@sports-management-sim/engine-core';
 import {
   applyCpuCaptains,
+  buildRivalries,
+  recordRivalryGame,
+  rivalryForGame,
+  seriesSummary,
   applyCpuRedshirts,
   autoDevelopmentPlans,
   moodLabel,
@@ -30,10 +34,12 @@ import {
   type PracticeGain,
   type LacrosseStaff,
   type LacrossePlayer,
+  type RivalrySeriesMap,
   type LacrossePlayerGameStats,
   type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, processInjuries } from './dynasty-helpers';
+import { formatTeamName } from './ui/format';
 import type { InjuredPlayer } from './dynasty-helpers';
 import { computeNationalRankings } from './rankings';
 import type { RankingEntry } from './rankings';
@@ -68,6 +74,8 @@ export interface WeekSimState {
   practicePlan?: LacrossePracticePlan;
   /** Rating points the user's players gained at practice this season, newest first. */
   practiceGains?: PracticeLogEntry[];
+  /** Every rivalry's all-time series, carried across seasons. */
+  rivalrySeries?: RivalrySeriesMap;
 }
 
 export interface PracticeLogEntry extends PracticeGain {
@@ -132,6 +140,27 @@ export function simulateOneWeek(
 
   // Every program practices after the week's games. CPU staffs run a normal
   // week with plans on their highest-upside young players.
+  const rivalries = buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+  let rivalrySeries = state.rivalrySeries ?? {};
+  const rivalryNews: NewsItem[] = [];
+  for (const game of seasonAfterGames.schedule) {
+    if (game.week !== weekToSim || game.status !== 'final' || !game.result) continue;
+    const rivalry = rivalryForGame(rivalries, game);
+    if (!rivalry) continue;
+    const previousHolder = rivalrySeries[rivalry.key]?.holderId ?? null;
+    rivalrySeries = recordRivalryGame(rivalrySeries, rivalry, game, dynasty.season.year);
+    const { winnerTeamId, loserTeamId, homeScore, awayScore } = game.result;
+    const verb = previousHolder === null ? 'wins' : previousHolder === winnerTeamId ? 'keeps' : 'takes back';
+    const involvesUser = winnerTeamId === dynasty.userTeamId || loserTeamId === dynasty.userTeamId;
+    rivalryNews.push({
+      id: `rivalry-${dynasty.season.year}-${weekToSim}-${rivalry.key}`,
+      week: weekToSim,
+      category: 'game',
+      ...(involvesUser ? { featured: true } : {}),
+      headline: `Rivalry: ${formatTeamName(teamMap.get(winnerTeamId) ?? winnerTeamId)} ${verb} ${rivalry.trophy}, beating ${formatTeamName(teamMap.get(loserTeamId) ?? loserTeamId)} ${Math.max(homeScore, awayScore)}-${Math.min(homeScore, awayScore)} (${seriesSummary(rivalrySeries[rivalry.key], winnerTeamId, loserTeamId).toLowerCase()})`,
+    });
+  }
+
   const playedTeamIds = new Set(
     seasonAfterGames.schedule
       .filter((g) => g.week === weekToSim && g.status === 'final')
@@ -156,7 +185,8 @@ export function simulateOneWeek(
         (g) => g.week === weekToSim && g.status === 'final' && (g.homeTeamId === team.id || g.awayTeamId === team.id),
       );
       const won = game?.result ? game.result.winnerTeamId === team.id : null;
-      const mood = runMoraleWeek(practiced.team, { won, intensity: plan.intensity });
+      const rivalry = game ? rivalryForGame(rivalries, game) !== null : false;
+      const mood = runMoraleWeek(practiced.team, { won, intensity: plan.intensity, rivalry });
       if (isUser) moraleChanges.push(...mood.changes);
       return mood.team;
     }),
@@ -360,7 +390,8 @@ export function simulateOneWeek(
     dynasty: newDynasty,
     rankings: newRankings,
     injuries: newInjuries,
-    newsItems: [...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
+    rivalrySeries,
+    newsItems: [...rivalryNews, ...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
     scouting: advanceScoutingWeek(state.scouting),
     recruitingActivity: emptyRecruitingActivity(),
     recruitTrends,
