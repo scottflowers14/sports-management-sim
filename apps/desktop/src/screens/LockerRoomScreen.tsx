@@ -1,9 +1,14 @@
 import {
+  captainInfluence,
+  CAPTAIN_NAMED_BOOST,
+  MAX_CAPTAINS,
   moodLabel,
   moraleReason,
   playerRoleStatus,
   PLAYER_TALK_BOOST,
+  suggestCaptains,
   TEAM_MEETING_BOOST,
+  teamCaptains,
   teamChemistry,
   type LacrossePlayer,
   type LacrosseTeam,
@@ -21,6 +26,7 @@ interface LockerRoomScreenProps {
   meetingReadyWeek: number | null;
   onTalk: (playerId: string) => void;
   onTeamMeeting: () => void;
+  onSetCaptain: (playerId: string, captain: boolean) => void;
   onSelectPlayer: (playerId: string) => void;
 }
 
@@ -44,8 +50,13 @@ export function LockerRoomScreen({
   meetingReadyWeek,
   onTalk,
   onTeamMeeting,
+  onSetCaptain,
   onSelectPlayer,
 }: LockerRoomScreenProps) {
+  const captains = teamCaptains(team);
+  const captainIds = new Set(captains.map((p) => p.id));
+  const influence = captainInfluence(team);
+  const captainSuggestions = captains.length < MAX_CAPTAINS ? suggestCaptains(team, MAX_CAPTAINS + 2).filter((p) => !captainIds.has(p.id)).slice(0, 3) : [];
   const chemistry = teamChemistry(team);
   const counts = new Map<MoodLabel, number>(MOODS.map((m) => [m, 0]));
   for (const p of team.roster) counts.set(moodLabel(p.morale), (counts.get(moodLabel(p.morale)) ?? 0) + 1);
@@ -117,6 +128,70 @@ export function LockerRoomScreen({
         </div>
       </article>
 
+      <article className="card" aria-label="Team captains">
+        <h2>Captains</h2>
+        <p className="dim practice-note">
+          Captains set the tone. A happy captain with strong leadership lifts the whole room every week; an unhappy one
+          drags it down, and a weak leader does little good. Naming a captain lifts his own morale by {CAPTAIN_NAMED_BOOST}.
+        </p>
+        {captains.length === 0 ? (
+          <p className="dim">No captains named.</p>
+        ) : (
+          <ul className="locker-concerns">
+            {captains.map((player) => (
+              <li key={player.id} className="locker-concern">
+                <div>
+                  <button type="button" className="practice-name-btn" onClick={() => onSelectPlayer(player.id)}>
+                    <span className="captain-badge">C</span> {player.name.first} {player.name.last}
+                  </button>
+                  <span className="dim">
+                    {' '}
+                    {player.position} · {classLabel(player)} · Leadership {player.ratings.leadership}
+                  </span>
+                </div>
+                <span className={moodClass(moodLabel(player.morale))}>
+                  {moodLabel(player.morale)} {Math.round(player.morale)}
+                </span>
+                <button type="button" className="offer-btn locker-talk-btn" onClick={() => onSetCaptain(player.id, false)}>
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className={influence >= 0 ? 'locker-influence mood-happy' : 'locker-influence mood-unhappy'}>
+          {captains.length === 0
+            ? 'Without captains, nobody steadies the room.'
+            : `Captains ${influence >= 0 ? 'lift' : 'drag'} everyone's morale by ${influence >= 0 ? '+' : ''}${influence.toFixed(1)} a week.`}
+        </p>
+        {captainSuggestions.length > 0 && (
+          <>
+            <h3 className="redshirt-subhead">Natural leaders</h3>
+            <ul className="locker-concerns">
+              {captainSuggestions.map((player) => (
+                <li key={player.id} className="locker-concern">
+                  <div>
+                    <button type="button" className="practice-name-btn" onClick={() => onSelectPlayer(player.id)}>
+                      {player.name.first} {player.name.last}
+                    </button>
+                    <span className="dim">
+                      {' '}
+                      {player.position} · {classLabel(player)} · Leadership {player.ratings.leadership}
+                    </span>
+                  </div>
+                  <span className={moodClass(moodLabel(player.morale))}>
+                    {moodLabel(player.morale)} {Math.round(player.morale)}
+                  </span>
+                  <button type="button" className="offer-btn locker-talk-btn" onClick={() => onSetCaptain(player.id, true)}>
+                    Make captain
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </article>
+
       <article className="card" aria-label="Player concerns">
         <h2>Concerns</h2>
         {concerns.length === 0 && <p className="dim">Nobody is unhappy right now.</p>}
@@ -169,7 +244,7 @@ export function LockerRoomScreen({
                 <tr key={player.id}>
                   <td>
                     <button type="button" className="practice-name-btn" onClick={() => onSelectPlayer(player.id)}>
-                      {player.name.first} {player.name.last}
+                      {captainIds.has(player.id) && <span className="captain-badge">C</span>} {player.name.first} {player.name.last}
                     </button>
                   </td>
                   <td>{player.position}</td>

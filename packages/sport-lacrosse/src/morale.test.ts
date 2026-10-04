@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { decidePortalEntry, portalMoraleMultiplier } from '@sports-management-sim/engine-core';
 import type { LacrossePlayer, LacrosseTeam } from './models';
 import {
+  applyCpuCaptains,
   boostMorale,
+  captainInfluence,
+  CAPTAIN_NAMED_BOOST,
   MORALE_BASELINE,
   moodLabel,
   moraleDevelopmentMultiplier,
   moraleReason,
   playerRoleStatus,
   runMoraleWeek,
+  setCaptain,
+  suggestCaptains,
+  teamCaptains,
   teamChemistry,
   weeklyMoraleChange,
 } from './morale';
@@ -139,5 +145,56 @@ describe('what morale changes', () => {
     };
     expect(entrants(25)).toBeGreaterThan(entrants(65) * 1.8);
     expect(entrants(90)).toBeLessThan(entrants(65));
+  });
+});
+
+describe('captains', () => {
+  function withLeadership(leadership: number[]): LacrosseTeam {
+    const roster = attackUnit().map((p, i) => ({ ...p, ratings: { ...p.ratings, leadership: leadership[i] ?? 50 } }));
+    return withDepthChart(roster, roster.map((p) => p.id));
+  }
+
+  it('names up to two captains and lifts the one named', () => {
+    let team = withLeadership([80, 70, 60, 40]);
+    const [a, b, c] = team.roster;
+    team = setCaptain(team, a!.id, true);
+    expect(team.roster[0]!.morale).toBe(MORALE_BASELINE + CAPTAIN_NAMED_BOOST);
+    team = setCaptain(setCaptain(team, b!.id, true), c!.id, true);
+    expect(teamCaptains(team).map((p) => p.id)).toEqual([a!.id, b!.id]);
+    expect(teamCaptains(setCaptain(team, a!.id, false)).map((p) => p.id)).toEqual([b!.id]);
+  });
+
+  it('lets a happy leader lift the room and an unhappy one drag it down', () => {
+    const team = withLeadership([90, 50, 50, 50]);
+    const happy = setCaptain(team, team.roster[0]!.id, true);
+    expect(captainInfluence(happy)).toBeGreaterThan(0.2);
+    const sour = { ...happy, roster: happy.roster.map((p, i) => (i === 0 ? { ...p, morale: 30 } : p)) };
+    expect(captainInfluence(sour)).toBeLessThan(-0.4);
+    // A weak leader does a little harm even when he's happy.
+    const weak = setCaptain(withLeadership([20, 50, 50, 50]), team.roster[0]!.id, true);
+    expect(captainInfluence(weak)).toBeLessThan(0);
+    expect(captainInfluence(team)).toBe(0);
+  });
+
+  it('shows up in the weekly morale of everyone but the captain', () => {
+    const team = withLeadership([90, 50, 50, 50]);
+    const led = setCaptain(team, team.roster[0]!.id, true);
+    const input = { won: null, intensity: 'normal' } as const;
+    const without = runMoraleWeek(team, input).team.roster[1]!.morale;
+    const withCaptain = runMoraleWeek(led, input).team.roster[1]!.morale;
+    expect(withCaptain).toBeGreaterThan(without);
+  });
+
+  it('has CPU staffs pick their best upperclass leaders, once', () => {
+    const roster = attackUnit().map((p, i) => ({
+      ...p,
+      classYear: i === 0 ? ('FR' as const) : ('SR' as const),
+      ratings: { ...p.ratings, leadership: [99, 60, 80, 70][i]! },
+    }));
+    const team = withDepthChart(roster, roster.map((p) => p.id));
+    expect(suggestCaptains(team).map((p) => p.ratings.leadership)).toEqual([80, 70]);
+    const named = applyCpuCaptains(team);
+    expect(teamCaptains(named)).toHaveLength(2);
+    expect(applyCpuCaptains(named)).toBe(named);
   });
 });
