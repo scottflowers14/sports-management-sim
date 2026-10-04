@@ -88,6 +88,8 @@ export function App() {
     hallOfFame,
     proDraftHistory,
     upgradeCoachAbility,
+    scheduleEditable,
+    swapNonConferenceGame,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -600,6 +602,9 @@ export function App() {
           onBoxScore={setSelectedBoxScore}
           rivalries={rivalries}
           rivalrySeries={rivalrySeries}
+          conferences={dynasty.season.conferences}
+          editable={scheduleEditable}
+          onSwapNonConference={swapNonConferenceGame}
         />
       )}
 

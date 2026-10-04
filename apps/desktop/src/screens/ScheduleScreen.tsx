@@ -1,5 +1,8 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import {
+  calculateLacrosseTeamRating,
+  eligibleNonConferenceOpponents,
+  userNonConferenceSlots,
   rivalryFor,
   rivalryForGame,
   seriesSummary,
@@ -23,6 +26,9 @@ export function ScheduleScreen({
   onBoxScore,
   rivalries = [],
   rivalrySeries = {},
+  conferences = [],
+  editable = false,
+  onSwapNonConference,
 }: {
   schedule: ScheduledGame[];
   teams: LacrosseTeam[];
@@ -33,6 +39,9 @@ export function ScheduleScreen({
   onBoxScore: (data: BoxScoreData) => void;
   rivalries?: Rivalry[];
   rivalrySeries?: RivalrySeriesMap;
+  conferences?: Array<{ id: string; shortName: string; teamIds: string[] }>;
+  editable?: boolean;
+  onSwapNonConference?: (week: number, opponentId: string) => void;
 }) {
   const rivalry = rivalryFor(rivalries, userTeamId);
   const rivalId = rivalry?.teamIds.find((id) => id !== userTeamId) ?? null;
@@ -81,6 +90,17 @@ export function ScheduleScreen({
             </ul>
           )}
         </article>
+      )}
+
+      {onSwapNonConference && conferences.length > 0 && (
+        <NonConferenceCard
+          schedule={schedule}
+          teams={teams}
+          conferences={conferences}
+          userTeamId={userTeamId}
+          editable={editable}
+          onSwap={onSwapNonConference}
+        />
       )}
 
       {nextPreview && (
@@ -188,6 +208,75 @@ export function ScheduleScreen({
         );
       })}
     </div>
+  );
+}
+
+function NonConferenceCard({
+  schedule,
+  teams,
+  conferences,
+  userTeamId,
+  editable,
+  onSwap,
+}: {
+  schedule: ScheduledGame[];
+  teams: LacrosseTeam[];
+  conferences: Array<{ id: string; shortName: string; teamIds: string[] }>;
+  userTeamId: string;
+  editable: boolean;
+  onSwap: (week: number, opponentId: string) => void;
+}) {
+  const context = { schedule, conferences, userTeamId };
+  const slots = userNonConferenceSlots(context);
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const ratingById = new Map(teams.map((t) => [t.id, calculateLacrosseTeamRating(t).overall]));
+  const conferenceName = (teamId: string) => conferences.find((c) => c.teamIds.includes(teamId))?.shortName ?? '';
+  const label = (teamId: string) => {
+    const team = teamById.get(teamId);
+    return `${formatTeamName(team?.name ?? teamId)} (${conferenceName(teamId)}, OVR ${ratingById.get(teamId) ?? '?'}, Prestige ${team?.reputation.nationalPrestige ?? '?'})`;
+  };
+  if (slots.length === 0) return null;
+  const avgOvr = Math.round(slots.reduce((sum, s) => sum + (ratingById.get(s.opponentId) ?? 0), 0) / slots.length);
+
+  return (
+    <article className="card nonconf-card" aria-label="Non-conference schedule">
+      <p className="eyebrow">Non-Conference Schedule</p>
+      <h2>Build Your Slate</h2>
+      <p className="dim">
+        {editable
+          ? 'Swap any non-conference opponent before your first game. Tough games lift your RPI for NCAA selection; easy ones pad the record.'
+          : 'Your season is underway, so the non-conference slate is locked until next year.'}{' '}
+        Average opponent OVR: <strong>{avgOvr}</strong>.
+      </p>
+      <ul className="nonconf-list">
+        {slots.map((slot) => {
+          const options = editable ? eligibleNonConferenceOpponents(context, slot.week) : [];
+          options.sort((a, b) => (ratingById.get(b) ?? 0) - (ratingById.get(a) ?? 0));
+          return (
+            <li key={slot.week}>
+              <span className="nonconf-week">Week {slot.week}</span>
+              <span className="nonconf-site">{slot.home ? 'vs' : 'at'}</span>
+              {editable ? (
+                <select
+                  aria-label={`Week ${slot.week} opponent`}
+                  value={slot.opponentId}
+                  onChange={(e) => onSwap(slot.week, e.target.value)}
+                >
+                  <option value={slot.opponentId}>{label(slot.opponentId)}</option>
+                  {options.map((id) => (
+                    <option key={id} value={id}>
+                      {label(id)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <strong>{label(slot.opponentId)}</strong>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </article>
   );
 }
 

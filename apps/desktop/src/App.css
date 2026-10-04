@@ -5880,3 +5880,35 @@ li span {
   font-weight: 800;
   color: #72f2c6;
 }
+
+.nonconf-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nonconf-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.nonconf-week {
+  min-width: 4.5rem;
+  font-weight: 600;
+}
+
+.nonconf-site {
+  min-width: 1.5rem;
+  color: var(--text-dim, #8a94a6);
+}
+
+.nonconf-list select {
+  flex: 1;
+  min-width: 0;
+  max-width: 34rem;
+}
