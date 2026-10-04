@@ -26,7 +26,11 @@ import {
 import type { StaffRole } from '@sports-management-sim/sport-lacrosse';
 import {
   autoDevelopmentPlans,
+  boostMorale,
   MAX_DEVELOPMENT_PLANS,
+  PLAYER_TALK_BOOST,
+  TEAM_MEETING_BOOST,
+  TEAM_MEETING_COOLDOWN,
   prunePracticePlan,
   type DevelopmentFocusArea,
   type LacrossePracticePlan,
@@ -41,6 +45,7 @@ import { simulateOneWeek, simulateRemainingWeeks, withoutInjured } from './week-
 import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, WeekSimState } from './week-sim';
+import { EMPTY_LOCKER_ROOM, type LockerRoomState } from './locker-room';
 import {
   createCoachProfile,
   generateCoachName,
@@ -124,7 +129,8 @@ export type View =
   | 'programs'
   | 'players'
   | 'staff'
-  | 'practice';
+  | 'practice'
+  | 'locker-room';
 
 export function useDynastyController() {
   const [screen, setScreen] = useState<'start' | 'game'>('start');
@@ -186,6 +192,7 @@ export function useDynastyController() {
     () => loadedSave?.practicePlan ?? defaultPracticePlan(dynasty),
   );
   const [practiceGains, setPracticeGains] = useState<PracticeLogEntry[]>(() => loadedSave?.practiceGains ?? []);
+  const [lockerRoom, setLockerRoom] = useState<LockerRoomState>(() => loadedSave?.lockerRoom ?? EMPTY_LOCKER_ROOM);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
 
@@ -210,6 +217,7 @@ export function useDynastyController() {
     trainingFocus,
     practicePlan,
     practiceGains,
+    lockerRoom,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -218,7 +226,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -251,6 +259,7 @@ export function useDynastyController() {
     setGamePlan(DEFAULT_GAME_PLAN);
     setTrainingFocus('balanced');
     setPracticeGains([]);
+    setLockerRoom(EMPTY_LOCKER_ROOM);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
     setAutoRecruitingOffers(false);
@@ -310,6 +319,7 @@ export function useDynastyController() {
       trainingFocus: 'balanced',
       practicePlan: newPracticePlan,
       practiceGains: [],
+      lockerRoom: EMPTY_LOCKER_ROOM,
       pendingJobOffers: null,
       shortlistIds: [],
       recruitingActivity: emptyRecruitingActivity(),
@@ -361,6 +371,7 @@ export function useDynastyController() {
     setTrainingFocus(save.trainingFocus ?? 'balanced');
     setPracticePlan(save.practicePlan ?? defaultPracticePlan(save.dynasty));
     setPracticeGains(save.practiceGains ?? []);
+    setLockerRoom(save.lockerRoom ?? EMPTY_LOCKER_ROOM);
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -413,6 +424,22 @@ export function useDynastyController() {
       },
     }));
     setSaveStatus('Depth chart updated');
+  }, []);
+
+  /** Drop every manual depth chart choice, so each position runs in rating order. */
+  const resetDepthChart = useCallback(() => {
+    setDynasty((current) => ({
+      ...current,
+      season: {
+        ...current.season,
+        teams: current.season.teams.map((team) => {
+          if (team.id !== current.userTeamId) return team;
+          const { depthChart: _manual, ...rest } = team as LacrosseTeam & { depthChart?: unknown };
+          return rest as LacrosseTeam;
+        }),
+      },
+    }));
+    setSaveStatus('Depth chart reset to the best lineup');
   }, []);
 
   const userTeam = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
@@ -863,6 +890,38 @@ export function useDynastyController() {
     setSaveStatus(`Released ${member.name.first} ${member.name.last}`);
   }, [staffState]);
 
+  const updateUserRoster = useCallback((change: (team: LacrosseTeam) => LacrosseTeam) => {
+    setDynasty((prev) => ({
+      ...prev,
+      season: {
+        ...prev.season,
+        teams: prev.season.teams.map((t) => (t.id === prev.userTeamId ? change(t) : t)),
+      },
+    }));
+  }, []);
+
+  /** A one-on-one: lifts a player's morale, once a season each. */
+  const talkToPlayer = useCallback((playerId: string) => {
+    if (lockerRoom.talkedIds.includes(playerId)) return;
+    const player = userTeam?.roster.find((p) => p.id === playerId);
+    if (!player) return;
+    updateUserRoster((team) => boostMorale(team, new Set([playerId]), PLAYER_TALK_BOOST));
+    setLockerRoom((room) => ({ ...room, talkedIds: [...room.talkedIds, playerId] }));
+    setSaveStatus(`Met with ${player.name.first} ${player.name.last}`);
+  }, [lockerRoom.talkedIds, userTeam, updateUserRoster]);
+
+  const currentWeekNumber = dynasty.season.currentWeek;
+  const meetingReadyWeek = lockerRoom.lastMeetingWeek === null ? null : lockerRoom.lastMeetingWeek + TEAM_MEETING_COOLDOWN;
+  const canHoldTeamMeeting = meetingReadyWeek === null || currentWeekNumber >= meetingReadyWeek;
+
+  /** A team meeting lifts everyone a little; players tune out if it's too often. */
+  const holdTeamMeeting = useCallback(() => {
+    if (!canHoldTeamMeeting) return;
+    updateUserRoster((team) => boostMorale(team, 'all', TEAM_MEETING_BOOST));
+    setLockerRoom((room) => ({ ...room, lastMeetingWeek: currentWeekNumber }));
+    setSaveStatus('Held a team meeting');
+  }, [canHoldTeamMeeting, currentWeekNumber, updateUserRoster]);
+
   const setPracticeIntensity = useCallback((intensity: PracticeIntensity) => {
     setPracticePlan((plan) => ({ ...plan, intensity }));
   }, []);
@@ -912,6 +971,7 @@ export function useDynastyController() {
     // Graduates and transfers drop off their development plans.
     if (userTeamData) setPracticePlan((plan) => prunePracticePlan(plan, userTeamData));
     setPracticeGains([]);
+    setLockerRoom(EMPTY_LOCKER_ROOM);
     setOffseasonSummary(null);
     // Empty chairs don't stay empty into the season.
     const filled = fillStaffVacancies(staffState.staff, staffState.staffCandidates, staffBudget);
@@ -1056,6 +1116,11 @@ export function useDynastyController() {
     setDevelopmentPlan,
     removeDevelopmentPlan,
     autoFillDevelopmentPlans,
+    lockerRoom,
+    talkToPlayer,
+    holdTeamMeeting,
+    canHoldTeamMeeting,
+    meetingReadyWeek,
     pendingJobOffers,
     persistDynasty,
     startNewDynasty,
@@ -1063,6 +1128,7 @@ export function useDynastyController() {
     deleteSave,
     resetDynasty,
     updateDepthChartSlot,
+    resetDepthChart,
     userTeam,
     simWeek,
     simToEnd,

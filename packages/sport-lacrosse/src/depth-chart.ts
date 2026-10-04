@@ -59,10 +59,12 @@ export function updateLacrosseDepthChartSlot(
   const positionOrder = current[position].filter((id) => id !== playerId);
   positionOrder.splice(slotIndex, 0, playerId);
 
+  // Only the edited position is pinned; the rest keep following the ratings,
+  // so a player who improves at practice still moves up on his own.
   return {
     ...team,
     depthChart: {
-      ...current,
+      ...team.depthChart,
       [position]: positionOrder,
     },
   };

@@ -24,6 +24,7 @@ import { NewsScreen } from './screens/NewsScreen';
 import { OffseasonScreen } from './screens/OffseasonScreen';
 import { StaffScreen } from './screens/StaffScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
+import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
@@ -96,6 +97,11 @@ export function App() {
     setDevelopmentPlan,
     removeDevelopmentPlan,
     autoFillDevelopmentPlans,
+    lockerRoom,
+    talkToPlayer,
+    holdTeamMeeting,
+    canHoldTeamMeeting,
+    meetingReadyWeek,
     pendingJobOffers,
     persistDynasty,
     startNewDynasty,
@@ -103,6 +109,7 @@ export function App() {
     deleteSave,
     resetDynasty,
     updateDepthChartSlot,
+    resetDepthChart,
     userTeam,
     simWeek,
     simToEnd,
@@ -215,6 +222,8 @@ export function App() {
 
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
 
+  const unhappyCount = userTeam.roster.filter((p) => p.morale < 50).length;
+
   const keyPositions = new Set(['GK', 'FOGO']);
   const highPriorityCount = injuries.filter((inj) => {
     if (inj.teamId !== dynasty.userTeamId) return false;
@@ -304,6 +313,7 @@ export function App() {
         { view: 'schedule', label: 'Schedule' },
         { view: 'staff', label: 'Staff' },
         { view: 'practice', label: 'Practice' },
+        { view: 'locker-room', label: 'Locker Room', ...(unhappyCount > 0 ? { badge: unhappyCount } : {}) },
         { view: 'recruiting', label: committedCount > 0 ? `Recruiting · ${committedCount}` : 'Recruiting' },
       ],
     },
@@ -473,6 +483,7 @@ export function App() {
           classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
           vacantStaffRoles={STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase())}
           openPlanSlots={Math.max(0, MAX_DEVELOPMENT_PLANS - practicePlan.developmentPlans.length)}
+          unhappyCount={unhappyCount}
         />
       )}
 
@@ -517,6 +528,7 @@ export function App() {
           gamePlan={gamePlan}
           onSelectPlayer={setSelectedPlayerId}
           onDepthChartChange={updateDepthChartSlot}
+          onResetDepthChart={resetDepthChart}
         />
       )}
 
@@ -638,6 +650,18 @@ export function App() {
           onRemovePlan={removeDevelopmentPlan}
           onAutoFill={autoFillDevelopmentPlans}
           onTrainingFocusChange={setTrainingFocus}
+          onSelectPlayer={setSelectedPlayerId}
+        />
+      )}
+
+      {view === 'locker-room' && userTeam && (
+        <LockerRoomScreen
+          team={userTeam}
+          talkedIds={lockerRoom.talkedIds}
+          canHoldMeeting={canHoldTeamMeeting}
+          meetingReadyWeek={meetingReadyWeek}
+          onTalk={talkToPlayer}
+          onTeamMeeting={holdTeamMeeting}
           onSelectPlayer={setSelectedPlayerId}
         />
       )}

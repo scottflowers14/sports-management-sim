@@ -173,3 +173,27 @@ describe('practice during the season', () => {
     expect(count('intense')).toBeGreaterThan(count('light'));
   });
 });
+
+describe('morale during the season', () => {
+  it('sours a benched star and says so in the news', () => {
+    const base = { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 42 }) };
+    const userId = base.dynasty.userTeamId;
+    const team = base.dynasty.season.teams.find((t) => t.id === userId)!;
+    const attack = team.roster.filter((p) => p.position === 'ATT').sort((a, b) => b.ratings.overall - a.ratings.overall);
+    const star = attack[0]!;
+    // Bury the best attackman at the bottom of the depth chart.
+    const benched = {
+      ...team,
+      roster: team.roster.map((p) => (p.id === star.id ? { ...p, morale: 55 } : p)),
+      depthChart: { ATT: [...attack.slice(1).map((p) => p.id), star.id] },
+    };
+    let state: WeekSimState = {
+      ...base,
+      dynasty: { ...base.dynasty, season: { ...base.dynasty.season, teams: base.dynasty.season.teams.map((t) => (t.id === userId ? benched : t)) } },
+    };
+    for (let week = 0; week < 4; week += 1) state = simulateOneWeek(state, undefined, seededRandom(week + 1));
+    const after = state.dynasty.season.teams.find((t) => t.id === userId)!.roster.find((p) => p.id === star.id)!;
+    expect(after.morale).toBeLessThan(50);
+    expect(state.newsItems.some((n) => n.headline.includes(`${star.name.first} ${star.name.last} is `) && /starting/.test(n.headline))).toBe(true);
+  });
+});

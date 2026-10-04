@@ -54,9 +54,21 @@ const BIGGER_STAGE_CHANCE = 0.07;
 const AWAY_FROM_HOME_CHANCE = 0.02;
 
 /**
+ * Unhappy players shop around; happy ones stay. A player at the usual
+ * mid-60s morale is unaffected.
+ */
+export function portalMoraleMultiplier(morale: number): number {
+  if (morale < 35) return 2.2;
+  if (morale < 50) return 1.5;
+  if (morale >= 80) return 0.6;
+  return 1;
+}
+
+/**
  * Decide whether a player enters the portal this offseason and why. Playing time
  * drives most moves: starters stay, rotation players waver, buried players leave.
- * Leaders and high-leadership players stick; low-motivation players bolt.
+ * Leaders and high-leadership players stick; low-motivation and unhappy
+ * players bolt.
  * Returns the reason, or null when the player stays.
  */
 export function decidePortalEntry<Position extends string, SportTraits>(
@@ -73,6 +85,7 @@ export function decidePortalEntry<Position extends string, SportTraits>(
   if (player.traits.includes('leader')) chance *= 0.5;
   if (player.traits.includes('low_motivation')) chance *= 1.4;
   if (player.ratings.leadership >= 75) chance *= 0.75;
+  chance *= portalMoraleMultiplier(player.morale);
 
   const wantsBiggerStage =
     role === 'starter' &&

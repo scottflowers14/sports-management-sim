@@ -9,6 +9,9 @@ import {
 } from '@sports-management-sim/engine-core';
 import {
   autoDevelopmentPlans,
+  moodLabel,
+  moraleReason,
+  runMoraleWeek,
   DEFAULT_GAME_PLAN,
   DEFAULT_PRACTICE_PLAN,
   deriveCpuGamePlan,
@@ -21,6 +24,7 @@ import {
   type LacrosseDynastyState,
   type LacrosseGamePlan,
   type LacrossePracticePlan,
+  type MoraleChange,
   type PracticeGain,
   type LacrosseStaff,
   type LacrossePlayerGameStats,
@@ -123,6 +127,7 @@ export function simulateOneWeek(
   );
   const userPractice = state.practicePlan ?? DEFAULT_PRACTICE_PLAN;
   const practiceGains: PracticeGain[] = [];
+  const moraleChanges: MoraleChange[] = [];
   const newSeason = {
     ...seasonAfterGames,
     teams: seasonAfterGames.teams.map((team) => {
@@ -134,7 +139,14 @@ export function simulateOneWeek(
         skipPlayerIds: injuredIds,
       });
       if (isUser) practiceGains.push(...practiced.gains);
-      return practiced.team;
+      // Then the locker room reacts to the week: roles, the result, practice.
+      const game = seasonAfterGames.schedule.find(
+        (g) => g.week === weekToSim && g.status === 'final' && (g.homeTeamId === team.id || g.awayTeamId === team.id),
+      );
+      const won = game?.result ? game.result.winnerTeamId === team.id : null;
+      const mood = runMoraleWeek(practiced.team, { won, intensity: plan.intensity });
+      if (isUser) moraleChanges.push(...mood.changes);
+      return mood.team;
     }),
   };
 
@@ -303,6 +315,20 @@ export function simulateOneWeek(
       week: weekToSim,
       category: 'coaching',
       headline: `Practice report: ${names.join(', ')}`,
+    });
+  }
+
+  // A player who turns unhappy makes it known.
+  for (const change of moraleChanges) {
+    if (change.from < 50 || change.to >= 50) continue;
+    const player = updatedUserTeam.roster.find((p) => p.id === change.playerId);
+    if (!player) continue;
+    practiceNews.push({
+      id: `morale-${weekToSim}-${player.id}`,
+      week: weekToSim,
+      category: 'coaching',
+      featured: true,
+      headline: `${player.position} ${player.name.first} ${player.name.last} is ${moodLabel(change.to).toLowerCase()}: ${moraleReason(updatedUserTeam, player).toLowerCase()}`,
     });
   }
 

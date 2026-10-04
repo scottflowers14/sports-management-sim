@@ -5266,3 +5266,121 @@ li span {
 .practice-log li strong {
   display: inline;
 }
+
+/* ── Locker room ────────────────────────────────────────────── */
+.locker-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+.locker-layout > [aria-label='Player morale'] {
+  grid-column: 1 / -1;
+}
+@media (max-width: 1100px) {
+  .locker-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.locker-chemistry {
+  display: grid;
+  text-align: right;
+  font-size: 0.8rem;
+}
+.locker-chemistry strong {
+  font-size: 2rem;
+}
+.locker-mood-bar {
+  display: flex;
+  height: 22px;
+  margin: 14px 0 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.locker-mood-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  color: #0b1424;
+}
+.locker-mood-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.78rem;
+}
+.locker-meeting {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.locker-meeting .offer-btn,
+.locker-talk-btn {
+  width: auto;
+}
+.locker-meeting .offer-btn:disabled,
+.locker-talk-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.locker-talk-btn {
+  padding: 3px 12px;
+  font-size: 0.78rem;
+}
+.locker-concerns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.locker-concern {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.85rem;
+}
+.locker-risk {
+  color: #f2b872;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.locker-table td {
+  vertical-align: middle;
+}
+.locker-morale-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.mood {
+  font-weight: 700;
+}
+.mood-delighted { color: #72f2c6; }
+.mood-happy { color: #9cc8ff; }
+.mood-content { color: #e6edf3; }
+.mood-unhappy { color: #f2b872; }
+.mood-furious { color: #ff8a8a; }
+.mood-bg-delighted { background: #72f2c6; }
+.mood-bg-happy { background: #9cc8ff; }
+.mood-bg-content { background: #c9d4e0; }
+.mood-bg-unhappy { background: #f2b872; }
+.mood-bg-furious { background: #ff8a8a; }
+.depth-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.depth-reset-btn {
+  width: auto;
+  padding: 4px 12px;
+}

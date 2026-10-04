@@ -22,6 +22,7 @@ export function TeamScreen({
   gamePlan,
   onSelectPlayer,
   onDepthChartChange,
+  onResetDepthChart,
 }: {
   team: LacrosseTeam;
   injuries: Set<string>;
@@ -30,6 +31,7 @@ export function TeamScreen({
   gamePlan: LacrosseGamePlan;
   onSelectPlayer: (playerId: string) => void;
   onDepthChartChange: (position: LacrossePosition, slotIndex: number, playerId: string) => void;
+  onResetDepthChart?: () => void;
 }) {
   const rosterGroups = POSITION_ORDER.map((pos) => ({
     position: pos,
@@ -78,8 +80,18 @@ export function TeamScreen({
       </article>
 
       <article className="card team-depth-card">
-        <h2>Depth Chart</h2>
-        <p className="dim">Set starters by position. These choices feed the live team rating and game simulation.</p>
+        <div className="depth-chart-header">
+          <h2>Depth Chart</h2>
+          {onResetDepthChart && (team as { depthChart?: object }).depthChart && (
+            <button type="button" className="offer-btn depth-reset-btn" onClick={onResetDepthChart}>
+              Best lineup
+            </button>
+          )}
+        </div>
+        <p className="dim">
+          Set starters by position. These choices feed the live team rating and game simulation. Players rated higher
+          than their spot notice; Best lineup puts everyone back in rating order.
+        </p>
         <DepthChart team={team} injuries={injuries} onDepthChartChange={onDepthChartChange} />
       </article>
 

@@ -29,11 +29,13 @@ function computeActionItems({
   classNeeds = [],
   vacantStaffRoles = [],
   openPlanSlots = 0,
+  unhappyCount = 0,
 }: {
   currentWeek: number;
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
   openPlanSlots?: number;
+  unhappyCount?: number;
   injuries: InjuredPlayer[];
   userTeam: LacrosseTeam;
   scouting: ScoutingState;
@@ -116,6 +118,16 @@ function computeActionItems({
     });
   }
 
+  if (unhappyCount > 0) {
+    items.push({
+      id: 'unhappy-players',
+      priority: unhappyCount >= 3 ? 'high' : 'medium',
+      icon: '😠',
+      text: `${unhappyCount} player${unhappyCount === 1 ? ' is' : 's are'} unhappy. Unhappy players develop slower and are likelier to transfer.`,
+      nav: 'locker-room',
+    });
+  }
+
   if (!seasonComplete && openPlanSlots > 0) {
     items.push({
       id: 'development-plans',
@@ -177,6 +189,7 @@ export function WeekHubScreen({
   classNeeds,
   vacantStaffRoles,
   openPlanSlots,
+  unhappyCount,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -199,6 +212,7 @@ export function WeekHubScreen({
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
   openPlanSlots?: number;
+  unhappyCount?: number;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -217,6 +231,7 @@ export function WeekHubScreen({
     ...(classNeeds ? { classNeeds } : {}),
     ...(vacantStaffRoles ? { vacantStaffRoles } : {}),
     ...(openPlanSlots !== undefined ? { openPlanSlots } : {}),
+    ...(unhappyCount !== undefined ? { unhappyCount } : {}),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
 

@@ -518,6 +518,23 @@ describe('Desktop App', () => {
     expect(within(roster).getAllByRole('button', { name: 'Add plan' }).every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
   });
 
+  it('talks to players and holds a team meeting in the Locker Room', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Locker Room/ }));
+    const chemistry = screen.getByLabelText('Team chemistry');
+    expect(chemistry).toHaveTextContent(/Team Chemistry/);
+    const table = screen.getByLabelText('Player morale');
+    const firstTalk = within(table).getAllByRole('button', { name: 'Talk' })[0]!;
+    await userEvent.click(firstTalk);
+    expect(within(table).getAllByRole('button', { name: 'Talked' })).toHaveLength(1);
+    await waitFor(() => expect(loadActiveDynastySave()?.lockerRoom?.talkedIds).toHaveLength(1));
+
+    const meeting = within(chemistry).getByRole('button', { name: 'Hold team meeting' });
+    await userEvent.click(meeting);
+    expect(meeting).toBeDisabled();
+    expect(chemistry).toHaveTextContent(/needs a break from meetings until week \d+/);
+  });
+
   it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {
     await renderStartedApp();
     const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
