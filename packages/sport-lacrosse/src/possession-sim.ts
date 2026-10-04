@@ -4,6 +4,7 @@ import { getTacticEffects, normalizeGamePlan, type LacrosseGamePlan, type Tactic
 import { buildLacrosseLineup, midfieldLineShares, type LacrosseLineup } from './lineups';
 import type { LacrossePlayer, LacrossePlayerGameStats, LacrosseTeam, LacrosseTeamStats } from './models';
 import type { CoachingEdge } from './staff';
+import { fanHomeEdgeFactor } from './program-investments';
 
 export type RandomSource = () => number;
 
@@ -44,7 +45,8 @@ const MAX_OVERTIMES = 6;
 /**
  * Home teams score a little more often (crowd, familiarity, last change).
  * Expressed in the same units as a coaching edge: about half a goal a game,
- * so home teams win about 57% of even matchups.
+ * so home teams win about 57% of even matchups. A bigger crowd adds to it
+ * (see fanHomeEdgeFactor).
  */
 export const HOME_SCORING_EDGE = 0.016;
 
@@ -109,7 +111,8 @@ export function simulatePossessionGame(input: SimulateLacrosseGameInput): Lacros
   const random = input.random ?? Math.random;
   const home = makeSide(input.homeTeam, true, input.homeGamePlan, input.homeCoaching ?? NO_COACHING_EDGE);
   const away = makeSide(input.awayTeam, false, input.awayGamePlan, input.awayCoaching ?? NO_COACHING_EDGE);
-  const homeFinishEdge = EDGE_TO_FINISH * ((input.neutralSite ? 0 : HOME_SCORING_EDGE) + home.coaching.offense - away.coaching.defense);
+  const homeEdge = input.neutralSite ? 0 : HOME_SCORING_EDGE * fanHomeEdgeFactor(input.homeTeam.reputation.fanSupport);
+  const homeFinishEdge = EDGE_TO_FINISH * (homeEdge + home.coaching.offense - away.coaching.defense);
   const awayFinishEdge = EDGE_TO_FINISH * (away.coaching.offense - home.coaching.defense);
 
   const events: GameEvent[] = [];

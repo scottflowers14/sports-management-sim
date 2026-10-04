@@ -28,6 +28,9 @@ import {
   generateLacrosseCpuPortalOffers,
   resolveLacrossePortal,
   runCoachingCarousel,
+  ageProgram,
+  applyInvestmentPlan,
+  cpuInvestmentPlan,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
   CarouselChange,
@@ -462,7 +465,12 @@ export function runOffseason(
   const evolvedTeams = evolveProgramPrestige(season.teams, sortedStandings, nationalChampionId);
   // CPU programs fire, hire and lose coaches on the finished season's records.
   const carousel = runCoachingCarousel(evolvedTeams, { userTeamId, year: season.year, seed });
-  const teamsWithPrestige = carousel.teams;
+  // A year passes for every program; CPU athletic departments spend their
+  // budgets now, the user spends theirs on the Offseason screen.
+  const teamsWithPrestige = carousel.teams.map((team) => {
+    const aged = ageProgram(team);
+    return team.id === userTeamId ? aged : applyInvestmentPlan(aged, cpuInvestmentPlan(aged));
+  });
 
   // Run offseason for returning players first (advances class years, graduates seniors),
   // then add the signing class as true freshmen for the upcoming season.
