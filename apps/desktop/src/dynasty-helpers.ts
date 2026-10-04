@@ -33,8 +33,13 @@ import {
   cpuInvestmentPlan,
   runProDraft,
   applyProDraftPrestige,
+  applyRealignment,
+  dynastyRivalries,
+  planRealignment,
+  realignmentInvolves,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
+  RealignmentMove,
   CarouselChange,
   LacrossePlayer,
   LacrossePortalEntry,
@@ -100,6 +105,10 @@ export interface OffseasonSummary {
   coachOfYear?: CoachOfYear | null;
   /** The whole pro draft, every program's picks. */
   proDraft?: ProDraftPick[];
+  /** Two programs that changed leagues this offseason. */
+  realignment?: RealignmentMove | null;
+  /** A stronger league inviting the user's program; null once answered. */
+  realignmentInvite?: RealignmentMove | null;
 }
 
 /** Production needs a few games behind it before scouts trust it. */
@@ -595,11 +604,29 @@ export function runOffseason(
   const newUserTeam = teamsForNewSeason.find((t) => t.id === userTeamId)!;
   const newRecruitBoard = sortRecruitBoardForTeam(newUserTeam, newRecruits, rosterTargets);
 
+  // Realignment: a rising pair of rivals may trade leagues with a fading pair.
+  // A move that takes the user's program up waits for the user to accept.
+  const rivalries = dynastyRivalries(dynasty);
+  const realignment = planRealignment({
+    conferences: season.conferences,
+    teams: teamsForNewSeason,
+    rivalries,
+    year: newYear,
+    seed,
+    userTeamId,
+  });
+  const realignmentInvite = realignment && realignmentInvolves(realignment, userTeamId) ? realignment : null;
+  const realigned =
+    realignment && !realignmentInvite
+      ? applyRealignment(season.conferences, teamsForNewSeason, realignment)
+      : { conferences: season.conferences, teams: teamsForNewSeason };
+
   const newSeason: LacrosseSeason = {
     ...season,
     year: newYear,
-    teams: teamsForNewSeason,
-    schedule: createLacrosseSeasonSchedule(newYear, season.conferences),
+    teams: realigned.teams,
+    conferences: realigned.conferences,
+    schedule: createLacrosseSeasonSchedule(newYear, realigned.conferences),
     standings: [],
     currentWeek: 1,
     phase: 'regular_season',
@@ -619,6 +646,8 @@ export function runOffseason(
     coachingCarousel: carousel.changes,
     coachOfYear,
     proDraft,
+    realignment: realignment && !realignmentInvite ? realignment : null,
+    realignmentInvite,
   };
 
   return {
@@ -629,6 +658,7 @@ export function runOffseason(
       recruitBoard: newRecruitBoard,
       seed: newSeed,
       portalEntries,
+      ...(realignment && !realignmentInvite ? { rivalries } : {}),
     },
     summary,
   };

@@ -9,7 +9,7 @@ import {
 } from '@sports-management-sim/engine-core';
 import {
   applyCpuCaptains,
-  buildRivalries,
+  dynastyRivalries,
   recordRivalryGame,
   rivalryForGame,
   seriesSummary,
@@ -144,7 +144,7 @@ export function simulateOneWeek(
 
   // Every program practices after the week's games. CPU staffs run a normal
   // week with plans on their highest-upside young players.
-  const rivalries = buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+  const rivalries = dynastyRivalries(dynasty);
   let rivalrySeries = state.rivalrySeries ?? {};
   const rivalryNews: NewsItem[] = [];
   for (const game of seasonAfterGames.schedule) {
