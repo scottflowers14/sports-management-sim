@@ -54,6 +54,8 @@ export interface MoraleWeekInput {
   /** True for a win, false for a loss, null for a bye. */
   won: boolean | null;
   intensity: PracticeIntensity;
+  /** A rivalry game counts triple, win or lose. */
+  rivalry?: boolean;
 }
 
 /** One player's weekly change, before drift. */
@@ -73,8 +75,9 @@ export function weeklyMoraleChange(player: LacrossePlayer, status: PlayerRoleSta
   } else if (player.classYear !== 'FR') {
     change -= 0.6;
   }
-  if (input.won === true) change += 0.8;
-  if (input.won === false) change -= 0.8;
+  const stakes = input.rivalry ? 3 : 1;
+  if (input.won === true) change += 0.8 * stakes;
+  if (input.won === false) change -= 0.8 * stakes;
   if (input.intensity === 'intense') change -= 1;
   if (input.intensity === 'light') change += 0.5;
   if (player.traits.includes('leader')) change += 0.3;

@@ -224,3 +224,14 @@ describe('redshirts during the season', () => {
     expect(userRedshirts.map((p) => p.id)).toEqual([star.id]);
   });
 });
+
+describe('rivalries during the season', () => {
+  it('records every rivalry game in the series and reports it', () => {
+    const state = simulateRemainingWeeks(freshState(), undefined, seededRandom(5));
+    const series = Object.values(state.rivalrySeries ?? {});
+    // Rivals share a conference, so every pair meets once in the round-robin.
+    expect(series.length).toBeGreaterThanOrEqual(15);
+    expect(series.every((s) => Object.values(s.wins).reduce((a, b) => a + b, 0) === 1 && s.holderId !== null)).toBe(true);
+    expect(state.newsItems.some((n) => /^Rivalry: .+ wins The \w+ \w+, beating .+ \d+-\d+ \(leads the series 1-0\)$/.test(n.headline))).toBe(true);
+  });
+});
