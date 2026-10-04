@@ -5692,3 +5692,22 @@ li span {
 .awards-race .stat-val {
   white-space: nowrap;
 }
+
+.program-coach {
+  margin: 4px 0 0;
+  color: var(--text-dim, #9fb0c8);
+  font-size: 0.82rem;
+}
+
+.hot-seat-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 107, 107, 0.16);
+  color: #ff8a8a;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

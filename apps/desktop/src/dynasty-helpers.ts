@@ -27,8 +27,10 @@ import {
   openLacrossePortal,
   generateLacrosseCpuPortalOffers,
   resolveLacrossePortal,
+  runCoachingCarousel,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
+  CarouselChange,
   LacrossePlayer,
   LacrossePortalEntry,
   LacrosseDynastyState,
@@ -85,6 +87,8 @@ export interface OffseasonSummary {
   awards: SeasonAwards | null;
   /** The user's players who put their name in the transfer portal. */
   portalDepartures?: PortalDeparture[];
+  /** CPU head coaching changes this offseason. */
+  coachingCarousel?: CarouselChange[];
 }
 
 export interface PortalDeparture {
@@ -450,7 +454,10 @@ export function runOffseason(
   );
 
   // Evolve program prestige based on season performance
-  const teamsWithPrestige = evolveProgramPrestige(season.teams, sortedStandings, nationalChampionId);
+  const evolvedTeams = evolveProgramPrestige(season.teams, sortedStandings, nationalChampionId);
+  // CPU programs fire, hire and lose coaches on the finished season's records.
+  const carousel = runCoachingCarousel(evolvedTeams, { userTeamId, year: season.year, seed });
+  const teamsWithPrestige = carousel.teams;
 
   // Run offseason for returning players first (advances class years, graduates seniors),
   // then add the signing class as true freshmen for the upcoming season.
@@ -547,6 +554,7 @@ export function runOffseason(
     awards,
     developmentReport,
     portalDepartures,
+    coachingCarousel: carousel.changes,
   };
 
   return {

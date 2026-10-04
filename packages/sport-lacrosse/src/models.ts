@@ -1,4 +1,5 @@
 import type { Player, Rating, Season, Team } from '@sports-management-sim/engine-core';
+import type { HeadCoach } from './coaching-carousel';
 
 export type LacrossePosition = 'ATT' | 'MID' | 'DEF' | 'GK' | 'FOGO' | 'LSM';
 
@@ -24,6 +25,8 @@ export type LacrosseTeam = Team<LacrossePosition, LacrossePlayerTraits> & {
   depthChart?: Partial<Record<LacrossePosition, string[]>>;
   /** Players the coach named captains; graduates drop off on their own. */
   captainIds?: string[];
+  /** CPU programs' head coach; the user's program has none. */
+  headCoach?: HeadCoach;
 };
 
 export type LacrosseSeason = Season<LacrossePosition, LacrossePlayerTraits>;
