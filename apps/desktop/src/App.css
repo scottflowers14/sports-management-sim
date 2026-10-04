@@ -5559,3 +5559,27 @@ li span {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+/* ── Season preview ───────────────────────────────────────── */
+
+.season-preview-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.season-preview-grid h3 {
+  margin: 8px 0;
+}
+
+.season-preview-poll {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 4px;
+}
+
+.season-preview-user {
+  color: #72f2c6;
+  font-weight: 800;
+}

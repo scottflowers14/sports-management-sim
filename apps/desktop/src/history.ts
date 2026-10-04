@@ -43,6 +43,8 @@ export interface DynastySeasonRecord {
   awards?: SeasonAwardRecord[];
   /** The user program's leading scorer that season. */
   teamLeader?: SeasonLeaderRecord;
+  /** Where the preseason poll picked the program to finish in its conference. */
+  predictedConfFinish?: number;
 }
 
 /** Flatten the computed season awards into the slim records stored in history. */

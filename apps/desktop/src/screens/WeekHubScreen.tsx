@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { GameLog, LacrosseTeam, LacrossePortalEntry, LacrossePosition, LacrossePlayerTraits } from '@sports-management-sim/sport-lacrosse';
 import type { PositionNeed, RecruitBoardEntry, ScheduledGame } from '@sports-management-sim/engine-core';
 import type { InjuredPlayer } from '../dynasty-helpers';
@@ -223,6 +224,7 @@ export function WeekHubScreen({
   redshirtSuggestions,
   captainCount,
   rivalryWeek,
+  previewCard,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -249,6 +251,8 @@ export function WeekHubScreen({
   redshirtSuggestions?: number;
   captainCount?: number;
   rivalryWeek?: string;
+  /** Shown before the opener. */
+  previewCard?: ReactNode;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -342,6 +346,8 @@ export function WeekHubScreen({
           ))}
         </div>
       )}
+
+      {previewCard}
 
       {/* ── Last Week Results ─────────────────────────── */}
       {lastSimWeek !== null && lastWeekGames.length > 0 && (
