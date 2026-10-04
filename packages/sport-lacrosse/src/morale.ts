@@ -88,13 +88,70 @@ export interface MoraleChange {
   to: number;
 }
 
+/** A team names up to this many captains. */
+export const MAX_CAPTAINS = 2;
+/** Being named captain lifts a player this much. */
+export const CAPTAIN_NAMED_BOOST = 8;
+
+/** The team's captains still on the roster. */
+export function teamCaptains(team: LacrosseTeam): LacrossePlayer[] {
+  const ids = new Set(team.captainIds ?? []);
+  return team.roster.filter((p) => ids.has(p.id));
+}
+
+/**
+ * What the captains do for everyone else each week. A respected, happy
+ * captain steadies the room; an unhappy one spreads it. Leadership 50 is
+ * neutral, so naming the wrong player can cost you.
+ */
+export function captainInfluence(team: LacrosseTeam): number {
+  let influence = 0;
+  for (const captain of teamCaptains(team)) {
+    const pull = (captain.ratings.leadership - 50) / 50;
+    influence += captain.morale >= 50 ? pull * 0.35 : -Math.abs(pull) * 0.35 - 0.3;
+  }
+  return Math.max(-1, Math.min(1, Math.round(influence * 100) / 100));
+}
+
+/** Name or remove a captain. Naming one beyond the limit does nothing. */
+export function setCaptain(team: LacrosseTeam, playerId: string, captain: boolean): LacrosseTeam {
+  const current = teamCaptains(team).map((p) => p.id);
+  if (captain) {
+    if (current.includes(playerId) || current.length >= MAX_CAPTAINS) return team;
+    if (!team.roster.some((p) => p.id === playerId)) return team;
+    const named = { ...team, captainIds: [...current, playerId] };
+    return boostMorale(named, new Set([playerId]), CAPTAIN_NAMED_BOOST);
+  }
+  if (!current.includes(playerId)) return team;
+  return { ...team, captainIds: current.filter((id) => id !== playerId) };
+}
+
+/** The players a staff would pick: the best leaders among the upperclassmen. */
+export function suggestCaptains(team: LacrosseTeam, count = MAX_CAPTAINS): LacrossePlayer[] {
+  const upperclassmen = team.roster.filter((p) => p.classYear !== 'FR' && p.classYear !== 'SO');
+  const pool = upperclassmen.length >= count ? upperclassmen : team.roster;
+  return [...pool]
+    .sort((a, b) => b.ratings.leadership - a.ratings.leadership || b.ratings.overall - a.ratings.overall || a.id.localeCompare(b.id))
+    .slice(0, count);
+}
+
+/** A CPU program names its captains before the opener if it has none. */
+export function applyCpuCaptains(team: LacrosseTeam): LacrosseTeam {
+  if (teamCaptains(team).length > 0) return team;
+  return { ...team, captainIds: suggestCaptains(team).map((p) => p.id) };
+}
+
 /** A week of morale for a whole team. */
 export function runMoraleWeek(team: LacrosseTeam, input: MoraleWeekInput): { team: LacrosseTeam; changes: MoraleChange[] } {
   const changes: MoraleChange[] = [];
+  const captainIds = new Set(teamCaptains(team).map((p) => p.id));
+  const influence = captainInfluence(team);
   const roster = team.roster.map((player) => {
     const status = playerRoleStatus(team, player);
     const drift = (MORALE_BASELINE - player.morale) * MORALE_DRIFT;
-    const next = clampMorale(player.morale + weeklyMoraleChange(player, status, input) + drift);
+    // Captains don't lift themselves.
+    const fromCaptains = captainIds.has(player.id) ? 0 : influence;
+    const next = clampMorale(player.morale + weeklyMoraleChange(player, status, input) + drift + fromCaptains);
     if (next === player.morale) return player;
     changes.push({ playerId: player.id, from: player.morale, to: next });
     return { ...player, morale: next };

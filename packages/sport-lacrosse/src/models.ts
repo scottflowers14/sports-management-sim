@@ -22,6 +22,8 @@ export type LacrossePlayer = Player<LacrossePosition, LacrossePlayerTraits>;
 
 export type LacrosseTeam = Team<LacrossePosition, LacrossePlayerTraits> & {
   depthChart?: Partial<Record<LacrossePosition, string[]>>;
+  /** Players the coach named captains; graduates drop off on their own. */
+  captainIds?: string[];
 };
 
 export type LacrosseSeason = Season<LacrossePosition, LacrossePlayerTraits>;
