@@ -19,3 +19,4 @@ export * from './win-probability';
 export * from './transfer-portal';
 export * from './practice';
 export * from './morale';
+export * from './redshirts';

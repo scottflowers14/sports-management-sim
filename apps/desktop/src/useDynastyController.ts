@@ -27,6 +27,7 @@ import type { StaffRole } from '@sports-management-sim/sport-lacrosse';
 import {
   autoDevelopmentPlans,
   boostMorale,
+  setLacrosseRedshirt,
   MAX_DEVELOPMENT_PLANS,
   PLAYER_TALK_BOOST,
   TEAM_MEETING_BOOST,
@@ -41,7 +42,7 @@ import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { healInjuriesOneWeek, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
-import { simulateOneWeek, simulateRemainingWeeks, withoutInjured } from './week-sim';
+import { simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
 import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, WeekSimState } from './week-sim';
@@ -688,7 +689,7 @@ export function useDynastyController() {
   // Injured players miss postseason games too.
   const tournamentTeams = useMemo(() => {
     const injuredIds = new Set(injuries.map((inj) => inj.playerId));
-    return dynasty.season.teams.map((team) => withoutInjured(team, injuredIds));
+    return dynasty.season.teams.map((team) => withoutUnavailable(team, injuredIds));
   }, [dynasty.season.teams, injuries]);
 
   const simTournamentSemis = useCallback(() => {
@@ -922,6 +923,18 @@ export function useDynastyController() {
     setSaveStatus('Held a team meeting');
   }, [canHoldTeamMeeting, currentWeekNumber, updateUserRoster]);
 
+  /** Redshirt calls happen during the regular season, not the tournament or offseason. */
+  const redshirtsOpen = tournament === null && offseasonSummary === null;
+  const gamesPlayedFor = useCallback((playerId: string) => seasonStats[playerId]?.gamesPlayed ?? 0, [seasonStats]);
+
+  const setRedshirt = useCallback((playerId: string, redshirt: boolean) => {
+    if (!redshirtsOpen) return;
+    const player = userTeam?.roster.find((p) => p.id === playerId);
+    if (!player) return;
+    updateUserRoster((team) => setLacrosseRedshirt(team, playerId, redshirt, gamesPlayedFor(playerId)));
+    setSaveStatus(`${player.name.first} ${player.name.last} ${redshirt ? 'will redshirt this season' : 'is off his redshirt'}`);
+  }, [redshirtsOpen, userTeam, updateUserRoster, gamesPlayedFor]);
+
   const setPracticeIntensity = useCallback((intensity: PracticeIntensity) => {
     setPracticePlan((plan) => ({ ...plan, intensity }));
   }, []);
@@ -1119,6 +1132,9 @@ export function useDynastyController() {
     lockerRoom,
     talkToPlayer,
     holdTeamMeeting,
+    setRedshirt,
+    redshirtsOpen,
+    gamesPlayedFor,
     canHoldTeamMeeting,
     meetingReadyWeek,
     pendingJobOffers,

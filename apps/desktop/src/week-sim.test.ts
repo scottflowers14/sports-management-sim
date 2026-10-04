@@ -197,3 +197,26 @@ describe('morale during the season', () => {
     expect(state.newsItems.some((n) => n.headline.includes(`${star.name.first} ${star.name.last} is `) && /starting/.test(n.headline))).toBe(true);
   });
 });
+
+describe('redshirts during the season', () => {
+  it('sits a redshirting player out of every game and lets CPU staffs redshirt before the opener', () => {
+    const base = { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 7 }) };
+    const userId = base.dynasty.userTeamId;
+    const team = base.dynasty.season.teams.find((t) => t.id === userId)!;
+    const star = [...team.roster].filter((p) => p.position === 'ATT').sort((a, b) => b.ratings.overall - a.ratings.overall)[0]!;
+    const redshirted = { ...team, roster: team.roster.map((p) => (p.id === star.id ? { ...p, redshirtStatus: 'redshirting' as const } : p)) };
+    let state: WeekSimState = {
+      ...base,
+      dynasty: { ...base.dynasty, season: { ...base.dynasty.season, teams: base.dynasty.season.teams.map((t) => (t.id === userId ? redshirted : t)) } },
+    };
+    for (let week = 0; week < 3; week += 1) state = simulateOneWeek(state, undefined, seededRandom(week + 11));
+    expect(state.seasonStats[star.id]?.gamesPlayed ?? 0).toBe(0);
+    const cpuRedshirts = state.dynasty.season.teams
+      .filter((t) => t.id !== userId)
+      .reduce((sum, t) => sum + t.roster.filter((p) => p.redshirtStatus === 'redshirting').length, 0);
+    expect(cpuRedshirts).toBeGreaterThan(0);
+    // The user's own calls are left alone.
+    const userRedshirts = state.dynasty.season.teams.find((t) => t.id === userId)!.roster.filter((p) => p.redshirtStatus === 'redshirting');
+    expect(userRedshirts.map((p) => p.id)).toEqual([star.id]);
+  });
+});

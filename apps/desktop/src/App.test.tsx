@@ -535,6 +535,23 @@ describe('Desktop App', () => {
     expect(chemistry).toHaveTextContent(/needs a break from meetings until week \d+/);
   });
 
+  it('suggests redshirts before the opener and redshirts a player from the Team screen', async () => {
+    await renderStartedApp();
+    const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
+    expect(actions).toHaveTextContent(/buried on the depth chart\. Redshirt them/);
+    await userEvent.click(screen.getByRole('button', { name: /^Team/ }));
+    const card = screen.getByLabelText('Redshirts');
+    expect(card).toHaveTextContent('Redshirting (0)');
+    await userEvent.click(within(card).getAllByRole('button', { name: 'Redshirt' })[0]!);
+    expect(card).toHaveTextContent('Redshirting (1)');
+    expect(within(card).getByRole('button', { name: 'Remove RS' })).toBeInTheDocument();
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      const team = save.dynasty.season.teams.find((t) => t.id === save.dynasty.userTeamId)!;
+      expect(team.roster.filter((p) => p.redshirtStatus === 'redshirting')).toHaveLength(1);
+    });
+  });
+
   it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {
     await renderStartedApp();
     const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;

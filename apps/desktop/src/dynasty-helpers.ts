@@ -7,6 +7,7 @@ import {
   recruitPrestigeMultiplier,
   portalScholarshipsPending,
   evolveProgramPrestige,
+  isGraduating,
   runTeamOffseason,
   shouldReopenCommitment,
   signCommittedRecruit,
@@ -324,7 +325,7 @@ export const ROSTER_LIMIT = 48;
 
 /** Next fall's roster if every current pledge signs: leavers out, commits in. */
 function projectedRosterSize(team: LacrosseTeam, recruits: LacrosseRecruit[]): number {
-  const graduating = team.roster.filter((p) => p.classYear === 'SR' || p.classYear === 'GR').length;
+  const graduating = team.roster.filter((p) => isGraduating(p)).length;
   const pledged = recruits.filter(
     (r) => r.committedTeamId === team.id || r.signedTeamId === team.id,
   ).length;
@@ -396,7 +397,7 @@ export function runOffseason(
   const preOffseasonSnapshot = capturePreOffseasonSnapshot(userTeam);
 
   const graduates = userTeam.roster
-    .filter((p) => p.classYear === 'SR' || p.classYear === 'GR')
+    .filter((p) => isGraduating(p))
     .map((p) => ({
       name: `${p.name.first} ${p.name.last}`,
       position: p.position,
