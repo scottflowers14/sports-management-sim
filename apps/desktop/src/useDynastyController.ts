@@ -878,6 +878,7 @@ export function useDynastyController() {
       ...(seasonPreview?.year === dynasty.season.year && predictedFinish(seasonPreview, dynasty.userTeamId) !== null
         ? { predictedConfFinish: predictedFinish(seasonPreview, dynasty.userTeamId)! }
         : {}),
+      ...(summary.coachOfYear?.teamId === dynasty.userTeamId ? { coachOfYear: true } : {}),
     };
 
     // Staff contracts run down; expiring coaches re-enter the pool asking for a raise.
@@ -915,7 +916,19 @@ export function useDynastyController() {
       ...(newDynasty.season.teams.find((t) => t.id === change.teamId)?.conferenceId === userConferenceId ? { featured: true } : {}),
       headline: carouselHeadline(change, teamName),
     }));
-    const offseasonNews = [...staffNews, ...carouselNews];
+    const coachOfYearNews: NewsItem[] = [];
+    if (summary.coachOfYear) {
+      const winner = summary.coachOfYear;
+      const isUser = winner.teamId === dynasty.userTeamId;
+      coachOfYearNews.push({
+        id: `coach-of-year-${dynasty.season.year}`,
+        week: dynasty.season.currentWeek,
+        category: 'award',
+        ...(isUser ? { featured: true } : {}),
+        headline: `Coach of the Year: ${isUser ? (coachProfile?.name ?? 'Your coach') : winner.coachName} (${teamName(winner.teamId)}) after a ${winner.wins}-${winner.losses} season, ${winner.winsAboveExpected.toFixed(1)} wins better than expected`,
+      });
+    }
+    const offseasonNews = [...coachOfYearNews, ...staffNews, ...carouselNews];
     if (offseasonNews.length > 0) setNewsItems((prev) => [...offseasonNews, ...prev]);
 
     setDynasty(newDynasty);
