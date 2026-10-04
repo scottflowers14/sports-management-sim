@@ -87,7 +87,18 @@ export function OffseasonScreen({
         </article>
 
         {offseasonSummary.awards && (
-          <AwardsSection awards={offseasonSummary.awards} />
+          <AwardsSection
+            awards={offseasonSummary.awards}
+            coachOfYear={
+              offseasonSummary.coachOfYear
+                ? {
+                    name: offseasonSummary.coachOfYear.teamId === userTeamId ? (coachName ?? 'You') : (offseasonSummary.coachOfYear.coachName ?? ''),
+                    teamName: teamMap.get(offseasonSummary.coachOfYear.teamId) ?? offseasonSummary.coachOfYear.teamId,
+                    detail: `${offseasonSummary.coachOfYear.wins}-${offseasonSummary.coachOfYear.losses} · +${offseasonSummary.coachOfYear.winsAboveExpected.toFixed(1)} wins vs expected`,
+                  }
+                : null
+            }
+          />
         )}
 
         {offseasonSummary.developmentReport && offseasonSummary.developmentReport.entries.length > 0 && (
@@ -255,11 +266,26 @@ export function OffseasonScreen({
   );
 }
 
-function AwardsSection({ awards }: { awards: SeasonAwards }) {
+function AwardsSection({
+  awards,
+  coachOfYear,
+}: {
+  awards: SeasonAwards;
+  coachOfYear: { name: string; teamName: string; detail: string } | null;
+}) {
   return (
     <article className="card">
       <h2>Season Awards</h2>
       <div className="awards-grid">
+        {coachOfYear && (
+          <div className="award-item" aria-label="Coach of the Year">
+            <div className="award-label">Coach of the Year</div>
+            <div className="award-player">{coachOfYear.name}</div>
+            <div className="award-detail">
+              {formatTeamName(coachOfYear.teamName)} · {coachOfYear.detail}
+            </div>
+          </div>
+        )}
         {[
           { label: 'MVP', winner: awards.mvp },
           { label: 'Offensive Player', winner: awards.offensivePlayer },

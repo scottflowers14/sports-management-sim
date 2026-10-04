@@ -40,6 +40,8 @@ import type {
   LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
 import { computeSeasonAwards } from './awards';
+import { computeCoachOfYear } from './coach-of-year';
+import type { CoachOfYear } from './coach-of-year';
 import type { SeasonAwards } from './awards';
 import type { SeasonStatsMap } from './stats';
 import { capturePreOffseasonSnapshot, computeDevelopmentReport } from './development-report';
@@ -89,6 +91,7 @@ export interface OffseasonSummary {
   portalDepartures?: PortalDeparture[];
   /** CPU head coaching changes this offseason. */
   coachingCarousel?: CarouselChange[];
+  coachOfYear?: CoachOfYear | null;
 }
 
 export interface PortalDeparture {
@@ -454,6 +457,8 @@ export function runOffseason(
   );
 
   // Evolve program prestige based on season performance
+  // Coach of the Year is voted on before anyone is fired or hired.
+  const coachOfYear = computeCoachOfYear(season.teams, { userTeamId, nationalChampionId });
   const evolvedTeams = evolveProgramPrestige(season.teams, sortedStandings, nationalChampionId);
   // CPU programs fire, hire and lose coaches on the finished season's records.
   const carousel = runCoachingCarousel(evolvedTeams, { userTeamId, year: season.year, seed });
@@ -555,6 +560,7 @@ export function runOffseason(
     developmentReport,
     portalDepartures,
     coachingCarousel: carousel.changes,
+    coachOfYear,
   };
 
   return {

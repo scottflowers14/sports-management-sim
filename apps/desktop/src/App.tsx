@@ -738,7 +738,7 @@ export function App() {
       )}
 
       {view === 'history' && (
-        <HistoryScreen history={dynastyHistory} hallOfFame={hallOfFame} />
+        <HistoryScreen history={dynastyHistory} hallOfFame={hallOfFame} coachName={coachProfile?.name ?? null} />
       )}
 
       {view === 'offseason' && offseasonSummary && (

@@ -5711,3 +5711,27 @@ li span {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+/* Coach career */
+.coach-career-stints {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.coach-career-stints li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.coach-career-note {
+  margin: 10px 0 0;
+}
+
+.coy-pill {
+  margin-left: 6px;
+}
