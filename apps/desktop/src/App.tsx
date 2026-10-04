@@ -80,6 +80,10 @@ export function App() {
     recordBook,
     rivalrySeries,
     weeklyHonors,
+    investmentPlan,
+    investmentBudget,
+    fundInvestment,
+    unfundInvestment,
     seasonPreview,
     hallOfFame,
     saveStatus,
@@ -758,6 +762,7 @@ export function App() {
           portalTeams={dynasty.season.teams}
           portalScholarshipRoom={portalScholarshipRoom}
           onOpenPortal={() => { setRecruitTab('portal'); setView('recruiting'); }}
+          investments={{ budget: investmentBudget, plan: investmentPlan, onFund: fundInvestment, onUnfund: unfundInvestment }}
         />
       )}
 

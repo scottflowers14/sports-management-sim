@@ -21,11 +21,17 @@ import {
   releaseStaffMember,
   runStaffOffseason,
   carouselHeadline,
+  applyInvestmentPlan,
+  fundProject,
+  investmentBudget,
+  investmentSummary,
+  planCost,
+  unfundProject,
   staffBudgetFor,
   STAFF_ROLE_LABELS,
   updateLacrosseDepthChartSlot,
 } from '@sports-management-sim/sport-lacrosse';
-import type { StaffRole } from '@sports-management-sim/sport-lacrosse';
+import type { InvestmentPlan, InvestmentProject, StaffRole } from '@sports-management-sim/sport-lacrosse';
 import {
   autoDevelopmentPlans,
   boostMorale,
@@ -219,6 +225,7 @@ export function useDynastyController() {
   const [recordBook, setRecordBook] = useState<RecordBookArchive>(() => loadedSave?.recordBook ?? {});
   const [rivalrySeries, setRivalrySeries] = useState<RivalrySeriesMap>(() => loadedSave?.rivalrySeries ?? {});
   const [weeklyHonors, setWeeklyHonors] = useState<WeeklyHonor[]>(() => loadedSave?.weeklyHonors ?? []);
+  const [investmentPlan, setInvestmentPlan] = useState<InvestmentPlan>(() => loadedSave?.investmentPlan ?? {});
   const [hallOfFame, setHallOfFame] = useState<HallOfFameEntry[]>(() => loadedSave?.hallOfFame ?? []);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
@@ -249,6 +256,7 @@ export function useDynastyController() {
     recordBook,
     rivalrySeries,
     weeklyHonors,
+    investmentPlan,
     seasonPreview,
     hallOfFame,
     pendingJobOffers,
@@ -259,7 +267,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, seasonPreview, hallOfFame, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -296,6 +304,7 @@ export function useDynastyController() {
     setRecordBook({});
     setRivalrySeries({});
     setWeeklyHonors([]);
+    setInvestmentPlan({});
     setHallOfFame([]);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
@@ -364,6 +373,7 @@ export function useDynastyController() {
       recordBook: {},
       rivalrySeries: {},
       weeklyHonors: [],
+      investmentPlan: {},
       hallOfFame: [],
       seasonPreview: preview,
       pendingJobOffers: null,
@@ -421,6 +431,7 @@ export function useDynastyController() {
     setRecordBook(save.recordBook ?? {});
     setRivalrySeries(save.rivalrySeries ?? {});
     setWeeklyHonors(save.weeklyHonors ?? []);
+    setInvestmentPlan(save.investmentPlan ?? {});
     setSeasonPreview(save.seasonPreview ?? null);
     setHallOfFame(save.hallOfFame ?? []);
     setPendingJobOffers(save.pendingJobOffers ?? null);
@@ -1169,10 +1180,40 @@ export function useDynastyController() {
     });
   }, [userTeam]);
 
+  // The AD's budget is set by the program as it stands after the season.
+  const userInvestmentBudget = userTeam ? investmentBudget(userTeam) : 0;
+  const fundInvestment = useCallback((project: InvestmentProject) => {
+    setInvestmentPlan((plan) => fundProject(plan, project, userInvestmentBudget));
+  }, [userInvestmentBudget]);
+  const unfundInvestment = useCallback((project: InvestmentProject) => {
+    setInvestmentPlan((plan) => unfundProject(plan, project));
+  }, []);
+
   const startNewSeason = useCallback(() => {
     // Resolve the portal once, outside the state updater: updaters must be pure,
     // and this one feeds the news feed and several other pieces of state.
-    const { dynasty: nextDynasty, moves } = resolveAndApplyPortal(dynasty);
+    const { dynasty: afterPortal, moves } = resolveAndApplyPortal(dynasty);
+    // The user's program investments land as the new season opens.
+    const nextDynasty = {
+      ...afterPortal,
+      season: {
+        ...afterPortal.season,
+        teams: afterPortal.season.teams.map((t) => (t.id === afterPortal.userTeamId ? applyInvestmentPlan(t, investmentPlan) : t)),
+      },
+    };
+    const investedBefore = afterPortal.season.teams.find((t) => t.id === afterPortal.userTeamId);
+    const investedAfter = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
+    const investmentNews: NewsItem[] =
+      investedBefore && investedAfter && planCost(investmentPlan) > 0
+        ? [{
+            id: `investments-${nextDynasty.season.year}`,
+            week: 1,
+            category: 'coaching',
+            featured: true,
+            headline: `Program investments are done: ${investmentSummary(investedBefore, investedAfter)}`,
+          }]
+        : [];
+    setInvestmentPlan({});
     const portalNews = portalMoveNews(moves, nextDynasty.userTeamId, new Map(nextDynasty.season.teams.map((t) => [t.id, t.name])));
     const userTeamData = nextDynasty.season.teams.find((t) => t.id === nextDynasty.userTeamId);
     const prestige = userTeamData?.reputation.nationalPrestige ?? 50;
@@ -1197,6 +1238,7 @@ export function useDynastyController() {
     setStaffState({ staff: filled.staff, staffCandidates: filled.candidates });
     setScouting((s) => withStaffRecruitingHours(resetScoutingForNewClass(s), filled.staff));
     setNewsItems([
+      ...investmentNews,
       ...seasonPreviewNews(preview, nextDynasty),
       ...portalNews,
       ...filled.hired.map((member) => ({
@@ -1221,7 +1263,7 @@ export function useDynastyController() {
     setShortlistIds([]);
     setRecruitBoardView('all');
     setView('week-hub');
-  }, [dynasty, staffState, staffBudget]);
+  }, [dynasty, staffState, staffBudget, investmentPlan]);
 
   const handleExportSave = useCallback((saveId: string) => {
     const json = exportSaveAsJson(saveId);
@@ -1341,6 +1383,10 @@ export function useDynastyController() {
     recordBook,
     rivalrySeries,
     weeklyHonors,
+    investmentPlan,
+    investmentBudget: userInvestmentBudget,
+    fundInvestment,
+    unfundInvestment,
     seasonPreview,
     hallOfFame,
     talkToPlayer,

@@ -18,6 +18,7 @@ import type { SeasonStatsMap } from './stats';
 import type { CareerStatsMap } from './career-stats';
 import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
 import type { WeeklyHonor } from './weekly-honors';
+import type { InvestmentPlan } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName } from './ui/format';
 
 export const DYNASTY_SAVE_VERSION = 1;
@@ -58,6 +59,8 @@ export interface DynastySaveState {
   rivalrySeries?: RivalrySeriesMap;
   /** This season's Player of the Week honors. */
   weeklyHonors?: WeeklyHonor[];
+  /** Program investments the user has funded this offseason. */
+  investmentPlan?: InvestmentPlan;
   /** The media's preseason picks for the current season. */
   seasonPreview?: SeasonPreview | null;
   /** The user's program Hall of Fame, newest first. */
