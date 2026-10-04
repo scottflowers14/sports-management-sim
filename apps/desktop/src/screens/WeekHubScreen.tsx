@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { GameLog, LacrosseTeam, LacrossePortalEntry, LacrossePosition, LacrossePlayerTraits } from '@sports-management-sim/sport-lacrosse';
 import type { PositionNeed, RecruitBoardEntry, ScheduledGame } from '@sports-management-sim/engine-core';
 import type { InjuredPlayer } from '../dynasty-helpers';
@@ -29,11 +30,19 @@ function computeActionItems({
   classNeeds = [],
   vacantStaffRoles = [],
   openPlanSlots = 0,
+  unhappyCount = 0,
+  redshirtSuggestions = 0,
+  captainCount,
+  rivalryWeek,
 }: {
   currentWeek: number;
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
   openPlanSlots?: number;
+  unhappyCount?: number;
+  redshirtSuggestions?: number;
+  captainCount?: number;
+  rivalryWeek?: string;
   injuries: InjuredPlayer[];
   userTeam: LacrosseTeam;
   scouting: ScoutingState;
@@ -116,6 +125,40 @@ function computeActionItems({
     });
   }
 
+  if (unhappyCount > 0) {
+    items.push({
+      id: 'unhappy-players',
+      priority: unhappyCount >= 3 ? 'high' : 'medium',
+      icon: '😠',
+      text: `${unhappyCount} player${unhappyCount === 1 ? ' is' : 's are'} unhappy. Unhappy players develop slower and are likelier to transfer.`,
+      nav: 'locker-room',
+    });
+  }
+
+  if (!seasonComplete && rivalryWeek) {
+    items.push({ id: 'rivalry-week', priority: 'high', icon: '🏆', text: rivalryWeek, nav: 'schedule' });
+  }
+
+  if (!seasonComplete && captainCount === 0) {
+    items.push({
+      id: 'captains',
+      priority: 'medium',
+      icon: '©',
+      text: 'No team captains named. A respected captain lifts the whole locker room every week.',
+      nav: 'locker-room',
+    });
+  }
+
+  if (!seasonComplete && redshirtSuggestions > 0) {
+    items.push({
+      id: 'redshirts',
+      priority: 'medium',
+      icon: '🎽',
+      text: `${redshirtSuggestions} young player${redshirtSuggestions === 1 ? ' is' : 's are'} buried on the depth chart. Redshirt them to save a year of eligibility.`,
+      nav: 'team',
+    });
+  }
+
   if (!seasonComplete && openPlanSlots > 0) {
     items.push({
       id: 'development-plans',
@@ -177,6 +220,11 @@ export function WeekHubScreen({
   classNeeds,
   vacantStaffRoles,
   openPlanSlots,
+  unhappyCount,
+  redshirtSuggestions,
+  captainCount,
+  rivalryWeek,
+  previewCard,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -199,6 +247,12 @@ export function WeekHubScreen({
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
   openPlanSlots?: number;
+  unhappyCount?: number;
+  redshirtSuggestions?: number;
+  captainCount?: number;
+  rivalryWeek?: string;
+  /** Shown before the opener. */
+  previewCard?: ReactNode;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -217,6 +271,10 @@ export function WeekHubScreen({
     ...(classNeeds ? { classNeeds } : {}),
     ...(vacantStaffRoles ? { vacantStaffRoles } : {}),
     ...(openPlanSlots !== undefined ? { openPlanSlots } : {}),
+    ...(unhappyCount !== undefined ? { unhappyCount } : {}),
+    ...(redshirtSuggestions !== undefined ? { redshirtSuggestions } : {}),
+    ...(captainCount !== undefined ? { captainCount } : {}),
+    ...(rivalryWeek !== undefined ? { rivalryWeek } : {}),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
 
@@ -288,6 +346,8 @@ export function WeekHubScreen({
           ))}
         </div>
       )}
+
+      {previewCard}
 
       {/* ── Last Week Results ─────────────────────────── */}
       {lastSimWeek !== null && lastWeekGames.length > 0 && (

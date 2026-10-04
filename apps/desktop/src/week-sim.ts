@@ -8,7 +8,16 @@ import {
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import {
+  applyCpuCaptains,
+  buildRivalries,
+  recordRivalryGame,
+  rivalryForGame,
+  seriesSummary,
+  applyCpuRedshirts,
   autoDevelopmentPlans,
+  moodLabel,
+  moraleReason,
+  runMoraleWeek,
   DEFAULT_GAME_PLAN,
   DEFAULT_PRACTICE_PLAN,
   deriveCpuGamePlan,
@@ -21,12 +30,16 @@ import {
   type LacrosseDynastyState,
   type LacrosseGamePlan,
   type LacrossePracticePlan,
+  type MoraleChange,
   type PracticeGain,
   type LacrosseStaff,
+  type LacrossePlayer,
+  type RivalrySeriesMap,
   type LacrossePlayerGameStats,
   type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, processInjuries } from './dynasty-helpers';
+import { formatTeamName } from './ui/format';
 import type { InjuredPlayer } from './dynasty-helpers';
 import { computeNationalRankings } from './rankings';
 import type { RankingEntry } from './rankings';
@@ -61,6 +74,8 @@ export interface WeekSimState {
   practicePlan?: LacrossePracticePlan;
   /** Rating points the user's players gained at practice this season, newest first. */
   practiceGains?: PracticeLogEntry[];
+  /** Every rivalry's all-time series, carried across seasons. */
+  rivalrySeries?: RivalrySeriesMap;
 }
 
 export interface PracticeLogEntry extends PracticeGain {
@@ -95,11 +110,20 @@ export function simulateOneWeek(
   const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
     team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
-  const seasonAfterGames = advanceSeasonWeek(dynasty.season, (game, homeTeam, awayTeam) => {
-    // Injured players sit: the depth chart promotes the next man up for the
+  // CPU staffs name captains and make their redshirt calls before the opener.
+  const firstWeek = dynasty.season.schedule.reduce((min, game) => Math.min(min, game.week), Infinity);
+  const seasonBeforeGames =
+    weekToSim === firstWeek
+      ? {
+          ...dynasty.season,
+          teams: dynasty.season.teams.map((t) => (t.id === dynasty.userTeamId ? t : applyCpuCaptains(applyCpuRedshirts(t)))),
+        }
+      : dynasty.season;
+  const seasonAfterGames = advanceSeasonWeek(seasonBeforeGames, (game, homeTeam, awayTeam) => {
+    // Injured and redshirting players sit: the depth chart promotes the next man up for the
     // rating, the game plan, and the box score.
-    const home = withoutInjured(homeTeam, injuredIds);
-    const away = withoutInjured(awayTeam, injuredIds);
+    const home = withoutUnavailable(homeTeam, injuredIds);
+    const away = withoutUnavailable(awayTeam, injuredIds);
     const { log, players, ...result } = simulateLacrosseGameWithLog({
       homeTeam: home,
       awayTeam: away,
@@ -116,6 +140,27 @@ export function simulateOneWeek(
 
   // Every program practices after the week's games. CPU staffs run a normal
   // week with plans on their highest-upside young players.
+  const rivalries = buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+  let rivalrySeries = state.rivalrySeries ?? {};
+  const rivalryNews: NewsItem[] = [];
+  for (const game of seasonAfterGames.schedule) {
+    if (game.week !== weekToSim || game.status !== 'final' || !game.result) continue;
+    const rivalry = rivalryForGame(rivalries, game);
+    if (!rivalry) continue;
+    const previousHolder = rivalrySeries[rivalry.key]?.holderId ?? null;
+    rivalrySeries = recordRivalryGame(rivalrySeries, rivalry, game, dynasty.season.year);
+    const { winnerTeamId, loserTeamId, homeScore, awayScore } = game.result;
+    const verb = previousHolder === null ? 'wins' : previousHolder === winnerTeamId ? 'keeps' : 'takes back';
+    const involvesUser = winnerTeamId === dynasty.userTeamId || loserTeamId === dynasty.userTeamId;
+    rivalryNews.push({
+      id: `rivalry-${dynasty.season.year}-${weekToSim}-${rivalry.key}`,
+      week: weekToSim,
+      category: 'game',
+      ...(involvesUser ? { featured: true } : {}),
+      headline: `Rivalry: ${formatTeamName(teamMap.get(winnerTeamId) ?? winnerTeamId)} ${verb} ${rivalry.trophy}, beating ${formatTeamName(teamMap.get(loserTeamId) ?? loserTeamId)} ${Math.max(homeScore, awayScore)}-${Math.min(homeScore, awayScore)} (${seriesSummary(rivalrySeries[rivalry.key], winnerTeamId, loserTeamId).toLowerCase()})`,
+    });
+  }
+
   const playedTeamIds = new Set(
     seasonAfterGames.schedule
       .filter((g) => g.week === weekToSim && g.status === 'final')
@@ -123,6 +168,7 @@ export function simulateOneWeek(
   );
   const userPractice = state.practicePlan ?? DEFAULT_PRACTICE_PLAN;
   const practiceGains: PracticeGain[] = [];
+  const moraleChanges: MoraleChange[] = [];
   const newSeason = {
     ...seasonAfterGames,
     teams: seasonAfterGames.teams.map((team) => {
@@ -134,7 +180,15 @@ export function simulateOneWeek(
         skipPlayerIds: injuredIds,
       });
       if (isUser) practiceGains.push(...practiced.gains);
-      return practiced.team;
+      // Then the locker room reacts to the week: roles, the result, practice.
+      const game = seasonAfterGames.schedule.find(
+        (g) => g.week === weekToSim && g.status === 'final' && (g.homeTeamId === team.id || g.awayTeamId === team.id),
+      );
+      const won = game?.result ? game.result.winnerTeamId === team.id : null;
+      const rivalry = game ? rivalryForGame(rivalries, game) !== null : false;
+      const mood = runMoraleWeek(practiced.team, { won, intensity: plan.intensity, rivalry });
+      if (isUser) moraleChanges.push(...mood.changes);
+      return mood.team;
     }),
   };
 
@@ -306,6 +360,20 @@ export function simulateOneWeek(
     });
   }
 
+  // A player who turns unhappy makes it known.
+  for (const change of moraleChanges) {
+    if (change.from < 50 || change.to >= 50) continue;
+    const player = updatedUserTeam.roster.find((p) => p.id === change.playerId);
+    if (!player) continue;
+    practiceNews.push({
+      id: `morale-${weekToSim}-${player.id}`,
+      week: weekToSim,
+      category: 'coaching',
+      featured: true,
+      headline: `${player.position} ${player.name.first} ${player.name.last} is ${moodLabel(change.to).toLowerCase()}: ${moraleReason(updatedUserTeam, player).toLowerCase()}`,
+    });
+  }
+
   const newSeasonStats = updateSeasonStats(state.seasonStats, newSeason.schedule, newSeason.teams, weekToSim, weekPlayerLines);
   const playerOfWeekNews = buildPlayerOfWeekNews(weekToSim, state.seasonStats, newSeasonStats, newSeason.teams);
 
@@ -322,7 +390,8 @@ export function simulateOneWeek(
     dynasty: newDynasty,
     rankings: newRankings,
     injuries: newInjuries,
-    newsItems: [...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
+    rivalrySeries,
+    newsItems: [...rivalryNews, ...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
     scouting: advanceScoutingWeek(state.scouting),
     recruitingActivity: emptyRecruitingActivity(),
     recruitTrends,
@@ -339,9 +408,11 @@ export function simulateOneWeek(
   };
 }
 
-export function withoutInjured(team: LacrosseTeam, injuredIds: ReadonlySet<string>): LacrosseTeam {
-  if (!team.roster.some((p) => injuredIds.has(p.id))) return team;
-  return { ...team, roster: team.roster.filter((p) => !injuredIds.has(p.id)) };
+/** The roster that can dress for a game: no injured or redshirting players. */
+export function withoutUnavailable(team: LacrosseTeam, injuredIds: ReadonlySet<string>): LacrosseTeam {
+  const sitsOut = (p: LacrossePlayer) => injuredIds.has(p.id) || p.redshirtStatus === 'redshirting';
+  if (!team.roster.some(sitsOut)) return team;
+  return { ...team, roster: team.roster.filter((p) => !sitsOut(p)) };
 }
 
 function buildPlayerOfWeekNews(

@@ -1,5 +1,6 @@
 import { getLacrosseParticipationMinutes } from './lineups';
 import type { LacrossePlayer, LacrossePlayerTraits, LacrossePosition, LacrosseTeam } from './models';
+import { moraleDevelopmentMultiplier } from './morale';
 import { developmentBonusFor } from './staff';
 
 export type PracticeIntensity = 'light' | 'normal' | 'intense';
@@ -110,7 +111,8 @@ export interface PracticeWeekOptions {
 /**
  * One week of practice progress for a player. Growth slows as a player nears
  * his ceiling and stops at it; work ethic, the development coordinator,
- * practice intensity, an individual plan and game minutes all speed it up.
+ * practice intensity, an individual plan, game minutes and a happy player all
+ * speed it up.
  */
 export function weeklyPracticeProgress(
   player: LacrossePlayer,
@@ -124,7 +126,7 @@ export function weeklyPracticeProgress(
   const practice = BASE_WEEKLY_PROGRESS * PRACTICE_INTENSITIES[options.intensity].progress;
   const plan = options.hasPlan ? DEVELOPMENT_PLAN_MULTIPLIER : 1;
   const reps = GAME_REPS_PROGRESS * Math.min(1, Math.max(0, options.minutesShare));
-  return Math.max(0, (practice * plan + reps) * workEthic * staff * room);
+  return Math.max(0, (practice * plan + reps) * workEthic * staff * room * moraleDevelopmentMultiplier(player.morale));
 }
 
 function ratingValue(player: LacrossePlayer, key: DevelopableRating): number | undefined {

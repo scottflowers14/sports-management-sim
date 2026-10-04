@@ -5266,3 +5266,355 @@ li span {
 .practice-log li strong {
   display: inline;
 }
+
+/* ── Locker room ────────────────────────────────────────────── */
+.locker-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+.locker-layout > [aria-label='Player morale'] {
+  grid-column: 1 / -1;
+}
+@media (max-width: 1100px) {
+  .locker-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.locker-chemistry {
+  display: grid;
+  text-align: right;
+  font-size: 0.8rem;
+}
+.locker-chemistry strong {
+  font-size: 2rem;
+}
+.locker-mood-bar {
+  display: flex;
+  height: 22px;
+  margin: 14px 0 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.locker-mood-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  color: #0b1424;
+}
+.locker-mood-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.78rem;
+}
+.locker-meeting {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.locker-meeting .offer-btn,
+.locker-talk-btn {
+  width: auto;
+}
+.locker-meeting .offer-btn:disabled,
+.locker-talk-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.locker-talk-btn {
+  padding: 3px 12px;
+  font-size: 0.78rem;
+}
+.locker-concerns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.locker-concern {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.85rem;
+}
+.locker-risk {
+  color: #f2b872;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.locker-table td {
+  vertical-align: middle;
+}
+.locker-morale-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.mood {
+  font-weight: 700;
+}
+.mood-delighted { color: #72f2c6; }
+.mood-happy { color: #9cc8ff; }
+.mood-content { color: #e6edf3; }
+.mood-unhappy { color: #f2b872; }
+.mood-furious { color: #ff8a8a; }
+.mood-bg-delighted { background: #72f2c6; }
+.mood-bg-happy { background: #9cc8ff; }
+.mood-bg-content { background: #c9d4e0; }
+.mood-bg-unhappy { background: #f2b872; }
+.mood-bg-furious { background: #ff8a8a; }
+.depth-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.depth-reset-btn {
+  width: auto;
+  padding: 4px 12px;
+}
+
+/* ── Redshirts ────────────────────────────────────────────── */
+
+.rs-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(196, 30, 58, 0.22);
+  color: #ff8a9a;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.redshirt-subhead {
+  margin: 16px 0 8px;
+  font-size: 0.9rem;
+}
+
+.redshirt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.redshirt-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.redshirt-btn {
+  display: inline-block;
+  width: auto;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.redshirt-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Record book ──────────────────────────────────────────── */
+
+.records-layout {
+  display: grid;
+  gap: 24px;
+}
+
+.records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.records-controls {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.records-controls .stats-cat-bar {
+  margin: 0;
+}
+
+.records-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+
+.records-card h3 {
+  margin: 0 0 10px;
+}
+
+.records-table td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.records-rank {
+  width: 28px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.records-value {
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.records-holder .records-value,
+.records-holder .records-rank {
+  color: #f2c472;
+}
+
+.records-active {
+  color: #72f2c6;
+}
+
+.records-meta {
+  font-size: 0.75rem;
+}
+
+.records-live {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(114, 242, 198, 0.14);
+  color: #72f2c6;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.captain-badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(242, 196, 114, 0.2);
+  color: #f2c472;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.locker-influence {
+  margin: 12px 0 0;
+  font-weight: 700;
+}
+
+/* ── Rivalries ────────────────────────────────────────────── */
+
+.rivalry-card {
+  grid-column: 1 / -1;
+  border-color: rgba(242, 196, 114, 0.35);
+}
+
+.rivalry-card h2 {
+  color: #f2c472;
+}
+
+.rivalry-recent {
+  display: flex;
+  gap: 14px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-weight: 700;
+}
+
+.rivalry-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(242, 196, 114, 0.18);
+  color: #f2c472;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Season preview ───────────────────────────────────────── */
+
+.season-preview-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.season-preview-grid h3 {
+  margin: 8px 0;
+}
+
+.season-preview-poll {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 4px;
+}
+
+.season-preview-user {
+  color: #72f2c6;
+  font-weight: 800;
+}
+
+.locker-concern-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.locker-promise {
+  color: #f2c472;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* ── Hall of Fame ─────────────────────────────────────────── */
+
+.hall-of-fame-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.hall-of-fame-plaque {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(242, 196, 114, 0.3);
+  background: rgba(242, 196, 114, 0.06);
+}
+
+.hall-of-fame-citation {
+  margin-top: 4px;
+  color: #f2c472;
+  font-size: 0.85rem;
+}

@@ -1,6 +1,6 @@
 import type { LacrosseGamePlan, LacrossePlayer, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { ROTATION_LABELS, buildLacrosseLineup, midfieldLineShares } from '@sports-management-sim/sport-lacrosse';
-import { withoutInjured } from '../week-sim';
+import { withoutUnavailable } from '../week-sim';
 
 /**
  * The units a team actually sends out: who plays the offensive end, the
@@ -18,7 +18,7 @@ export function Lineups({
   onSelectPlayer?: (playerId: string) => void;
 }) {
   // Injured players sit, so the lines show who actually goes out this week.
-  const lineup = buildLacrosseLineup(withoutInjured(team, injuries));
+  const lineup = buildLacrosseLineup(withoutUnavailable(team, injuries));
   const shares = midfieldLineShares(lineup.midfieldLines.length, gamePlan.rotation);
 
   const units: Array<{ label: string; note?: string | undefined; players: LacrossePlayer[] }> = [

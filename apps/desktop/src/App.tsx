@@ -3,6 +3,12 @@ import {
   deriveCpuGamePlan,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
+  buildRivalries,
+  rivalryFor,
+  rivalryForGame,
+  seriesSummary,
+  suggestRedshirts,
+  teamCaptains,
   STAFF_ROLES,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
@@ -24,7 +30,10 @@ import { NewsScreen } from './screens/NewsScreen';
 import { OffseasonScreen } from './screens/OffseasonScreen';
 import { StaffScreen } from './screens/StaffScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
+import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
+import { RecordsScreen } from './screens/RecordsScreen';
+import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
@@ -68,6 +77,10 @@ export function App() {
     scouting,
     seasonStats,
     careerStats,
+    recordBook,
+    rivalrySeries,
+    seasonPreview,
+    hallOfFame,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -96,6 +109,11 @@ export function App() {
     setDevelopmentPlan,
     removeDevelopmentPlan,
     autoFillDevelopmentPlans,
+    lockerRoom,
+    talkToPlayer,
+    holdTeamMeeting,
+    canHoldTeamMeeting,
+    meetingReadyWeek,
     pendingJobOffers,
     persistDynasty,
     startNewDynasty,
@@ -103,6 +121,12 @@ export function App() {
     deleteSave,
     resetDynasty,
     updateDepthChartSlot,
+    resetDepthChart,
+    setRedshirt,
+    setTeamCaptain,
+    promisePlayingTime,
+    redshirtsOpen,
+    gamesPlayedFor,
     userTeam,
     simWeek,
     simToEnd,
@@ -215,6 +239,25 @@ export function App() {
 
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
 
+  const unhappyCount = userTeam.roster.filter((p) => p.morale < 50).length;
+  const rivalries = buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+  const userRivalry = rivalryFor(rivalries, userTeam.id);
+  const rivalGameThisWeek = userRivalry
+    ? dynasty.season.schedule.find(
+        (g) => g.week === dynasty.season.currentWeek && g.status !== 'final' && rivalryForGame([userRivalry], g) !== null,
+      )
+    : undefined;
+  const rivalId = userRivalry?.teamIds.find((id) => id !== userTeam.id);
+  const rivalryWeek =
+    rivalGameThisWeek && userRivalry && rivalId
+      ? `Rivalry week: ${userRivalry.trophy} is on the line against ${formatTeamName(teamMap.get(rivalId) ?? rivalId)} (${seriesSummary(rivalrySeries[userRivalry.key], userTeam.id, rivalId).toLowerCase()}). The result hits morale three times as hard.`
+      : undefined;
+  // Only nudge before the opener, and only until the coach has made a call.
+  const redshirtSuggestions =
+    redshirtsOpen && !userTeam.roster.some((p) => p.redshirtStatus === 'redshirting') && dynasty.season.currentWeek <= 1
+      ? suggestRedshirts(userTeam, gamesPlayedFor).length
+      : 0;
+
   const keyPositions = new Set(['GK', 'FOGO']);
   const highPriorityCount = injuries.filter((inj) => {
     if (inj.teamId !== dynasty.userTeamId) return false;
@@ -304,6 +347,7 @@ export function App() {
         { view: 'schedule', label: 'Schedule' },
         { view: 'staff', label: 'Staff' },
         { view: 'practice', label: 'Practice' },
+        { view: 'locker-room', label: 'Locker Room', ...(unhappyCount > 0 ? { badge: unhappyCount } : {}) },
         { view: 'recruiting', label: committedCount > 0 ? `Recruiting · ${committedCount}` : 'Recruiting' },
       ],
     },
@@ -318,6 +362,7 @@ export function App() {
           ? [{ view: 'tournament' as const, label: 'Tournament', ...(tournament?.nationalChampion ? { badge: '✓' } : {}) }]
           : []),
         { view: 'history', label: 'History' },
+        { view: 'records', label: 'Records' },
       ],
     },
   ];
@@ -473,6 +518,21 @@ export function App() {
           classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
           vacantStaffRoles={STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase())}
           openPlanSlots={Math.max(0, MAX_DEVELOPMENT_PLANS - practicePlan.developmentPlans.length)}
+          unhappyCount={unhappyCount}
+          redshirtSuggestions={redshirtSuggestions}
+          captainCount={teamCaptains(userTeam).length}
+          {...(rivalryWeek ? { rivalryWeek } : {})}
+          previewCard={
+            seasonPreview && seasonPreview.year === dynasty.season.year && lastSimWeek === null && !offseasonSummary ? (
+              <SeasonPreviewCard
+                preview={seasonPreview}
+                conferences={dynasty.season.conferences}
+                teamMap={teamMap}
+                userTeamId={dynasty.userTeamId}
+                onSelectPlayer={setSelectedPlayerId}
+              />
+            ) : null
+          }
         />
       )}
 
@@ -517,6 +577,8 @@ export function App() {
           gamePlan={gamePlan}
           onSelectPlayer={setSelectedPlayerId}
           onDepthChartChange={updateDepthChartSlot}
+          onResetDepthChart={resetDepthChart}
+          redshirts={{ open: redshirtsOpen, gamesPlayedFor, onSetRedshirt: setRedshirt }}
         />
       )}
 
@@ -529,6 +591,8 @@ export function App() {
           currentWeek={dynasty.season.currentWeek}
           gameLogs={gameLogs}
           onBoxScore={setSelectedBoxScore}
+          rivalries={rivalries}
+          rivalrySeries={rivalrySeries}
         />
       )}
 
@@ -642,8 +706,36 @@ export function App() {
         />
       )}
 
+      {view === 'locker-room' && userTeam && (
+        <LockerRoomScreen
+          team={userTeam}
+          talkedIds={lockerRoom.talkedIds}
+          canHoldMeeting={canHoldTeamMeeting}
+          meetingReadyWeek={meetingReadyWeek}
+          onTalk={talkToPlayer}
+          onTeamMeeting={holdTeamMeeting}
+          onSetCaptain={setTeamCaptain}
+          promises={lockerRoom.promises ?? []}
+          onPromise={promisePlayingTime}
+          onSelectPlayer={setSelectedPlayerId}
+        />
+      )}
+
+      {view === 'records' && (
+        <RecordsScreen
+          archive={recordBook}
+          careers={careerStats}
+          // After the offseason runs the year has rolled over; last season is already in the careers.
+          seasonStats={offseasonSummary ? {} : seasonStats}
+          teams={dynasty.season.teams}
+          seasonYear={dynasty.season.year}
+          userTeamName={userTeam.name}
+          onSelectPlayer={setSelectedPlayerId}
+        />
+      )}
+
       {view === 'history' && (
-        <HistoryScreen history={dynastyHistory} />
+        <HistoryScreen history={dynastyHistory} hallOfFame={hallOfFame} />
       )}
 
       {view === 'offseason' && offseasonSummary && (

@@ -1,8 +1,10 @@
 import type { DynastySeasonRecord, SeasonAwardRecord } from '../history';
 import { buildRecordBook } from '../history';
+import { versusPrediction } from '../preseason';
+import type { HallOfFameEntry } from '../records';
 import { formatTeamName } from '../ui/format';
 
-export function HistoryScreen({ history }: { history: DynastySeasonRecord[] }) {
+export function HistoryScreen({ history, hallOfFame = [] }: { history: DynastySeasonRecord[]; hallOfFame?: HallOfFameEntry[] }) {
   if (history.length === 0) {
     return (
       <article className="card">
@@ -54,6 +56,7 @@ export function HistoryScreen({ history }: { history: DynastySeasonRecord[] }) {
               <th>Coach</th>
               <th>Record</th>
               <th>Conf</th>
+              <th>Picked</th>
               <th>Nat Rank</th>
               <th>Top Scorer</th>
               <th>Conf</th>
@@ -68,6 +71,20 @@ export function HistoryScreen({ history }: { history: DynastySeasonRecord[] }) {
                 <td className="dim">{record.coachName ?? '—'}</td>
                 <td className="record-cell">{record.wins}–{record.losses}</td>
                 <td>#{record.confStanding}</td>
+                <td
+                  className={
+                    record.predictedConfFinish === undefined
+                      ? 'dim'
+                      : record.confStanding < record.predictedConfFinish
+                        ? 'mood-happy'
+                        : record.confStanding > record.predictedConfFinish
+                          ? 'mood-unhappy'
+                          : undefined
+                  }
+                  title={versusPrediction(record.predictedConfFinish, record.confStanding) ?? undefined}
+                >
+                  {record.predictedConfFinish !== undefined ? `#${record.predictedConfFinish}` : '—'}
+                </td>
                 <td>{record.natRankAtEnd !== null ? `#${record.natRankAtEnd}` : '—'}</td>
                 <td>
                   {record.teamLeader
@@ -88,8 +105,37 @@ export function HistoryScreen({ history }: { history: DynastySeasonRecord[] }) {
         <NationalChampionsCard history={history} />
       </div>
 
+      <HallOfFameCard entries={hallOfFame} />
+
       <AwardsHistoryCard history={history} />
     </div>
+  );
+}
+
+function HallOfFameCard({ entries }: { entries: HallOfFameEntry[] }) {
+  return (
+    <article className="card hall-of-fame-card" aria-label="Hall of Fame">
+      <h2>Program Hall of Fame</h2>
+      {entries.length === 0 ? (
+        <p className="dim">
+          Players who finish a career of three seasons or more among the program's top three in a stat are inducted when
+          they leave. Nobody has made it yet.
+        </p>
+      ) : (
+        <ul className="hall-of-fame-list">
+          {entries.map((entry) => (
+            <li key={entry.playerId} className="hall-of-fame-plaque">
+              <strong>{entry.name}</strong>
+              <span className="dim">
+                {' '}
+                {entry.position} · {entry.firstYear}–{entry.lastYear} · inducted {entry.inducted}
+              </span>
+              <div className="hall-of-fame-citation">{entry.citation}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </article>
   );
 }
 

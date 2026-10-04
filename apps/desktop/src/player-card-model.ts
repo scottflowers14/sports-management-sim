@@ -1,5 +1,5 @@
 import { POSITION_KEY_RATINGS, type DevelopableRating, type LacrossePlayer, type LacrosseRecruit } from '@sports-management-sim/sport-lacrosse';
-import type { PlayerRatings } from '@sports-management-sim/engine-core';
+import { classLabel, type PlayerRatings } from '@sports-management-sim/engine-core';
 
 /**
  * A normalized identity card used everywhere a person is shown in detail —
@@ -78,7 +78,7 @@ export function cardFromPlayer(player: LacrossePlayer, opts: { injured?: boolean
 
   return {
     name: `${player.name.first} ${player.name.last}`,
-    subtitle: `${player.position} · ${player.classYear} · ${player.hometown}`,
+    subtitle: `${player.position} · ${classLabel(player)} · ${player.hometown}`,
     badges,
     overall: player.ratings.overall,
     overallFuzzy: false,

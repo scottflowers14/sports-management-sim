@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Player, Team } from './models';
 import { advancePlayerClass, progressPlayer, runTeamOffseason } from './offseason';
+import { classLabel, isGraduating, REDSHIRT_GAME_LIMIT, redshirtBlock } from './redshirt';
 
 function makePlayer(id: string, classYear: Player['classYear'], overrides: Partial<Player<'GENERIC'>> = {}): Player<'GENERIC'> {
   return {
@@ -251,5 +252,40 @@ describe('offseason progression', () => {
     );
     expect(again.roster[0]!.ratingHistory).toEqual(once.roster[0]!.ratingHistory);
     expect(twiceOnSameSeason.roster[0]!.ratingHistory?.map((h) => h.season)).toEqual([2028]);
+  });
+});
+
+describe('redshirts', () => {
+  it('keeps a redshirting player in his class with his eligibility, then marks the redshirt used', () => {
+    const team = makeTeam([makePlayer('rs', 'FR', { redshirtStatus: 'redshirting' }), makePlayer('plays', 'FR')]);
+    const [redshirted, played] = runTeamOffseason(team, { developmentRandom: () => 0.5 }).roster;
+    expect(redshirted).toMatchObject({ classYear: 'FR', redshirtStatus: 'redshirt_used', age: 21 });
+    expect(redshirted!.eligibility).toEqual(team.roster[0]!.eligibility);
+    expect(played).toMatchObject({ classYear: 'SO', redshirtStatus: 'none' });
+    expect(played!.eligibility.seasonsRemaining).toBe(3);
+  });
+
+  it('gives the redshirt year a development boost', () => {
+    const team = makeTeam([makePlayer('rs', 'SO', { redshirtStatus: 'redshirting' }), makePlayer('plays', 'SO')]);
+    const [redshirted, played] = runTeamOffseason(team, { developmentRandom: () => 0.4 }).roster;
+    expect(redshirted!.ratings.overall).toBeGreaterThan(played!.ratings.overall);
+  });
+
+  it('brings a redshirting senior back for a fifth year', () => {
+    const team = makeTeam([makePlayer('fifth', 'SR', { redshirtStatus: 'redshirting' }), makePlayer('grad', 'SR')]);
+    const roster = runTeamOffseason(team).roster;
+    expect(roster.map((p) => p.id)).toEqual(['fifth']);
+    expect(classLabel(roster[0]!)).toBe('RS-SR');
+    expect(isGraduating(team.roster[0]!)).toBe(false);
+    expect(isGraduating(team.roster[1]!)).toBe(true);
+  });
+
+  it('allows one redshirt per career, through the game limit', () => {
+    const fr = makePlayer('a', 'FR');
+    expect(redshirtBlock(fr, 0)).toBeNull();
+    expect(redshirtBlock(fr, REDSHIRT_GAME_LIMIT)).toBeNull();
+    expect(redshirtBlock(fr, REDSHIRT_GAME_LIMIT + 1)).toBe('played');
+    expect(redshirtBlock({ ...fr, redshirtStatus: 'redshirt_used' }, 0)).toBe('used');
+    expect(redshirtBlock({ ...fr, classYear: 'GR' }, 0)).toBe('graduate');
   });
 });

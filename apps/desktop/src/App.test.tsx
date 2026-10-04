@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -448,6 +449,19 @@ describe('Desktop App', () => {
     expect(screen.getByRole('button', { name: /Advance: Week 2/i })).toBeInTheDocument();
   });
 
+  it('keeps a record book that counts the season as it is played', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Records$/ }));
+    const goals = screen.getByLabelText('Goals records');
+    expect(within(goals).getAllByRole('row').length).toBeGreaterThan(0);
+    expect(goals).toHaveTextContent(/Live/);
+    await userEvent.click(screen.getByRole('button', { name: 'League' }));
+    expect(screen.getByRole('heading', { name: 'League Records' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Career' }));
+    expect(within(screen.getByLabelText('Points records')).getAllByRole('row')).toHaveLength(10);
+  });
+
   it('reopens the offseason after a reload instead of skipping into a broken season', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
@@ -462,6 +476,10 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
     // Wait for the debounced autosave, then reload the way a player would.
     await waitFor(() => expect(loadActiveDynastySave()?.offseasonSummary).toBeTruthy());
+    // The finished season went into the saved record book, with the preseason pick.
+    expect(loadActiveDynastySave()?.dynastyHistory[0]?.predictedConfFinish).toBeGreaterThan(0);
+    expect(loadActiveDynastySave()?.recordBook?.league?.career.points?.length).toBeGreaterThan(0);
+    expect(loadActiveDynastySave()?.hallOfFame).toEqual([]);
     cleanup();
 
     render(<App />);
@@ -516,6 +534,111 @@ describe('Desktop App', () => {
     await userEvent.click(within(roster).getAllByRole('button', { name: 'Add plan' }).find((b) => !(b as HTMLButtonElement).disabled)!);
     expect(within(plans).getAllByRole('button', { name: 'Remove' })).toHaveLength(4);
     expect(within(roster).getAllByRole('button', { name: 'Add plan' }).every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+
+  it('talks to players and holds a team meeting in the Locker Room', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Locker Room/ }));
+    const chemistry = screen.getByLabelText('Team chemistry');
+    expect(chemistry).toHaveTextContent(/Team Chemistry/);
+    const table = screen.getByLabelText('Player morale');
+    const firstTalk = within(table).getAllByRole('button', { name: 'Talk' })[0]!;
+    await userEvent.click(firstTalk);
+    expect(within(table).getAllByRole('button', { name: 'Talked' })).toHaveLength(1);
+    await waitFor(() => expect(loadActiveDynastySave()?.lockerRoom?.talkedIds).toHaveLength(1));
+
+    const meeting = within(chemistry).getByRole('button', { name: 'Hold team meeting' });
+    await userEvent.click(meeting);
+    expect(meeting).toBeDisabled();
+    expect(chemistry).toHaveTextContent(/needs a break from meetings until week \d+/);
+  });
+
+  it('suggests redshirts before the opener and redshirts a player from the Team screen', async () => {
+    await renderStartedApp();
+    const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
+    expect(actions).toHaveTextContent(/buried on the depth chart\. Redshirt them/);
+    await userEvent.click(screen.getByRole('button', { name: /^Team/ }));
+    const card = screen.getByLabelText('Redshirts');
+    expect(card).toHaveTextContent('Redshirting (0)');
+    await userEvent.click(within(card).getAllByRole('button', { name: 'Redshirt' })[0]!);
+    expect(card).toHaveTextContent('Redshirting (1)');
+    expect(within(card).getByRole('button', { name: 'Remove RS' })).toBeInTheDocument();
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      const team = save.dynasty.season.teams.find((t) => t.id === save.dynasty.userTeamId)!;
+      expect(team.roster.filter((p) => p.redshirtStatus === 'redshirting')).toHaveLength(1);
+    });
+  });
+
+  it('names a team captain from the Locker Room', async () => {
+    await renderStartedApp();
+    const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
+    expect(actions).toHaveTextContent(/No team captains named/);
+    await userEvent.click(screen.getByRole('button', { name: /^Locker Room/ }));
+    const card = screen.getByLabelText('Team captains');
+    expect(card).toHaveTextContent('No captains named.');
+    await userEvent.click(within(card).getAllByRole('button', { name: 'Make captain' })[0]!);
+    expect(within(card).getAllByRole('button', { name: 'Remove' })).toHaveLength(1);
+    expect(card).toHaveTextContent(/Captains (lift|drag) everyone's morale by/);
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      expect(teamCaptains(save.dynasty.season.teams.find((t) => t.id === save.dynasty.userTeamId)!)).toHaveLength(1);
+    });
+  });
+
+  it('shows the rivalry on the schedule and keeps the series after it is played', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Schedule$/ }));
+    const card = screen.getByLabelText('Rivalry');
+    expect(card).toHaveTextContent(/The \w+ \w+/);
+    expect(card).toHaveTextContent('First meeting');
+    expect(screen.getAllByText('Rivalry', { selector: '.rivalry-pill' }).length).toBeGreaterThan(0);
+
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim to End of Season/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Schedule$/ }));
+    expect(screen.getByLabelText('Rivalry')).toHaveTextContent(/(Leads|Trails) the series [01]-[01]/);
+    expect(screen.getByLabelText('Rivalry')).toHaveTextContent(/This season: (won|lost) \d+-\d+/);
+    await waitFor(() => expect(Object.keys(loadActiveDynastySave()?.rivalrySeries ?? {}).length).toBeGreaterThan(0));
+  });
+
+  it('previews the season on the Week Hub until the opener', async () => {
+    await renderStartedApp();
+    const preview = screen.getByLabelText('Season preview');
+    expect(preview).toHaveTextContent(/you're picked \d+(st|nd|rd|th)/);
+    expect(within(preview).getAllByRole('listitem').length).toBeGreaterThan(10);
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
+    expect(screen.queryByLabelText('Season preview')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^News/ }));
+    expect(screen.getAllByText(/^Preseason poll: /).length).toBeGreaterThan(0);
+  });
+
+  it('makes a playing-time promise and calls out a broken one', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Team/ }));
+    // Start a backup in a position's first slot, pushing its last starter to
+    // the bench. Ties go against the benched player, so use a position whose
+    // last starter is rated strictly above every backup.
+    const slots = within(screen.getByText('Depth Chart').closest('article')!).getAllByRole('combobox') as HTMLSelectElement[];
+    const overall = (option: HTMLOptionElement) => Number(/· (\d+)/.exec(option.text)![1]);
+    const slot = slots.find((candidate, index) => {
+      if (index > 0 && slots[index - 1]!.options[0]!.value === candidate.options[0]!.value) return false;
+      const starters = slots.filter((other) => other.options[0]!.value === candidate.options[0]!.value).length;
+      const options = Array.from(candidate.options);
+      return options.length > starters && options.slice(starters).every((option) => overall(option) < overall(options[starters - 1]!));
+    })!;
+    const starterCount = slots.filter((other) => other.options[0]!.value === slot.options[0]!.value).length;
+    await userEvent.selectOptions(slot, slot.options[starterCount]!.value);
+    await userEvent.click(screen.getByRole('button', { name: /^Locker Room/ }));
+    const concerns = screen.getByLabelText('Player concerns');
+    await userEvent.click(within(concerns).getAllByRole('button', { name: 'Promise role' })[0]!);
+    expect(concerns).toHaveTextContent(/Promised a starter role by week 3/);
+    for (let week = 1; week <= 3; week += 1) {
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+    }
+    await userEvent.click(screen.getByRole('button', { name: /^News/ }));
+    expect(screen.getByText(/feels betrayed after a broken promise of playing time/)).toBeInTheDocument();
   });
 
   it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {

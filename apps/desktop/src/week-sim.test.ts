@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
@@ -171,5 +172,66 @@ describe('practice during the season', () => {
       return total;
     };
     expect(count('intense')).toBeGreaterThan(count('light'));
+  });
+});
+
+describe('morale during the season', () => {
+  it('sours a benched star and says so in the news', () => {
+    const base = { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 42 }) };
+    const userId = base.dynasty.userTeamId;
+    const team = base.dynasty.season.teams.find((t) => t.id === userId)!;
+    const attack = team.roster.filter((p) => p.position === 'ATT').sort((a, b) => b.ratings.overall - a.ratings.overall);
+    const star = attack[0]!;
+    // Bury the best attackman at the bottom of the depth chart.
+    const benched = {
+      ...team,
+      roster: team.roster.map((p) => (p.id === star.id ? { ...p, morale: 55 } : p)),
+      depthChart: { ATT: [...attack.slice(1).map((p) => p.id), star.id] },
+    };
+    let state: WeekSimState = {
+      ...base,
+      dynasty: { ...base.dynasty, season: { ...base.dynasty.season, teams: base.dynasty.season.teams.map((t) => (t.id === userId ? benched : t)) } },
+    };
+    for (let week = 0; week < 4; week += 1) state = simulateOneWeek(state, undefined, seededRandom(week + 1));
+    const after = state.dynasty.season.teams.find((t) => t.id === userId)!.roster.find((p) => p.id === star.id)!;
+    expect(after.morale).toBeLessThan(50);
+    expect(state.newsItems.some((n) => n.headline.includes(`${star.name.first} ${star.name.last} is `) && /starting/.test(n.headline))).toBe(true);
+  });
+});
+
+describe('redshirts during the season', () => {
+  it('sits a redshirting player out of every game and lets CPU staffs redshirt before the opener', () => {
+    const base = { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 7 }) };
+    const userId = base.dynasty.userTeamId;
+    const team = base.dynasty.season.teams.find((t) => t.id === userId)!;
+    const star = [...team.roster].filter((p) => p.position === 'ATT').sort((a, b) => b.ratings.overall - a.ratings.overall)[0]!;
+    const redshirted = { ...team, roster: team.roster.map((p) => (p.id === star.id ? { ...p, redshirtStatus: 'redshirting' as const } : p)) };
+    let state: WeekSimState = {
+      ...base,
+      dynasty: { ...base.dynasty, season: { ...base.dynasty.season, teams: base.dynasty.season.teams.map((t) => (t.id === userId ? redshirted : t)) } },
+    };
+    for (let week = 0; week < 3; week += 1) state = simulateOneWeek(state, undefined, seededRandom(week + 11));
+    expect(state.seasonStats[star.id]?.gamesPlayed ?? 0).toBe(0);
+    const cpuRedshirts = state.dynasty.season.teams
+      .filter((t) => t.id !== userId)
+      .reduce((sum, t) => sum + t.roster.filter((p) => p.redshirtStatus === 'redshirting').length, 0);
+    expect(cpuRedshirts).toBeGreaterThan(0);
+    // ...and named their captains.
+    expect(state.dynasty.season.teams.filter((t) => t.id !== userId).every((t) => teamCaptains(t).length === 2)).toBe(true);
+    expect(teamCaptains(state.dynasty.season.teams.find((t) => t.id === userId)!)).toHaveLength(0);
+    // The user's own calls are left alone.
+    const userRedshirts = state.dynasty.season.teams.find((t) => t.id === userId)!.roster.filter((p) => p.redshirtStatus === 'redshirting');
+    expect(userRedshirts.map((p) => p.id)).toEqual([star.id]);
+  });
+});
+
+describe('rivalries during the season', () => {
+  it('records every rivalry game in the series and reports it', () => {
+    const state = simulateRemainingWeeks(freshState(), undefined, seededRandom(5));
+    const series = Object.values(state.rivalrySeries ?? {});
+    // Rivals share a conference, so every pair meets once in the round-robin.
+    expect(series.length).toBeGreaterThanOrEqual(15);
+    expect(series.every((s) => Object.values(s.wins).reduce((a, b) => a + b, 0) === 1 && s.holderId !== null)).toBe(true);
+    expect(state.newsItems.some((n) => /^Rivalry: .+ wins The \w+ \w+, beating .+ \d+-\d+ \(leads the series 1-0\)$/.test(n.headline))).toBe(true);
   });
 });
