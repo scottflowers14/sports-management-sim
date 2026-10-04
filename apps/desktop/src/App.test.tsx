@@ -448,6 +448,19 @@ describe('Desktop App', () => {
     expect(screen.getByRole('button', { name: /Advance: Week 2/i })).toBeInTheDocument();
   });
 
+  it('keeps a record book that counts the season as it is played', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Records$/ }));
+    const goals = screen.getByLabelText('Goals records');
+    expect(within(goals).getAllByRole('row').length).toBeGreaterThan(0);
+    expect(goals).toHaveTextContent(/Live/);
+    await userEvent.click(screen.getByRole('button', { name: 'League' }));
+    expect(screen.getByRole('heading', { name: 'League Records' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Career' }));
+    expect(within(screen.getByLabelText('Points records')).getAllByRole('row')).toHaveLength(10);
+  });
+
   it('reopens the offseason after a reload instead of skipping into a broken season', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
@@ -462,6 +475,8 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
     // Wait for the debounced autosave, then reload the way a player would.
     await waitFor(() => expect(loadActiveDynastySave()?.offseasonSummary).toBeTruthy());
+    // The finished season went into the saved record book.
+    expect(loadActiveDynastySave()?.recordBook?.league?.career.points?.length).toBeGreaterThan(0);
     cleanup();
 
     render(<App />);

@@ -27,6 +27,7 @@ import { StaffScreen } from './screens/StaffScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
 import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
+import { RecordsScreen } from './screens/RecordsScreen';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
@@ -70,6 +71,7 @@ export function App() {
     scouting,
     seasonStats,
     careerStats,
+    recordBook,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -337,6 +339,7 @@ export function App() {
           ? [{ view: 'tournament' as const, label: 'Tournament', ...(tournament?.nationalChampion ? { badge: '✓' } : {}) }]
           : []),
         { view: 'history', label: 'History' },
+        { view: 'records', label: 'Records' },
       ],
     },
   ];
@@ -673,6 +676,19 @@ export function App() {
           meetingReadyWeek={meetingReadyWeek}
           onTalk={talkToPlayer}
           onTeamMeeting={holdTeamMeeting}
+          onSelectPlayer={setSelectedPlayerId}
+        />
+      )}
+
+      {view === 'records' && (
+        <RecordsScreen
+          archive={recordBook}
+          careers={careerStats}
+          // After the offseason runs the year has rolled over; last season is already in the careers.
+          seasonStats={offseasonSummary ? {} : seasonStats}
+          teams={dynasty.season.teams}
+          seasonYear={dynasty.season.year}
+          userTeamName={userTeam.name}
           onSelectPlayer={setSelectedPlayerId}
         />
       )}

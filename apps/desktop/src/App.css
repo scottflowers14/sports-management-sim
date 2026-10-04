@@ -5433,3 +5433,79 @@ li span {
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* ── Record book ──────────────────────────────────────────── */
+
+.records-layout {
+  display: grid;
+  gap: 24px;
+}
+
+.records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.records-controls {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.records-controls .stats-cat-bar {
+  margin: 0;
+}
+
+.records-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+
+.records-card h3 {
+  margin: 0 0 10px;
+}
+
+.records-table td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.records-rank {
+  width: 28px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.records-value {
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.records-holder .records-value,
+.records-holder .records-rank {
+  color: #f2c472;
+}
+
+.records-active {
+  color: #72f2c6;
+}
+
+.records-meta {
+  font-size: 0.75rem;
+}
+
+.records-live {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(114, 242, 198, 0.14);
+  color: #72f2c6;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}

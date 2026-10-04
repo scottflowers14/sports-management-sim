@@ -47,6 +47,7 @@ import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, WeekSimState } from './week-sim';
 import { EMPTY_LOCKER_ROOM, type LockerRoomState } from './locker-room';
+import { archiveRecords, recordNewsForWeek, type RecordBookArchive } from './records';
 import {
   createCoachProfile,
   generateCoachName,
@@ -122,6 +123,7 @@ export type View =
   | 'schedule'
   | 'recruiting'
   | 'standings'
+  | 'records'
   | 'offseason'
   | 'news'
   | 'tournament'
@@ -194,6 +196,7 @@ export function useDynastyController() {
   );
   const [practiceGains, setPracticeGains] = useState<PracticeLogEntry[]>(() => loadedSave?.practiceGains ?? []);
   const [lockerRoom, setLockerRoom] = useState<LockerRoomState>(() => loadedSave?.lockerRoom ?? EMPTY_LOCKER_ROOM);
+  const [recordBook, setRecordBook] = useState<RecordBookArchive>(() => loadedSave?.recordBook ?? {});
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
 
@@ -219,6 +222,7 @@ export function useDynastyController() {
     practicePlan,
     practiceGains,
     lockerRoom,
+    recordBook,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -227,7 +231,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -261,6 +265,7 @@ export function useDynastyController() {
     setTrainingFocus('balanced');
     setPracticeGains([]);
     setLockerRoom(EMPTY_LOCKER_ROOM);
+    setRecordBook({});
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
     setAutoRecruitingOffers(false);
@@ -321,6 +326,7 @@ export function useDynastyController() {
       practicePlan: newPracticePlan,
       practiceGains: [],
       lockerRoom: EMPTY_LOCKER_ROOM,
+      recordBook: {},
       pendingJobOffers: null,
       shortlistIds: [],
       recruitingActivity: emptyRecruitingActivity(),
@@ -373,6 +379,7 @@ export function useDynastyController() {
     setPracticePlan(save.practicePlan ?? defaultPracticePlan(save.dynasty));
     setPracticeGains(save.practiceGains ?? []);
     setLockerRoom(save.lockerRoom ?? EMPTY_LOCKER_ROOM);
+    setRecordBook(save.recordBook ?? {});
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -463,10 +470,28 @@ export function useDynastyController() {
   }), [staffState.staff, practicePlan, practiceGains, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((result: WeekSimState) => {
+    const programName = result.dynasty.season.teams.find((t) => t.id === result.dynasty.userTeamId)?.name;
+    const recordNews: NewsItem[] = programName
+      ? recordNewsForWeek({
+          archive: recordBook,
+          careers: careerStats,
+          year: result.dynasty.season.year,
+          programName,
+          programLabel: formatTeamName(programName),
+          before: { seasonStats, teams: dynasty.season.teams },
+          after: { seasonStats: result.seasonStats, teams: result.dynasty.season.teams },
+        }).map((headline, i) => ({
+          id: `record-${result.dynasty.season.year}-${result.lastSimWeek ?? 0}-${i}`,
+          week: result.lastSimWeek ?? result.dynasty.season.currentWeek,
+          category: 'award' as const,
+          featured: true,
+          headline,
+        }))
+      : [];
     setDynasty(result.dynasty);
     setRankings(result.rankings);
     setInjuries(result.injuries);
-    setNewsItems(result.newsItems);
+    setNewsItems([...recordNews, ...result.newsItems]);
     setScouting(result.scouting);
     setRecruitingActivity(result.recruitingActivity);
     setRecruitTrends(result.recruitTrends);
@@ -484,7 +509,7 @@ export function useDynastyController() {
     if (offeredIds.length > 0) {
       setShortlistIds((prev) => [...prev, ...offeredIds.filter((id) => !prev.includes(id))]);
     }
-  }, []);
+  }, [recordBook, careerStats, seasonStats, dynasty.season.teams]);
 
   // Simming is locked while the offseason is pending; send the coach back there instead.
   const simWeek = useCallback(() => {
@@ -796,9 +821,11 @@ export function useDynastyController() {
     setRecruitingActivity(emptyRecruitingActivity());
     setRecruitTrends({});
     setDynastyHistory((h) => [historyRecord, ...h]);
-    setCareerStats((prev) =>
-      recordSeasonToCareer(prev, seasonStats, dynasty.season.teams, dynasty.season.year),
-    );
+    const careersAfterSeason = recordSeasonToCareer(careerStats, seasonStats, dynasty.season.teams, dynasty.season.year);
+    setCareerStats(careersAfterSeason);
+    // Departed players' careers are pruned from saves, so their records are kept here.
+    const userProgramName = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId)?.name;
+    setRecordBook((book) => archiveRecords(book, careersAfterSeason, userProgramName ? [userProgramName] : []));
 
     // Evaluate season goals and update AD confidence
     if (coachProfile && seasonGoals) {
@@ -844,7 +871,7 @@ export function useDynastyController() {
     }
 
     setView('offseason');
-  }, [tournament, dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, staffState.staff]);
+  }, [tournament, dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, staffState.staff]);
 
   const acceptJobOffer = useCallback((teamId: string) => {
     const newTeam = dynasty.season.teams.find((t) => t.id === teamId);
@@ -1130,6 +1157,7 @@ export function useDynastyController() {
     removeDevelopmentPlan,
     autoFillDevelopmentPlans,
     lockerRoom,
+    recordBook,
     talkToPlayer,
     holdTeamMeeting,
     setRedshirt,
