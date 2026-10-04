@@ -21,3 +21,4 @@ export * from './practice';
 export * from './morale';
 export * from './redshirts';
 export * from './rivalries';
+export * from './coaching-carousel';

@@ -1,4 +1,4 @@
-import type { LacrossePortalEntry, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import type { CarouselChange, CoachDepartureReason, LacrossePortalEntry, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { PORTAL_REASON_LABELS } from '@sports-management-sim/engine-core';
 import { OfferControl } from '../components/OfferControl';
 import { portalStanding } from './PortalBoard';
@@ -150,6 +150,10 @@ export function OffseasonScreen({
             </div>
           )}
         </article>
+
+        {(offseasonSummary.coachingCarousel?.length ?? 0) > 0 && (
+          <CoachingCarouselCard changes={offseasonSummary.coachingCarousel!} teamShort={teamShort} />
+        )}
 
         {(availablePortal.length > 0 || departures.length > 0) && (
           <article className="card portal-offseason-card" aria-label="Transfer portal summary">
@@ -390,5 +394,33 @@ function PrestigeSection({ reputation }: {
         </div>
       ))}
     </div>
+  );
+}
+
+const DEPARTURE_VERBS: Record<CoachDepartureReason, string> = {
+  fired: 'Fired',
+  retired: 'Retired:',
+  poached: 'Lost',
+};
+
+function CoachingCarouselCard({ changes, teamShort }: { changes: CarouselChange[]; teamShort: (id: string) => string }) {
+  return (
+    <article className="card" aria-label="Coaching carousel">
+      <h2>Coaching Carousel · {changes.length} change{changes.length === 1 ? '' : 's'}</h2>
+      <ul className="player-list">
+        {changes.map(({ teamId, outgoing, incoming }) => (
+          <li key={teamId}>
+            <strong>{teamShort(teamId)}</strong>
+            <span>
+              {DEPARTURE_VERBS[outgoing.reason]} {outgoing.name} ({outgoing.wins}-{outgoing.losses} in {outgoing.seasons}{' '}
+              season{outgoing.seasons === 1 ? '' : 's'}){outgoing.reason === 'poached' ? ' to a bigger job' : ''}
+            </span>
+            <span>
+              Hired {incoming.name} ({incoming.rating}){incoming.fromTeamId ? ` from ${teamShort(incoming.fromTeamId)}` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </article>
   );
 }

@@ -20,6 +20,7 @@ import {
   programCoachingEdge,
   releaseStaffMember,
   runStaffOffseason,
+  carouselHeadline,
   staffBudgetFor,
   STAFF_ROLE_LABELS,
   updateLacrosseDepthChartSlot,
@@ -904,7 +905,18 @@ export function useDynastyController() {
         headline: `${STAFF_ROLE_LABELS[member.role].title} ${member.name.first} ${member.name.last} (${member.rating}) was hired away as a head coach. Find a replacement on the Staff screen.`,
       });
     }
-    if (staffNews.length > 0) setNewsItems((prev) => [...staffNews, ...prev]);
+    // Rival programs' head coaching changes; ones in the user's conference lead.
+    const userConferenceId = newUserTeam?.conferenceId;
+    const teamName = (id: string) => formatTeamName(newDynasty.season.teams.find((t) => t.id === id)?.name ?? id);
+    const carouselNews: NewsItem[] = (summary.coachingCarousel ?? []).map((change) => ({
+      id: `carousel-${dynasty.season.year}-${change.teamId}`,
+      week: dynasty.season.currentWeek,
+      category: 'coaching' as const,
+      ...(newDynasty.season.teams.find((t) => t.id === change.teamId)?.conferenceId === userConferenceId ? { featured: true } : {}),
+      headline: carouselHeadline(change, teamName),
+    }));
+    const offseasonNews = [...staffNews, ...carouselNews];
+    if (offseasonNews.length > 0) setNewsItems((prev) => [...offseasonNews, ...prev]);
 
     setDynasty(newDynasty);
     setOffseasonSummary(summary);

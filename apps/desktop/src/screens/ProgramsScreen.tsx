@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { calculateLacrosseTeamRating } from '@sports-management-sim/sport-lacrosse';
+import { calculateLacrosseTeamRating, coachName } from '@sports-management-sim/sport-lacrosse';
 import type { LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { Conference, ScheduledGame } from '@sports-management-sim/engine-core';
 import type { RankingEntry } from '../rankings';
@@ -194,6 +194,13 @@ function ProgramDetail({
           <div>
             <p className="eyebrow">{row?.conferenceName ?? team.conferenceId.toUpperCase()} · Program Page</p>
             <h2>{formatTeamName(team.name)}</h2>
+            {team.headCoach && (
+              <p className="program-coach" aria-label="Head coach">
+                Head Coach {coachName(team.headCoach)} · since {team.headCoach.hiredYear} · {team.headCoach.rating} rating ·{' '}
+                {team.headCoach.wins}–{team.headCoach.losses} here, {team.headCoach.careerWins}–{team.headCoach.careerLosses} career
+                {team.headCoach.hotSeat > 0 && <span className="hot-seat-pill">Hot seat</span>}
+              </p>
+            )}
           </div>
         </div>
         <div className="kv-strip">
