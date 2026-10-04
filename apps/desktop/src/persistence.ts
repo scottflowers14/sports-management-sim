@@ -4,6 +4,7 @@ import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, L
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import type { PracticeLogEntry } from './week-sim';
 import type { LockerRoomState } from './locker-room';
+import type { RecordBookArchive } from './records';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
 import type { ConferenceBracket, TournamentGame, TournamentPhase, TournamentState } from './tournament';
@@ -49,6 +50,8 @@ export interface DynastySaveState {
   practicePlan?: LacrossePracticePlan;
   practiceGains?: PracticeLogEntry[];
   lockerRoom?: LockerRoomState;
+  /** Program and league stat leaders, kept after their careers are pruned. */
+  recordBook?: RecordBookArchive;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */
