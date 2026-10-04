@@ -33,6 +33,7 @@ import { PracticeScreen } from './screens/PracticeScreen';
 import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
+import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
@@ -78,6 +79,7 @@ export function App() {
     careerStats,
     recordBook,
     rivalrySeries,
+    seasonPreview,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -518,6 +520,17 @@ export function App() {
           redshirtSuggestions={redshirtSuggestions}
           captainCount={teamCaptains(userTeam).length}
           {...(rivalryWeek ? { rivalryWeek } : {})}
+          previewCard={
+            seasonPreview && seasonPreview.year === dynasty.season.year && lastSimWeek === null && !offseasonSummary ? (
+              <SeasonPreviewCard
+                preview={seasonPreview}
+                conferences={dynasty.season.conferences}
+                teamMap={teamMap}
+                userTeamId={dynasty.userTeamId}
+                onSelectPlayer={setSelectedPlayerId}
+              />
+            ) : null
+          }
         />
       )}
 

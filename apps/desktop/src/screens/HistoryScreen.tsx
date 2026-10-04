@@ -1,5 +1,6 @@
 import type { DynastySeasonRecord, SeasonAwardRecord } from '../history';
 import { buildRecordBook } from '../history';
+import { versusPrediction } from '../preseason';
 import { formatTeamName } from '../ui/format';
 
 export function HistoryScreen({ history }: { history: DynastySeasonRecord[] }) {
@@ -54,6 +55,7 @@ export function HistoryScreen({ history }: { history: DynastySeasonRecord[] }) {
               <th>Coach</th>
               <th>Record</th>
               <th>Conf</th>
+              <th>Picked</th>
               <th>Nat Rank</th>
               <th>Top Scorer</th>
               <th>Conf</th>
@@ -68,6 +70,20 @@ export function HistoryScreen({ history }: { history: DynastySeasonRecord[] }) {
                 <td className="dim">{record.coachName ?? '—'}</td>
                 <td className="record-cell">{record.wins}–{record.losses}</td>
                 <td>#{record.confStanding}</td>
+                <td
+                  className={
+                    record.predictedConfFinish === undefined
+                      ? 'dim'
+                      : record.confStanding < record.predictedConfFinish
+                        ? 'mood-happy'
+                        : record.confStanding > record.predictedConfFinish
+                          ? 'mood-unhappy'
+                          : undefined
+                  }
+                  title={versusPrediction(record.predictedConfFinish, record.confStanding) ?? undefined}
+                >
+                  {record.predictedConfFinish !== undefined ? `#${record.predictedConfFinish}` : '—'}
+                </td>
                 <td>{record.natRankAtEnd !== null ? `#${record.natRankAtEnd}` : '—'}</td>
                 <td>
                   {record.teamLeader

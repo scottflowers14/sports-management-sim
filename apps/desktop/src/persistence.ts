@@ -5,6 +5,7 @@ import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-h
 import type { PracticeLogEntry } from './week-sim';
 import type { LockerRoomState } from './locker-room';
 import type { RecordBookArchive } from './records';
+import type { SeasonPreview } from './preseason';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
 import type { ConferenceBracket, TournamentGame, TournamentPhase, TournamentState } from './tournament';
@@ -54,6 +55,8 @@ export interface DynastySaveState {
   recordBook?: RecordBookArchive;
   /** Every rivalry's all-time series. */
   rivalrySeries?: RivalrySeriesMap;
+  /** The media's preseason picks for the current season. */
+  seasonPreview?: SeasonPreview | null;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */

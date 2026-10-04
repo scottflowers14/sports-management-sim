@@ -476,7 +476,8 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
     // Wait for the debounced autosave, then reload the way a player would.
     await waitFor(() => expect(loadActiveDynastySave()?.offseasonSummary).toBeTruthy());
-    // The finished season went into the saved record book.
+    // The finished season went into the saved record book, with the preseason pick.
+    expect(loadActiveDynastySave()?.dynastyHistory[0]?.predictedConfFinish).toBeGreaterThan(0);
     expect(loadActiveDynastySave()?.recordBook?.league?.career.points?.length).toBeGreaterThan(0);
     cleanup();
 
@@ -598,6 +599,18 @@ describe('Desktop App', () => {
     expect(screen.getByLabelText('Rivalry')).toHaveTextContent(/(Leads|Trails) the series [01]-[01]/);
     expect(screen.getByLabelText('Rivalry')).toHaveTextContent(/This season: (won|lost) \d+-\d+/);
     await waitFor(() => expect(Object.keys(loadActiveDynastySave()?.rivalrySeries ?? {}).length).toBeGreaterThan(0));
+  });
+
+  it('previews the season on the Week Hub until the opener', async () => {
+    await renderStartedApp();
+    const preview = screen.getByLabelText('Season preview');
+    expect(preview).toHaveTextContent(/you're picked \d+(st|nd|rd|th)/);
+    expect(within(preview).getAllByRole('listitem').length).toBeGreaterThan(10);
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
+    expect(screen.queryByLabelText('Season preview')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^News/ }));
+    expect(screen.getAllByText(/^Preseason poll: /).length).toBeGreaterThan(0);
   });
 
   it('flags unfilled class spots on the Week Hub and shows class needs on Recruiting', async () => {
