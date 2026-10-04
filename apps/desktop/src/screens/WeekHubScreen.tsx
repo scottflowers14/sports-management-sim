@@ -31,6 +31,7 @@ function computeActionItems({
   openPlanSlots = 0,
   unhappyCount = 0,
   redshirtSuggestions = 0,
+  captainCount,
 }: {
   currentWeek: number;
   classNeeds?: PositionNeed[];
@@ -38,6 +39,7 @@ function computeActionItems({
   openPlanSlots?: number;
   unhappyCount?: number;
   redshirtSuggestions?: number;
+  captainCount?: number;
   injuries: InjuredPlayer[];
   userTeam: LacrosseTeam;
   scouting: ScoutingState;
@@ -130,6 +132,16 @@ function computeActionItems({
     });
   }
 
+  if (!seasonComplete && captainCount === 0) {
+    items.push({
+      id: 'captains',
+      priority: 'medium',
+      icon: '©',
+      text: 'No team captains named. A respected captain lifts the whole locker room every week.',
+      nav: 'locker-room',
+    });
+  }
+
   if (!seasonComplete && redshirtSuggestions > 0) {
     items.push({
       id: 'redshirts',
@@ -203,6 +215,7 @@ export function WeekHubScreen({
   openPlanSlots,
   unhappyCount,
   redshirtSuggestions,
+  captainCount,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -227,6 +240,7 @@ export function WeekHubScreen({
   openPlanSlots?: number;
   unhappyCount?: number;
   redshirtSuggestions?: number;
+  captainCount?: number;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -247,6 +261,7 @@ export function WeekHubScreen({
     ...(openPlanSlots !== undefined ? { openPlanSlots } : {}),
     ...(unhappyCount !== undefined ? { unhappyCount } : {}),
     ...(redshirtSuggestions !== undefined ? { redshirtSuggestions } : {}),
+    ...(captainCount !== undefined ? { captainCount } : {}),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
 

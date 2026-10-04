@@ -27,6 +27,7 @@ import type { StaffRole } from '@sports-management-sim/sport-lacrosse';
 import {
   autoDevelopmentPlans,
   boostMorale,
+  setCaptain,
   setLacrosseRedshirt,
   MAX_DEVELOPMENT_PLANS,
   PLAYER_TALK_BOOST,
@@ -950,6 +951,13 @@ export function useDynastyController() {
     setSaveStatus('Held a team meeting');
   }, [canHoldTeamMeeting, currentWeekNumber, updateUserRoster]);
 
+  const setTeamCaptain = useCallback((playerId: string, captain: boolean) => {
+    const player = userTeam?.roster.find((p) => p.id === playerId);
+    if (!player) return;
+    updateUserRoster((team) => setCaptain(team, playerId, captain));
+    setSaveStatus(`${player.name.first} ${player.name.last} ${captain ? 'is a team captain' : 'is no longer a captain'}`);
+  }, [userTeam, updateUserRoster]);
+
   /** Redshirt calls happen during the regular season, not the tournament or offseason. */
   const redshirtsOpen = tournament === null && offseasonSummary === null;
   const gamesPlayedFor = useCallback((playerId: string) => seasonStats[playerId]?.gamesPlayed ?? 0, [seasonStats]);
@@ -1161,6 +1169,7 @@ export function useDynastyController() {
     talkToPlayer,
     holdTeamMeeting,
     setRedshirt,
+    setTeamCaptain,
     redshirtsOpen,
     gamesPlayedFor,
     canHoldTeamMeeting,

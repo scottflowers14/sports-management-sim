@@ -8,6 +8,7 @@ import {
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
 import {
+  applyCpuCaptains,
   applyCpuRedshirts,
   autoDevelopmentPlans,
   moodLabel,
@@ -101,13 +102,13 @@ export function simulateOneWeek(
   const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
     team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
-  // CPU staffs make their redshirt calls before the opener.
+  // CPU staffs name captains and make their redshirt calls before the opener.
   const firstWeek = dynasty.season.schedule.reduce((min, game) => Math.min(min, game.week), Infinity);
   const seasonBeforeGames =
     weekToSim === firstWeek
       ? {
           ...dynasty.season,
-          teams: dynasty.season.teams.map((t) => (t.id === dynasty.userTeamId ? t : applyCpuRedshirts(t))),
+          teams: dynasty.season.teams.map((t) => (t.id === dynasty.userTeamId ? t : applyCpuCaptains(applyCpuRedshirts(t)))),
         }
       : dynasty.season;
   const seasonAfterGames = advanceSeasonWeek(seasonBeforeGames, (game, homeTeam, awayTeam) => {

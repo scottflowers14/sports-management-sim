@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
@@ -215,6 +216,9 @@ describe('redshirts during the season', () => {
       .filter((t) => t.id !== userId)
       .reduce((sum, t) => sum + t.roster.filter((p) => p.redshirtStatus === 'redshirting').length, 0);
     expect(cpuRedshirts).toBeGreaterThan(0);
+    // ...and named their captains.
+    expect(state.dynasty.season.teams.filter((t) => t.id !== userId).every((t) => teamCaptains(t).length === 2)).toBe(true);
+    expect(teamCaptains(state.dynasty.season.teams.find((t) => t.id === userId)!)).toHaveLength(0);
     // The user's own calls are left alone.
     const userRedshirts = state.dynasty.season.teams.find((t) => t.id === userId)!.roster.filter((p) => p.redshirtStatus === 'redshirting');
     expect(userRedshirts.map((p) => p.id)).toEqual([star.id]);

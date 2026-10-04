@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -564,6 +565,22 @@ describe('Desktop App', () => {
       const save = loadActiveDynastySave()!;
       const team = save.dynasty.season.teams.find((t) => t.id === save.dynasty.userTeamId)!;
       expect(team.roster.filter((p) => p.redshirtStatus === 'redshirting')).toHaveLength(1);
+    });
+  });
+
+  it('names a team captain from the Locker Room', async () => {
+    await renderStartedApp();
+    const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
+    expect(actions).toHaveTextContent(/No team captains named/);
+    await userEvent.click(screen.getByRole('button', { name: /^Locker Room/ }));
+    const card = screen.getByLabelText('Team captains');
+    expect(card).toHaveTextContent('No captains named.');
+    await userEvent.click(within(card).getAllByRole('button', { name: 'Make captain' })[0]!);
+    expect(within(card).getAllByRole('button', { name: 'Remove' })).toHaveLength(1);
+    expect(card).toHaveTextContent(/Captains (lift|drag) everyone's morale by/);
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      expect(teamCaptains(save.dynasty.season.teams.find((t) => t.id === save.dynasty.userTeamId)!)).toHaveLength(1);
     });
   });
 

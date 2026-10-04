@@ -4,6 +4,7 @@ import {
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
   suggestRedshirts,
+  teamCaptains,
   STAFF_ROLES,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
@@ -114,6 +115,7 @@ export function App() {
     updateDepthChartSlot,
     resetDepthChart,
     setRedshirt,
+    setTeamCaptain,
     redshirtsOpen,
     gamesPlayedFor,
     userTeam,
@@ -497,6 +499,7 @@ export function App() {
           openPlanSlots={Math.max(0, MAX_DEVELOPMENT_PLANS - practicePlan.developmentPlans.length)}
           unhappyCount={unhappyCount}
           redshirtSuggestions={redshirtSuggestions}
+          captainCount={teamCaptains(userTeam).length}
         />
       )}
 
@@ -676,6 +679,7 @@ export function App() {
           meetingReadyWeek={meetingReadyWeek}
           onTalk={talkToPlayer}
           onTeamMeeting={holdTeamMeeting}
+          onSetCaptain={setTeamCaptain}
           onSelectPlayer={setSelectedPlayerId}
         />
       )}
