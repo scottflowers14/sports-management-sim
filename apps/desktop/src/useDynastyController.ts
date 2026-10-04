@@ -32,8 +32,12 @@ import {
   STAFF_ROLE_LABELS,
   updateLacrosseDepthChartSlot,
   swapNonConferenceOpponent,
+  cancelNilPortalDeal,
+  nilCollectiveBudget,
+  pitchNilRetention,
+  signNilPortalDeal,
 } from '@sports-management-sim/sport-lacrosse';
-import type { InvestmentPlan, InvestmentProject, ProDraftPick, StaffRole } from '@sports-management-sim/sport-lacrosse';
+import type { InvestmentPlan, InvestmentProject, NilState, ProDraftPick, StaffRole } from '@sports-management-sim/sport-lacrosse';
 import {
   autoDevelopmentPlans,
   boostMorale,
@@ -235,6 +239,7 @@ export function useDynastyController() {
   const [investmentPlan, setInvestmentPlan] = useState<InvestmentPlan>(() => loadedSave?.investmentPlan ?? {});
   const [hallOfFame, setHallOfFame] = useState<HallOfFameEntry[]>(() => loadedSave?.hallOfFame ?? []);
   const [proDraftHistory, setProDraftHistory] = useState<ProDraftPick[]>(() => loadedSave?.proDraftHistory ?? []);
+  const [nilSaved, setNil] = useState<NilState | null>(() => loadedSave?.nil ?? null);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
@@ -268,6 +273,7 @@ export function useDynastyController() {
     seasonPreview,
     hallOfFame,
     proDraftHistory,
+    nil: nilSaved,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -276,7 +282,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -316,6 +322,7 @@ export function useDynastyController() {
     setInvestmentPlan({});
     setHallOfFame([]);
     setProDraftHistory([]);
+    setNil(null);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
     setAutoRecruitingOffers(false);
@@ -386,6 +393,7 @@ export function useDynastyController() {
       investmentPlan: {},
       hallOfFame: [],
       proDraftHistory: [],
+      nil: null,
       seasonPreview: preview,
       pendingJobOffers: null,
       shortlistIds: [],
@@ -446,6 +454,7 @@ export function useDynastyController() {
     setSeasonPreview(save.seasonPreview ?? null);
     setHallOfFame(save.hallOfFame ?? []);
     setProDraftHistory(save.proDraftHistory ?? []);
+    setNil(save.nil ?? null);
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -803,9 +812,49 @@ export function useDynastyController() {
     setSaveStatus(`Offered ${entry.name.first} ${entry.name.last} a ${scholarshipPercent}% scholarship`);
   }, [dynasty]);
 
+  // The collective refills every year: a save from last season, or one from
+  // before NIL existed, starts this year's pot fresh.
+  const nil: NilState = useMemo(
+    () =>
+      nilSaved && nilSaved.year === dynasty.season.year
+        ? nilSaved
+        : { year: dynasty.season.year, budget: userTeam ? nilCollectiveBudget(userTeam) : 0, deals: [] },
+    [nilSaved, dynasty.season.year, userTeam],
+  );
+
   const withdrawPortalOffer = useCallback((portalEntryId: string) => {
     setDynasty((prev) => withdrawLacrossePortalOffer(prev, portalEntryId));
-  }, []);
+    setNil(cancelNilPortalDeal(nil, portalEntryId));
+  }, [nil]);
+
+  const retainWithNil = useCallback((portalEntryId: string) => {
+    const result = pitchNilRetention(nil, dynasty.season.teams, dynasty.portalEntries, portalEntryId, dynasty.userTeamId, dynasty.seed);
+    if (!result) return;
+    const entry = dynasty.portalEntries.find((e) => e.id === portalEntryId)!;
+    setNil(result.state);
+    setDynasty({ ...dynasty, portalEntries: result.entries, season: { ...dynasty.season, teams: result.teams } });
+    const name = `${entry.name.first} ${entry.name.last}`;
+    setSaveStatus(result.retained ? `${name} took the NIL deal and is staying` : `${name} turned down the NIL deal`);
+    setNewsItems((items) => [
+      {
+        id: `nil-${entry.id}`,
+        week: dynasty.season.currentWeek,
+        category: 'recruiting',
+        featured: true,
+        headline: result.retained
+          ? `${name} (${entry.position}) pulls his name from the portal after an NIL deal`
+          : `${name} (${entry.position}) turns down an NIL deal and stays in the portal`,
+      },
+      ...items,
+    ]);
+  }, [nil, dynasty]);
+
+  const signNilDeal = useCallback((portalEntryId: string) => {
+    const result = signNilPortalDeal(nil, dynasty.portalEntries, portalEntryId, dynasty.userTeamId);
+    if (!result) return;
+    setNil(result.state);
+    setDynasty({ ...dynasty, portalEntries: result.entries });
+  }, [nil, dynasty]);
 
   const portalScholarshipRoomLeft = userTeam ? portalScholarshipRoom(userTeam, dynasty.portalEntries) : 0;
 
@@ -1412,6 +1461,9 @@ export function useDynastyController() {
     releaseStaff,
     scheduleEditable,
     swapNonConferenceGame,
+    nil,
+    retainWithNil,
+    signNilDeal,
     activeSaveId,
     saves,
     customTeams,

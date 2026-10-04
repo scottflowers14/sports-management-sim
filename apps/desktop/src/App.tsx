@@ -156,6 +156,9 @@ export function App() {
     offerPortalPlayer,
     withdrawPortalOffer,
     portalScholarshipRoom,
+    nil,
+    retainWithNil,
+    signNilDeal,
     enterTournament,
     simTournamentSemis,
     simTournamentFinals,
@@ -632,6 +635,7 @@ export function App() {
           onToggleVisitInvite={toggleVisitInvite}
           onOfferPortalPlayer={offerPortalPlayer}
           onWithdrawPortalOffer={withdrawPortalOffer}
+          nil={{ state: nil, onRetain: retainWithNil, onDeal: signNilDeal }}
           portalTeams={dynasty.season.teams}
           portalScholarshipRoom={portalScholarshipRoom}
           seasonYear={dynasty.season.year}
