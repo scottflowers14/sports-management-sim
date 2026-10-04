@@ -4867,7 +4867,7 @@ li span {
 .portal-ahead-open { color: #72f2c6; font-weight: 700; }
 .portal-leading { color: #72f2c6; font-weight: 700; }
 .portal-trailing { color: #f5a623; font-weight: 600; }
-.portal-offer-state { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; }
+.portal-offer-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 0.76rem; }
 .portal-offer-state .badge { padding: 2px 8px; font-size: 0.7rem; }
 .portal-action .offer-control { justify-content: flex-end; }
 .link-btn {
@@ -5911,4 +5911,29 @@ li span {
   flex: 1;
   min-width: 0;
   max-width: 34rem;
+}
+
+.nil-btn {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+.nil-signed {
+  background: rgba(64, 196, 120, 0.16);
+  color: #6fdc9b;
+  border: 1px solid rgba(64, 196, 120, 0.35);
+}
+
+.nil-declined {
+  background: rgba(230, 90, 90, 0.14);
+  color: #f08c8c;
+  border: 1px solid rgba(230, 90, 90, 0.3);
+}
+
+.portal-departure-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }

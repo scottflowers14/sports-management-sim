@@ -18,7 +18,7 @@ import type { SeasonStatsMap } from './stats';
 import type { CareerStatsMap } from './career-stats';
 import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
 import type { WeeklyHonor } from './weekly-honors';
-import type { InvestmentPlan, ProDraftPick } from '@sports-management-sim/sport-lacrosse';
+import type { InvestmentPlan, NilState, ProDraftPick } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName } from './ui/format';
 
 export const DYNASTY_SAVE_VERSION = 1;
@@ -67,6 +67,8 @@ export interface DynastySaveState {
   hallOfFame?: HallOfFameEntry[];
   /** Every pro draft so far, all programs, newest first. */
   proDraftHistory?: ProDraftPick[];
+  /** The NIL collective's money and deals for the current portal. */
+  nil?: NilState | null;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */

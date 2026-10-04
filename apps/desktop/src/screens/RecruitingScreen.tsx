@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { OfferControl } from '../components/OfferControl';
-import { PortalBoard } from './PortalBoard';
+import { PortalBoard, type PortalNilProps } from './PortalBoard';
 import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { PositionNeed } from '@sports-management-sim/engine-core';
 import {
@@ -236,6 +236,7 @@ export function RecruitingScreen({
   onToggleVisitInvite,
   onOfferPortalPlayer,
   onWithdrawPortalOffer,
+  nil,
   portalTeams,
   portalScholarshipRoom,
   seasonYear,
@@ -274,6 +275,7 @@ export function RecruitingScreen({
   onToggleVisitInvite: (recruitId: string) => void;
   onOfferPortalPlayer: (entryId: string, scholarshipPercent: number) => void;
   onWithdrawPortalOffer: (entryId: string) => void;
+  nil?: PortalNilProps;
   portalTeams: LacrosseTeam[];
   portalScholarshipRoom: number;
   seasonYear: number;
@@ -504,6 +506,7 @@ export function RecruitingScreen({
           scholarshipRoom={portalScholarshipRoom}
           onOffer={onOfferPortalPlayer}
           onWithdraw={onWithdrawPortalOffer}
+          {...(nil ? { nil } : {})}
         />
       )}
     </div>
