@@ -479,6 +479,7 @@ describe('Desktop App', () => {
     // The finished season went into the saved record book, with the preseason pick.
     expect(loadActiveDynastySave()?.dynastyHistory[0]?.predictedConfFinish).toBeGreaterThan(0);
     expect(loadActiveDynastySave()?.recordBook?.league?.career.points?.length).toBeGreaterThan(0);
+    expect(loadActiveDynastySave()?.hallOfFame).toEqual([]);
     cleanup();
 
     render(<App />);

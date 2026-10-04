@@ -3,6 +3,7 @@ import type { CareerStatsMap, CareerSeasonLine } from './career-stats';
 import {
   archiveRecords,
   brokenRecordHeadlines,
+  hallOfFameInductees,
   careerRecords,
   LEAGUE_SCOPE,
   mergeRecords,
@@ -126,5 +127,38 @@ describe('what counts as breaking a record', () => {
     const news = brokenRecordHeadlines(before, scopeRecords({}, 'durham', big, 2030), 'Durham', 2030);
     expect(news.some((h) => h.includes('career goals'))).toBe(false);
     expect(news.some((h) => h.includes('single-season goals'))).toBe(true);
+  });
+});
+
+describe('the Hall of Fame', () => {
+  const longCareers: CareerStatsMap = {
+    vet: {
+      playerId: 'vet',
+      name: 'Val Veteran',
+      position: 'ATT',
+      seasons: [line(2028, 'durham', stats(30, 10)), line(2029, 'durham', stats(30, 10)), line(2030, 'durham', stats(30, 10))],
+    },
+    short: { playerId: 'short', name: 'Sid Short', position: 'ATT', seasons: [line(2030, 'durham', stats(95, 40))] },
+    stay: {
+      playerId: 'stay',
+      name: 'Stu Stays',
+      position: 'ATT',
+      seasons: [line(2028, 'durham', stats(28)), line(2029, 'durham', stats(28)), line(2030, 'durham', stats(28))],
+    },
+  };
+  const records = scopeRecords({}, 'durham', longCareers);
+
+  it('inducts departing players with a top-three career of three seasons or more', () => {
+    const inductees = hallOfFameInductees(records, new Set(['vet', 'short']), new Map([['vet', ['MVP 2030']]]), 2030);
+    expect(inductees).toHaveLength(1);
+    expect(inductees[0]).toMatchObject({ playerId: 'vet', firstYear: 2028, lastYear: 2030, inducted: 2030 });
+    expect(inductees[0]!.citation).toBe('#2 career points, #2 career goals, #2 career assists, MVP 2030');
+  });
+
+  it('waits until a player leaves, and inducts him once', () => {
+    expect(hallOfFameInductees(records, new Set(), new Map(), 2030)).toEqual([]);
+    const first = hallOfFameInductees(records, new Set(['stay']), new Map(), 2030);
+    expect(first.map((e) => e.playerId)).toEqual(['stay']);
+    expect(hallOfFameInductees(records, new Set(['stay']), new Map(), 2031, first)).toEqual([]);
   });
 });

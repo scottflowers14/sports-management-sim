@@ -4,7 +4,7 @@ import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, L
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import type { PracticeLogEntry } from './week-sim';
 import type { LockerRoomState } from './locker-room';
-import type { RecordBookArchive } from './records';
+import type { HallOfFameEntry, RecordBookArchive } from './records';
 import type { SeasonPreview } from './preseason';
 import type { RankingEntry } from './rankings';
 import type { NewsItem } from './news-feed';
@@ -57,6 +57,8 @@ export interface DynastySaveState {
   rivalrySeries?: RivalrySeriesMap;
   /** The media's preseason picks for the current season. */
   seasonPreview?: SeasonPreview | null;
+  /** The user's program Hall of Fame, newest first. */
+  hallOfFame?: HallOfFameEntry[];
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */
