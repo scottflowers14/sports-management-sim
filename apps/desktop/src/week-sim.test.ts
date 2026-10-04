@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
@@ -166,11 +166,15 @@ describe('practice during the season', () => {
     const count = (intensity: 'light' | 'intense') => {
       let total = 0;
       for (let seed = 1; seed <= 6; seed += 1) {
+        // Box scores draw from Math.random; pin it so both intensities play
+        // the same games and the test doesn't flake (it failed ~1 run in 12).
+        const pinned = vi.spyOn(Math, 'random').mockImplementation(seededRandom(seed + 100));
         const done = simulateRemainingWeeks(
           { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 42 }), practicePlan: { intensity, developmentPlans: [] } },
           undefined,
           seededRandom(seed),
         );
+        pinned.mockRestore();
         total += done.newsItems.filter((n) => n.category === 'injury' && !n.headline.includes('returned')).length;
       }
       return total;
