@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -579,7 +580,7 @@ describe('Desktop App', () => {
     expect(card).toHaveTextContent(/Captains (lift|drag) everyone's morale by/);
     await waitFor(() => {
       const save = loadActiveDynastySave()!;
-      expect(save.dynasty.season.teams.find((t) => t.id === save.dynasty.userTeamId)!.captainIds).toHaveLength(1);
+      expect(teamCaptains(save.dynasty.season.teams.find((t) => t.id === save.dynasty.userTeamId)!)).toHaveLength(1);
     });
   });
 
