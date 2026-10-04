@@ -1,3 +1,4 @@
+import type { Rivalry } from './rivalries';
 import {
   advanceSeasonWeek,
   applyPortalOffer,
@@ -34,6 +35,11 @@ export interface LacrosseDynastyState {
   recruitingClass: LacrosseRecruit[];
   rosterTargets: Record<LacrossePosition, number>;
   portalEntries: LacrossePortalEntry[];
+  /**
+   * Frozen once conferences first realign, so trophy games survive the move.
+   * Until then rivalries are rebuilt from the conferences.
+   */
+  rivalries?: Rivalry[];
 }
 
 export interface LacrosseRecruitingSummary {

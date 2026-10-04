@@ -26,3 +26,4 @@ export * from './program-investments';
 export * from './pro-draft';
 export * from './nonconference-scheduling';
 export * from './nil';
+export * from './realignment';

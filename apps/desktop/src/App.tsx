@@ -3,7 +3,7 @@ import {
   deriveCpuGamePlan,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
-  buildRivalries,
+  dynastyRivalries,
   rivalryFor,
   rivalryForGame,
   seriesSummary,
@@ -156,6 +156,7 @@ export function App() {
     offerPortalPlayer,
     withdrawPortalOffer,
     portalScholarshipRoom,
+    answerRealignmentInvite,
     nil,
     retainWithNil,
     signNilDeal,
@@ -252,7 +253,7 @@ export function App() {
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
 
   const unhappyCount = userTeam.roster.filter((p) => p.morale < 50).length;
-  const rivalries = buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+  const rivalries = dynastyRivalries(dynasty);
   const userRivalry = rivalryFor(rivalries, userTeam.id);
   const rivalGameThisWeek = userRivalry
     ? dynasty.season.schedule.find(
@@ -776,6 +777,7 @@ export function App() {
           portalScholarshipRoom={portalScholarshipRoom}
           onOpenPortal={() => { setRecruitTab('portal'); setView('recruiting'); }}
           investments={{ budget: investmentBudget, plan: investmentPlan, onFund: fundInvestment, onUnfund: unfundInvestment }}
+          realignment={{ conferences: dynasty.season.conferences, teams: dynasty.season.teams, onAnswer: answerRealignmentInvite }}
         />
       )}
 

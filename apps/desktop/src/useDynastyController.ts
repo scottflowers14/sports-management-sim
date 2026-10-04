@@ -33,6 +33,10 @@ import {
   updateLacrosseDepthChartSlot,
   swapNonConferenceOpponent,
   cancelNilPortalDeal,
+  applyRealignment,
+  createLacrosseSeasonSchedule,
+  dynastyRivalries,
+  realignmentHeadline,
   nilCollectiveBudget,
   pitchNilRetention,
   signNilPortalDeal,
@@ -1016,7 +1020,28 @@ export function useDynastyController() {
           : `Pro Draft: none of your players were drafted. ${top.position} ${top.name} (${teamName(top.collegeTeamId)}) went first overall to the ${top.proTeam}`,
       });
     }
-    const offseasonNews = [...draftNews, ...coachOfYearNews, ...staffNews, ...carouselNews];
+    const conferenceName = (id: string) => newDynasty.season.conferences.find((c) => c.id === id)?.shortName ?? id;
+    const realignmentNews: NewsItem[] = [];
+    if (summary.realignment) {
+      const move = summary.realignment;
+      realignmentNews.push({
+        id: `realignment-${move.year}`,
+        week: dynasty.season.currentWeek,
+        category: 'coaching',
+        ...([move.fromConferenceId, move.toConferenceId].includes(userConferenceId ?? '') ? { featured: true } : {}),
+        headline: realignmentHeadline(move, teamName, conferenceName),
+      });
+    }
+    if (summary.realignmentInvite) {
+      realignmentNews.push({
+        id: `realignment-invite-${summary.realignmentInvite.year}`,
+        week: dynasty.season.currentWeek,
+        category: 'coaching',
+        featured: true,
+        headline: `The ${conferenceName(summary.realignmentInvite.toConferenceId)} invites your program to join. Answer on the Offseason screen.`,
+      });
+    }
+    const offseasonNews = [...realignmentNews, ...draftNews, ...coachOfYearNews, ...staffNews, ...carouselNews];
     if (offseasonNews.length > 0) setNewsItems((prev) => [...offseasonNews, ...prev]);
 
     setDynasty(newDynasty);
@@ -1302,6 +1327,39 @@ export function useDynastyController() {
     dynasty.season.schedule.every(
       (g) => g.status === 'scheduled' || (g.homeTeamId !== dynasty.userTeamId && g.awayTeamId !== dynasty.userTeamId),
     );
+  // A stronger league's invitation, answered on the Offseason screen. Joining
+  // redraws next season's schedule around the new conference.
+  const answerRealignmentInvite = useCallback((accept: boolean) => {
+    const move = offseasonSummary?.realignmentInvite;
+    if (!move) return;
+    setOffseasonSummary({ ...offseasonSummary, realignmentInvite: null, ...(accept ? { realignment: move } : {}) });
+    if (!accept) return;
+    const rivalries = dynastyRivalries(dynasty);
+    const realigned = applyRealignment(dynasty.season.conferences, dynasty.season.teams, move);
+    setDynasty({
+      ...dynasty,
+      rivalries,
+      season: {
+        ...dynasty.season,
+        conferences: realigned.conferences,
+        teams: realigned.teams,
+        schedule: createLacrosseSeasonSchedule(dynasty.season.year, realigned.conferences),
+      },
+    });
+    const conferenceName = (id: string) => dynasty.season.conferences.find((c) => c.id === id)?.shortName ?? id;
+    const teamName = (id: string) => formatTeamName(dynasty.season.teams.find((t) => t.id === id)?.name ?? id);
+    setNewsItems((items) => [
+      {
+        id: `realignment-${move.year}`,
+        week: dynasty.season.currentWeek,
+        category: 'coaching',
+        featured: true,
+        headline: realignmentHeadline(move, teamName, conferenceName),
+      },
+      ...items,
+    ]);
+  }, [offseasonSummary, dynasty]);
+
   const swapNonConferenceGame = useCallback((week: number, opponentId: string) => {
     if (!scheduleEditable) return;
     setDynasty((prev) => {
@@ -1461,6 +1519,7 @@ export function useDynastyController() {
     releaseStaff,
     scheduleEditable,
     swapNonConferenceGame,
+    answerRealignmentInvite,
     nil,
     retainWithNil,
     signNilDeal,

@@ -74,6 +74,14 @@ export function buildRivalries(conferences: readonly Conference[], teams: readon
   return rivalries;
 }
 
+/** The dynasty's rivalries: frozen ones after a realignment, else the conference pairings. */
+export function dynastyRivalries(dynasty: {
+  rivalries?: Rivalry[] | undefined;
+  season: { conferences: readonly Conference[]; teams: readonly LacrosseTeam[] };
+}): Rivalry[] {
+  return dynasty.rivalries ?? buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+}
+
 export function rivalryFor(rivalries: readonly Rivalry[], teamId: string): Rivalry | null {
   return rivalries.find((r) => r.teamIds.includes(teamId)) ?? null;
 }

@@ -20,6 +20,7 @@ import { PORTAL_REASON_LABELS } from '@sports-management-sim/engine-core';
 import { OfferControl } from '../components/OfferControl';
 import { portalStanding } from './PortalBoard';
 import type { OffseasonSummary } from '../dynasty-helpers';
+import { conferenceStrength, type RealignmentMove } from '@sports-management-sim/sport-lacrosse';
 import type { DynastySeasonRecord } from '../history';
 import type { SeasonAwards } from '../awards';
 import type { JobOffer } from '../coach-profile';
@@ -43,6 +44,7 @@ export function OffseasonScreen({
   portalScholarshipRoom,
   onOpenPortal,
   investments,
+  realignment,
 }: {
   offseasonSummary: OffseasonSummary;
   userTeam: LacrosseTeam;
@@ -64,6 +66,11 @@ export function OffseasonScreen({
     plan: InvestmentPlan;
     onFund: (project: InvestmentProject) => void;
     onUnfund: (project: InvestmentProject) => void;
+  };
+  realignment?: {
+    conferences: Array<{ id: string; name: string; shortName: string; teamIds: string[] }>;
+    teams: LacrosseTeam[];
+    onAnswer: (accept: boolean) => void;
   };
 }) {
   const availablePortal = portalEntries.filter((e) => e.status === 'available');
@@ -189,6 +196,16 @@ export function OffseasonScreen({
             </div>
           )}
         </article>
+
+        {realignment && (offseasonSummary.realignmentInvite || offseasonSummary.realignment) && (
+          <RealignmentCard
+            move={(offseasonSummary.realignmentInvite ?? offseasonSummary.realignment)!}
+            invite={Boolean(offseasonSummary.realignmentInvite)}
+            userTeamId={userTeam.id}
+            teamShort={teamShort}
+            {...realignment}
+          />
+        )}
 
         {(offseasonSummary.proDraft?.length ?? 0) > 0 && (
           <ProDraftCard picks={offseasonSummary.proDraft!} userTeamId={userTeam.id} teamShort={teamShort} />
@@ -586,6 +603,69 @@ function InvestmentsCard({
           );
         })}
       </ul>
+    </article>
+  );
+}
+
+function RealignmentCard({
+  move,
+  invite,
+  userTeamId,
+  teamShort,
+  conferences,
+  teams,
+  onAnswer,
+}: {
+  move: RealignmentMove;
+  invite: boolean;
+  userTeamId: string;
+  teamShort: (id: string) => string;
+  conferences: Array<{ id: string; name: string; shortName: string; teamIds: string[] }>;
+  teams: LacrosseTeam[];
+  onAnswer: (accept: boolean) => void;
+}) {
+  const prestige = new Map(teams.map((t) => [t.id, t.reputation.nationalPrestige]));
+  const strength = (id: string) => {
+    const conference = conferences.find((c) => c.id === id);
+    return conference ? Math.round(conferenceStrength(conference, (t) => prestige.get(t) ?? 0)) : 0;
+  };
+  const name = (id: string) => conferences.find((c) => c.id === id)?.name ?? id;
+  const from = move.fromConferenceId;
+  const to = move.toConferenceId;
+  const pair = (ids: readonly string[]) => ids.map((id) => (id === userTeamId ? <strong key={id}>{teamShort(id)}</strong> : <span key={id}>{teamShort(id)}</span>));
+  return (
+    <article className="card realignment-card" aria-label="Conference realignment">
+      <p className="eyebrow">Conference Realignment</p>
+      <h2>{invite ? `The ${name(to)} wants you` : `${teamShort(move.risingTeamIds[0])} and ${teamShort(move.risingTeamIds[1])} move up`}</h2>
+      <div className="realignment-swap">
+        <div>
+          <p className="section-label">Joining the {name(to)}</p>
+          <p className="realignment-pair">{pair(move.risingTeamIds)}</p>
+        </div>
+        <div>
+          <p className="section-label">Joining the {name(from)}</p>
+          <p className="realignment-pair">{pair(move.fadingTeamIds)}</p>
+        </div>
+      </div>
+      <p className="dim">
+        League prestige: {name(to)} {strength(to)}, {name(from)} {strength(from)}. Rivals move together, so every trophy game stays on the schedule.
+      </p>
+      {invite && (
+        <>
+          <p>
+            Joining means a tougher conference slate and a stronger RPI, plus the prestige of a bigger league for recruiting. Next season's schedule is redrawn
+            around the new conference, so non-conference changes reset.
+          </p>
+          <div className="realignment-actions">
+            <button className="offer-btn" onClick={() => onAnswer(true)}>
+              Join the {name(to)}
+            </button>
+            <button className="ghost-btn" onClick={() => onAnswer(false)}>
+              Stay in the {name(from)}
+            </button>
+          </div>
+        </>
+      )}
     </article>
   );
 }

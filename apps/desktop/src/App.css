@@ -5937,3 +5937,23 @@ li span {
   justify-content: flex-end;
   gap: 8px;
 }
+
+.realignment-swap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.realignment-pair {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 0;
+}
+
+.realignment-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
