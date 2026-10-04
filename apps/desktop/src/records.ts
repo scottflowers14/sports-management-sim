@@ -227,3 +227,58 @@ export function recordNewsForWeek(input: RecordWeekInput): string[] {
     ),
   ];
 }
+
+export interface HallOfFameEntry {
+  playerId: string;
+  name: string;
+  position: string;
+  firstYear: number;
+  lastYear: number;
+  /** Why he's in, e.g. "#1 career goals, MVP 2030". */
+  citation: string;
+  inducted: number;
+}
+
+/** A career this high on a program list earns a place in its Hall of Fame. */
+export const HALL_OF_FAME_RANK = 3;
+/** Seasons in the book before a career counts: no one-year wonders. */
+export const HALL_OF_FAME_MIN_SEASONS = 3;
+
+/**
+ * Departing players whose careers, three seasons or more, rank among the
+ * program's best. Each list he tops goes on the plaque, along with any
+ * national awards he won there.
+ */
+export function hallOfFameInductees(
+  programRecords: ScopeRecords,
+  departing: ReadonlySet<string>,
+  awardsByPlayer: ReadonlyMap<string, string[]>,
+  year: number,
+  existing: readonly HallOfFameEntry[] = [],
+): HallOfFameEntry[] {
+  const already = new Set(existing.map((e) => e.playerId));
+  const reasons = new Map<string, { entry: RecordEntry; citations: string[] }>();
+  for (const { key, label } of RECORD_STATS) {
+    (programRecords.career[key] ?? []).slice(0, HALL_OF_FAME_RANK).forEach((entry, i) => {
+      if (!departing.has(entry.playerId) || already.has(entry.playerId)) return;
+      if (entry.lastYear - entry.firstYear + 1 < HALL_OF_FAME_MIN_SEASONS) return;
+      const slot = reasons.get(entry.playerId) ?? { entry, citations: [] };
+      slot.citations.push(`#${i + 1} career ${label.toLowerCase()}`);
+      reasons.set(entry.playerId, slot);
+    });
+  }
+  const inductees: HallOfFameEntry[] = [];
+  for (const [playerId, { entry, citations }] of reasons) {
+    const awards = awardsByPlayer.get(playerId) ?? [];
+    inductees.push({
+      playerId,
+      name: entry.name,
+      position: entry.position,
+      firstYear: entry.firstYear,
+      lastYear: entry.lastYear,
+      citation: [...citations, ...awards].join(', '),
+      inducted: year,
+    });
+  }
+  return inductees;
+}

@@ -80,6 +80,7 @@ export function App() {
     recordBook,
     rivalrySeries,
     seasonPreview,
+    hallOfFame,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -734,7 +735,7 @@ export function App() {
       )}
 
       {view === 'history' && (
-        <HistoryScreen history={dynastyHistory} />
+        <HistoryScreen history={dynastyHistory} hallOfFame={hallOfFame} />
       )}
 
       {view === 'offseason' && offseasonSummary && (

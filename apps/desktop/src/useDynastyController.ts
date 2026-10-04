@@ -3,6 +3,7 @@ import {
   applyRecruitPitch,
   applyScholarshipOffer,
   classScholarshipBudgetUsed,
+  isGraduating,
   recruitPrestigeMultiplier,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
@@ -51,7 +52,7 @@ import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, WeekSimState } from './week-sim';
 import { EMPTY_LOCKER_ROOM, type LockerRoomState } from './locker-room';
-import { archiveRecords, recordNewsForWeek, type RecordBookArchive } from './records';
+import { archiveRecords, hallOfFameInductees, recordNewsForWeek, scopeRecords, type HallOfFameEntry, type RecordBookArchive } from './records';
 import { buildSeasonPreview, predictedFinish, previewHeadlines, type SeasonPreview } from './preseason';
 import {
   createCoachProfile,
@@ -215,6 +216,7 @@ export function useDynastyController() {
   const [lockerRoom, setLockerRoom] = useState<LockerRoomState>(() => loadedSave?.lockerRoom ?? EMPTY_LOCKER_ROOM);
   const [recordBook, setRecordBook] = useState<RecordBookArchive>(() => loadedSave?.recordBook ?? {});
   const [rivalrySeries, setRivalrySeries] = useState<RivalrySeriesMap>(() => loadedSave?.rivalrySeries ?? {});
+  const [hallOfFame, setHallOfFame] = useState<HallOfFameEntry[]>(() => loadedSave?.hallOfFame ?? []);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
@@ -244,6 +246,7 @@ export function useDynastyController() {
     recordBook,
     rivalrySeries,
     seasonPreview,
+    hallOfFame,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -252,7 +255,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, seasonPreview, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, seasonPreview, hallOfFame, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -288,6 +291,7 @@ export function useDynastyController() {
     setLockerRoom(EMPTY_LOCKER_ROOM);
     setRecordBook({});
     setRivalrySeries({});
+    setHallOfFame([]);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
     setAutoRecruitingOffers(false);
@@ -354,6 +358,7 @@ export function useDynastyController() {
       lockerRoom: EMPTY_LOCKER_ROOM,
       recordBook: {},
       rivalrySeries: {},
+      hallOfFame: [],
       seasonPreview: preview,
       pendingJobOffers: null,
       shortlistIds: [],
@@ -410,6 +415,7 @@ export function useDynastyController() {
     setRecordBook(save.recordBook ?? {});
     setRivalrySeries(save.rivalrySeries ?? {});
     setSeasonPreview(save.seasonPreview ?? null);
+    setHallOfFame(save.hallOfFame ?? []);
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -903,7 +909,44 @@ export function useDynastyController() {
     setCareerStats(careersAfterSeason);
     // Departed players' careers are pruned from saves, so their records are kept here.
     const userProgramName = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId)?.name;
-    setRecordBook((book) => archiveRecords(book, careersAfterSeason, userProgramName ? [userProgramName] : []));
+    const newRecordBook = archiveRecords(recordBook, careersAfterSeason, userProgramName ? [userProgramName] : []);
+    setRecordBook(newRecordBook);
+
+    // Departing players with a top program career go into its Hall of Fame.
+    const inductees: HallOfFameEntry[] = [];
+    if (userProgramName && userTeamThisSeason) {
+      const departing = userTeamThisSeason.roster.filter((p) => isGraduating(p));
+      const awardsByPlayer = new Map<string, string[]>();
+      for (const record of [historyRecord, ...dynastyHistory]) {
+        for (const award of record.awards ?? []) {
+          if (award.teamName !== userProgramName) continue;
+          const player = departing.find((p) => `${p.name.first} ${p.name.last}` === award.playerName);
+          if (player) awardsByPlayer.set(player.id, [...(awardsByPlayer.get(player.id) ?? []), `${award.award} ${record.year}`]);
+        }
+      }
+      inductees.push(
+        ...hallOfFameInductees(
+          scopeRecords(newRecordBook, userProgramName, careersAfterSeason),
+          new Set(departing.map((p) => p.id)),
+          awardsByPlayer,
+          dynasty.season.year,
+          hallOfFame,
+        ),
+      );
+    }
+    if (inductees.length > 0) {
+      setHallOfFame((hall) => [...inductees, ...hall]);
+      setNewsItems((prev) => [
+        ...inductees.map((entry) => ({
+          id: `hall-of-fame-${entry.inducted}-${entry.playerId}`,
+          week: dynasty.season.currentWeek,
+          category: 'award' as const,
+          featured: true,
+          headline: `Hall of Fame: ${entry.position} ${entry.name} inducted into the ${formatTeamName(userProgramName ?? '')} Hall of Fame (${entry.citation})`,
+        })),
+        ...prev,
+      ]);
+    }
 
     // Evaluate season goals and update AD confidence
     if (coachProfile && seasonGoals) {
@@ -949,7 +992,7 @@ export function useDynastyController() {
     }
 
     setView('offseason');
-  }, [tournament, dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, seasonPreview, staffState.staff]);
+  }, [tournament, dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, seasonPreview, recordBook, hallOfFame, dynastyHistory, staffState.staff]);
 
   const acceptJobOffer = useCallback((teamId: string) => {
     const newTeam = dynasty.season.teams.find((t) => t.id === teamId);
@@ -1264,6 +1307,7 @@ export function useDynastyController() {
     recordBook,
     rivalrySeries,
     seasonPreview,
+    hallOfFame,
     talkToPlayer,
     promisePlayingTime,
     holdTeamMeeting,
