@@ -17,6 +17,7 @@ import type { RecruitingActivity } from './recruiting-activity';
 import type { SeasonStatsMap } from './stats';
 import type { CareerStatsMap } from './career-stats';
 import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
+import type { WeeklyHonor } from './weekly-honors';
 import { formatTeamName } from './ui/format';
 
 export const DYNASTY_SAVE_VERSION = 1;
@@ -55,6 +56,8 @@ export interface DynastySaveState {
   recordBook?: RecordBookArchive;
   /** Every rivalry's all-time series. */
   rivalrySeries?: RivalrySeriesMap;
+  /** This season's Player of the Week honors. */
+  weeklyHonors?: WeeklyHonor[];
   /** The media's preseason picks for the current season. */
   seasonPreview?: SeasonPreview | null;
   /** The user's program Hall of Fame, newest first. */

@@ -1,8 +1,20 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import type { LacrosseSeason } from '@sports-management-sim/sport-lacrosse';
+import { AWARD_RACE_KEYS, AWARD_RACE_LABELS, computeAwardsRace } from '../awards';
 import type { SeasonStatsMap, PlayerSeasonStats } from '../stats';
 import { formatTeamShort } from '../ui/format';
+import { WEEKLY_HONOR_LABELS, weeklyHonorCounts } from '../weekly-honors';
+import type { WeeklyHonor } from '../weekly-honors';
 
-type StatCategory = 'scoring' | 'goalkeeping' | 'faceoffs' | 'defense';
+type StatCategory = 'scoring' | 'goalkeeping' | 'faceoffs' | 'defense' | 'awards';
+
+const CATEGORY_LABELS: Record<StatCategory, string> = {
+  scoring: 'Scoring',
+  goalkeeping: 'Goalkeeping',
+  faceoffs: 'Faceoffs',
+  defense: 'Defense',
+  awards: 'Awards Race',
+};
 
 type StatColumn =
   | { label: string; key: keyof PlayerSeasonStats }
@@ -12,10 +24,14 @@ export function StatsScreen({
   seasonStats,
   playerLookup,
   userTeamId,
+  season,
+  weeklyHonors = [],
 }: {
   seasonStats: SeasonStatsMap;
   playerLookup: Map<string, { name: string; teamName: string; position: string; teamId: string }>;
   userTeamId: string;
+  season?: LacrosseSeason;
+  weeklyHonors?: WeeklyHonor[];
 }) {
   const [category, setCategory] = useState<StatCategory>('scoring');
 
@@ -30,7 +46,9 @@ export function StatsScreen({
     );
   }
 
-  const categories: StatCategory[] = ['scoring', 'goalkeeping', 'faceoffs', 'defense'];
+  const categories: StatCategory[] = season
+    ? ['scoring', 'goalkeeping', 'faceoffs', 'defense', 'awards']
+    : ['scoring', 'goalkeeping', 'faceoffs', 'defense'];
 
   return (
     <div className="stats-layout">
@@ -41,7 +59,7 @@ export function StatsScreen({
             className={category === cat ? 'stat-cat-btn active' : 'stat-cat-btn'}
             onClick={() => setCategory(cat)}
           >
-            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            {CATEGORY_LABELS[cat]}
           </button>
         ))}
       </div>
@@ -127,6 +145,107 @@ export function StatsScreen({
           userTeamId={userTeamId}
         />
       )}
+
+      {category === 'awards' && season && (
+        <AwardsRaceView
+          season={season}
+          seasonStats={seasonStats}
+          weeklyHonors={weeklyHonors}
+          playerLookup={playerLookup}
+          userTeamId={userTeamId}
+        />
+      )}
+    </div>
+  );
+}
+
+function AwardsRaceView({
+  season,
+  seasonStats,
+  weeklyHonors,
+  playerLookup,
+  userTeamId,
+}: {
+  season: LacrosseSeason;
+  seasonStats: SeasonStatsMap;
+  weeklyHonors: WeeklyHonor[];
+  playerLookup: Map<string, { name: string; teamName: string; position: string; teamId: string }>;
+  userTeamId: string;
+}) {
+  const honorCounts = useMemo(() => weeklyHonorCounts(weeklyHonors), [weeklyHonors]);
+  const race = useMemo(() => computeAwardsRace(season, seasonStats, honorCounts), [season, seasonStats, honorCounts]);
+  const recentHonors = [...weeklyHonors].reverse();
+
+  return (
+    <div className="awards-race">
+      <p className="dim awards-race-note">
+        Where the voting stands today. Whoever leads each race after the final week takes the award.
+      </p>
+      <div className="awards-race-grid">
+        {AWARD_RACE_KEYS.map((key) => {
+          const entries = race[key];
+          return (
+            <article key={key} className="card" aria-label={`${AWARD_RACE_LABELS[key]} race`}>
+              <h2>{AWARD_RACE_LABELS[key]}</h2>
+              {entries.length === 0 ? (
+                <p className="dim">No candidates yet.</p>
+              ) : (
+                <ol className="awards-race-list">
+                  {entries.map((entry, i) => (
+                    <li key={entry.playerId} className={entry.teamId === userTeamId ? 'user-row' : ''}>
+                      <span className="rank">{i === 0 ? 'Leader' : `#${i + 1}`}</span>
+                      <span className="awards-race-name">
+                        <span className="awards-race-player">{entry.position} {entry.playerName}</span>
+                        <span className="dim awards-race-meta">
+                          <span className="awards-race-team">{formatTeamShort(entry.teamName)}</span>
+                          {entry.weeklyHonors > 0 && (
+                            <span className="honor-pill" title="Weekly honors this season">
+                              {entry.weeklyHonors}× POW
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="stat-val">{entry.statLine}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      <article className="card" aria-label="Weekly honors">
+        <h2>Weekly Honors</h2>
+        {recentHonors.length === 0 ? (
+          <p className="dim">The first honors go out after week 1.</p>
+        ) : (
+          <table className="standings-table stats-table">
+            <thead>
+              <tr>
+                <th>Wk</th>
+                <th>Honor</th>
+                <th>Player</th>
+                <th>Team</th>
+                <th>Line</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentHonors.map((honor) => {
+                const info = playerLookup.get(honor.playerId);
+                return (
+                  <tr key={`${honor.week}-${honor.kind}`} className={honor.teamId === userTeamId ? 'user-row' : ''}>
+                    <td className="rank">{honor.week}</td>
+                    <td>{WEEKLY_HONOR_LABELS[honor.kind]}</td>
+                    <td>{info ? `${info.position} ${info.name}` : 'Former player'}</td>
+                    <td className="stats-team">{info ? formatTeamShort(info.teamName) : ''}</td>
+                    <td className="stat-val">{honor.line}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </article>
     </div>
   );
 }

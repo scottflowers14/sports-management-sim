@@ -51,6 +51,7 @@ import { simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './w
 import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, WeekSimState } from './week-sim';
+import type { WeeklyHonor } from './weekly-honors';
 import { EMPTY_LOCKER_ROOM, type LockerRoomState } from './locker-room';
 import { archiveRecords, hallOfFameInductees, recordNewsForWeek, scopeRecords, type HallOfFameEntry, type RecordBookArchive } from './records';
 import { buildSeasonPreview, predictedFinish, previewHeadlines, type SeasonPreview } from './preseason';
@@ -216,6 +217,7 @@ export function useDynastyController() {
   const [lockerRoom, setLockerRoom] = useState<LockerRoomState>(() => loadedSave?.lockerRoom ?? EMPTY_LOCKER_ROOM);
   const [recordBook, setRecordBook] = useState<RecordBookArchive>(() => loadedSave?.recordBook ?? {});
   const [rivalrySeries, setRivalrySeries] = useState<RivalrySeriesMap>(() => loadedSave?.rivalrySeries ?? {});
+  const [weeklyHonors, setWeeklyHonors] = useState<WeeklyHonor[]>(() => loadedSave?.weeklyHonors ?? []);
   const [hallOfFame, setHallOfFame] = useState<HallOfFameEntry[]>(() => loadedSave?.hallOfFame ?? []);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
@@ -245,6 +247,7 @@ export function useDynastyController() {
     lockerRoom,
     recordBook,
     rivalrySeries,
+    weeklyHonors,
     seasonPreview,
     hallOfFame,
     pendingJobOffers,
@@ -255,7 +258,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, seasonPreview, hallOfFame, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, seasonPreview, hallOfFame, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -291,6 +294,7 @@ export function useDynastyController() {
     setLockerRoom(EMPTY_LOCKER_ROOM);
     setRecordBook({});
     setRivalrySeries({});
+    setWeeklyHonors([]);
     setHallOfFame([]);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
@@ -358,6 +362,7 @@ export function useDynastyController() {
       lockerRoom: EMPTY_LOCKER_ROOM,
       recordBook: {},
       rivalrySeries: {},
+      weeklyHonors: [],
       hallOfFame: [],
       seasonPreview: preview,
       pendingJobOffers: null,
@@ -414,6 +419,7 @@ export function useDynastyController() {
     setLockerRoom(save.lockerRoom ?? EMPTY_LOCKER_ROOM);
     setRecordBook(save.recordBook ?? {});
     setRivalrySeries(save.rivalrySeries ?? {});
+    setWeeklyHonors(save.weeklyHonors ?? []);
     setSeasonPreview(save.seasonPreview ?? null);
     setHallOfFame(save.hallOfFame ?? []);
     setPendingJobOffers(save.pendingJobOffers ?? null);
@@ -504,7 +510,8 @@ export function useDynastyController() {
     practicePlan,
     practiceGains,
     rivalrySeries,
-  }), [staffState.staff, practicePlan, practiceGains, rivalrySeries, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+    weeklyHonors,
+  }), [staffState.staff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((simResult: WeekSimState) => {
     // Promises that came due are judged against the depth chart after the week.
@@ -581,6 +588,7 @@ export function useDynastyController() {
     setLastSimWeek(result.lastSimWeek);
     setPracticeGains(result.practiceGains ?? []);
     if (result.rivalrySeries) setRivalrySeries(result.rivalrySeries);
+    setWeeklyHonors(result.weeklyHonors ?? []);
     setAssistantReport(null);
     // Offers the assistant made during the sim pin those recruits, as manual offers do.
     const userId = result.dynasty.userTeamId;
@@ -1182,6 +1190,7 @@ export function useDynastyController() {
     setSelectedRecruitId(null);
     setGameLogs(new Map());
     setSeasonStats(emptySeasonStats());
+    setWeeklyHonors([]);
     setRecruitingActivity(emptyRecruitingActivity());
     setRecruitTrends({});
     setShortlistIds([]);
@@ -1306,6 +1315,7 @@ export function useDynastyController() {
     lockerRoom,
     recordBook,
     rivalrySeries,
+    weeklyHonors,
     seasonPreview,
     hallOfFame,
     talkToPlayer,

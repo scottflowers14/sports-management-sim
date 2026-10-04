@@ -79,6 +79,7 @@ export function App() {
     careerStats,
     recordBook,
     rivalrySeries,
+    weeklyHonors,
     seasonPreview,
     hallOfFame,
     saveStatus,
@@ -673,6 +674,8 @@ export function App() {
           seasonStats={seasonStats}
           playerLookup={playerLookup}
           userTeamId={dynasty.userTeamId}
+          season={dynasty.season}
+          weeklyHonors={weeklyHonors}
         />
       )}
 
