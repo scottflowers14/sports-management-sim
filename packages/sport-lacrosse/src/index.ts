@@ -29,3 +29,4 @@ export * from './nil';
 export * from './realignment';
 export * from './team-splits';
 export * from './team-talk';
+export * from './three-stars';
