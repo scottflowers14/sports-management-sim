@@ -134,7 +134,8 @@ export function HistoryScreen({
       <HallOfFameCard entries={hallOfFame} />
 
       <AwardsHistoryCard history={history} />
-      <AllAmericansCard history={history} />
+      <HonorRollCard history={history} title="All-Americans" pick={(r) => r.allAmericans} firstLabel="1st" tierSuffix=" All-America" />
+      <HonorRollCard history={history} title="All-Conference" pick={(r) => r.allConference} firstLabel="1st" tierSuffix=" All-Conference" />
     </div>
   );
 }
@@ -296,22 +297,36 @@ function AwardsHistoryCard({ history }: { history: DynastySeasonRecord[] }) {
   );
 }
 
-function AllAmericansCard({ history }: { history: DynastySeasonRecord[] }) {
-  const seasons = history.filter((r) => r.allAmericans && r.allAmericans.length > 0);
+function HonorRollCard({
+  history,
+  title,
+  pick,
+  firstLabel,
+  tierSuffix,
+}: {
+  history: DynastySeasonRecord[];
+  title: string;
+  pick: (record: DynastySeasonRecord) => SeasonAwardRecord[] | undefined;
+  /** How a first-team pick's award label starts. */
+  firstLabel: string;
+  /** Trimmed from award labels in the table. */
+  tierSuffix: string;
+}) {
+  const seasons = history.filter((r) => (pick(r)?.length ?? 0) > 0);
   if (seasons.length === 0) return null;
-  const total = seasons.reduce((sum, r) => sum + r.allAmericans!.length, 0);
-  const firstTeam = seasons.reduce((sum, r) => sum + r.allAmericans!.filter((a) => a.award.startsWith('1st')).length, 0);
+  const all = seasons.flatMap((r) => pick(r)!);
+  const firstTeam = all.filter((a) => a.award.startsWith(firstLabel)).length;
   return (
-    <article className="card" aria-label="Program All-Americans">
-      <h2>All-Americans</h2>
+    <article className="card" aria-label={`Program ${title}`}>
+      <h2>{title}</h2>
       <p className="dim">
-        {total} All-America selection{total === 1 ? '' : 's'}, {firstTeam} on the first team.
+        {all.length} selection{all.length === 1 ? '' : 's'}, {firstTeam} on the first team.
       </p>
       <table className="standings-table history-awards-table">
         <thead>
           <tr>
             <th>Year</th>
-            <th>Team</th>
+            <th>Honor</th>
             <th>Player</th>
             <th>Pos</th>
             <th>Stat Line</th>
@@ -319,10 +334,10 @@ function AllAmericansCard({ history }: { history: DynastySeasonRecord[] }) {
         </thead>
         <tbody>
           {seasons.flatMap((record) =>
-            record.allAmericans!.map((a, i) => (
-              <tr key={`${record.year}-${a.playerName}`}>
-                {i === 0 ? <td className="rank" rowSpan={record.allAmericans!.length}>{record.year}</td> : null}
-                <td>{a.award.replace(' All-America', '')}</td>
+            pick(record)!.map((a, i) => (
+              <tr key={`${record.year}-${a.award}-${a.playerName}`}>
+                {i === 0 ? <td className="rank" rowSpan={pick(record)!.length}>{record.year}</td> : null}
+                <td>{a.award.replace(tierSuffix, '')}</td>
                 <td>{a.playerName}</td>
                 <td>{a.position}</td>
                 <td className="record-cell">{a.statLine ?? '—'}</td>

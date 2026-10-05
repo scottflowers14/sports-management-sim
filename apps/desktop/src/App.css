@@ -6529,3 +6529,18 @@ li span {
   font-size: 0.84rem;
   line-height: 1.4;
 }
+
+/* All-Conference */
+.all-conference {
+  margin-top: 16px;
+}
+
+.conference-poy {
+  margin: 4px 0 8px;
+  font-size: 0.9rem;
+  color: #aab8ca;
+}
+
+.conference-poy.ours strong {
+  color: #72f2c6;
+}

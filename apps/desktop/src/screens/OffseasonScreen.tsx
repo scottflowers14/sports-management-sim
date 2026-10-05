@@ -27,7 +27,10 @@ import {
   ALL_AMERICA_TIER_LABELS,
   programAllAmericans,
   type AllAmericaTeams,
+  CONFERENCE_TIER_LABELS,
   type AllAmericaTier,
+  type ConferenceHonors,
+  type ConferenceTier,
   type SeasonAwards,
 } from '../awards';
 import type { JobOffer } from '../coach-profile';
@@ -128,6 +131,12 @@ export function OffseasonScreen({
           <AwardsSection
             awards={offseasonSummary.awards}
             userTeamId={userTeamId}
+            conference={(() => {
+              // The league the season was played in, before any realignment move.
+              const id = offseasonSummary.finalStandings.find((e) => e.teamId === userTeamId)?.conferenceId ?? userTeam.conferenceId;
+              const league = realignment?.conferences.find((c) => c.id === id);
+              return { id, name: league?.shortName ?? league?.name ?? id.toUpperCase() };
+            })()}
             coachOfYear={
               offseasonSummary.coachOfYear
                 ? {
@@ -326,10 +335,12 @@ export function OffseasonScreen({
 function AwardsSection({
   awards,
   userTeamId,
+  conference,
   coachOfYear,
 }: {
   awards: SeasonAwards;
   userTeamId: string;
+  conference: { id: string; name: string };
   coachOfYear: { name: string; teamName: string; detail: string } | null;
 }) {
   return (
@@ -361,6 +372,13 @@ function AwardsSection({
         ))}
       </div>
       {awards.allAmerica && <AllAmericaTable teams={awards.allAmerica} userTeamId={userTeamId} />}
+      {awards.conferenceHonors?.find((h) => h.conferenceId === conference.id) && (
+        <AllConferenceTable
+          honors={awards.conferenceHonors.find((h) => h.conferenceId === conference.id)!}
+          conferenceName={conference.name}
+          userTeamId={userTeamId}
+        />
+      )}
       {!awards.allAmerica && awards.allConference.length > 0 && (
         <>
           <p className="section-label">All-Conference</p>
@@ -422,6 +440,69 @@ function AllAmericaTable({ teams, userTeamId }: { teams: AllAmericaTeams; userTe
         </thead>
         <tbody>
           {teams[tier].map((winner) => (
+            <tr key={winner.playerId ?? winner.playerName} className={winner.teamId === userTeamId ? 'user-row' : ''}>
+              <td>{winner.playerName}</td>
+              <td>{winner.position}</td>
+              <td>{formatTeamName(winner.teamName)}</td>
+              <td>{winner.statLine ?? `${winner.overall} OVR`}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function AllConferenceTable({
+  honors,
+  conferenceName,
+  userTeamId,
+}: {
+  honors: ConferenceHonors;
+  conferenceName: string;
+  userTeamId: string;
+}) {
+  const [tier, setTier] = useState<ConferenceTier>('first');
+  const ours = [...honors.first, ...honors.second].filter((w) => w.teamId === userTeamId).length;
+  const poy = honors.playerOfYear;
+  return (
+    <section className="all-conference" aria-label="All-Conference teams">
+      <div className="news-header">
+        <p className="section-label">
+          All-{conferenceName} · {ours === 0 ? 'none of yours' : `${ours} of yours`}
+        </p>
+        <div className="news-filters" role="group" aria-label="All-Conference team">
+          {(['first', 'second'] as const).map((t) => {
+            const count = honors[t].filter((w) => w.teamId === userTeamId).length;
+            return (
+              <button
+                key={t}
+                type="button"
+                className={`pos-filter-btn${tier === t ? ' active' : ''}`}
+                aria-pressed={tier === t}
+                onClick={() => setTier(t)}
+              >
+                {CONFERENCE_TIER_LABELS[t].replace(' All-Conference', '')}
+                {count > 0 ? ` (${count})` : ''}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {poy && (
+        <p className={`conference-poy${poy.teamId === userTeamId ? ' ours' : ''}`}>
+          Player of the Year: <strong>{poy.playerName}</strong>, {poy.position}, {formatTeamName(poy.teamName)}
+          {poy.statLine ? ` · ${poy.statLine}` : ''}
+        </p>
+      )}
+      <table className="standings-table">
+        <thead>
+          <tr>
+            <th>Player</th><th>Pos</th><th>Team</th><th>Season</th>
+          </tr>
+        </thead>
+        <tbody>
+          {honors[tier].map((winner) => (
             <tr key={winner.playerId ?? winner.playerName} className={winner.teamId === userTeamId ? 'user-row' : ''}>
               <td>{winner.playerName}</td>
               <td>{winner.position}</td>
