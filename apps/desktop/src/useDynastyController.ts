@@ -65,7 +65,7 @@ import { createProgramStaff, withStaffRecruitingHours } from './program-staff';
 import { addCoachXp, availablePoints, seasonCoachXp, upgradeAbility, withCoachAbilities, type CoachAbility } from './coach-abilities';
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
-import { healInjuriesOneWeek, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
+import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { previewUserGame, simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
 import type { HalftimeState } from './halftime';
@@ -848,6 +848,12 @@ export function useDynastyController() {
     setDynasty((prev) => withdrawLacrossePortalOffer(prev, portalEntryId));
     setNil(cancelNilPortalDeal(nil, portalEntryId));
   }, [nil]);
+
+  // Rushing a player back halves his time out; the setback is rolled now, from
+  // the dynasty seed, so reloading and rushing again gives the same result.
+  const rushInjuredPlayer = useCallback((playerId: string) => {
+    setInjuries((prev) => rushInjury(prev, playerId, dynasty.season.currentWeek, dynasty.seed));
+  }, [dynasty.season.currentWeek, dynasty.seed]);
 
   const retainWithNil = useCallback((portalEntryId: string) => {
     const result = pitchNilRetention(nil, dynasty.season.teams, dynasty.portalEntries, portalEntryId, dynasty.userTeamId, dynasty.seed);
@@ -1650,6 +1656,7 @@ export function useDynastyController() {
     nil,
     retainWithNil,
     signNilDeal,
+    rushInjuredPlayer,
     activeSaveId,
     saves,
     customTeams,

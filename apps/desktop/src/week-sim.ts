@@ -312,7 +312,7 @@ export function simulateOneWeek(
 
   const newRankings = computeNationalRankings(newSeason.teams, state.rankings);
   const userInjuryRisk = PRACTICE_INTENSITIES[userPractice.intensity].injuryRisk;
-  const { injuries: newInjuries, newlyInjured, recovered } = processInjuries(
+  const { injuries: newInjuries, newlyInjured, recovered, setbacks } = processInjuries(
     state.injuries,
     newSeason.teams,
     random,
@@ -397,6 +397,19 @@ export function simulateOneWeek(
         featured: true,
         headline: `${r.playerName} has returned from injury`,
       })),
+    ...setbacks
+      .filter((sb) => sb.teamId === dynasty.userTeamId)
+      .map((sb, i) => {
+        const player = newSeason.teams.find((t) => t.id === sb.teamId)?.roster.find((p) => p.id === sb.playerId);
+        const name = player ? `${player.name.first} ${player.name.last}` : 'A rushed player';
+        return {
+          id: `setback-${weekToSim}-${i}`,
+          week: weekToSim,
+          category: 'injury' as const,
+          featured: true,
+          headline: `${name} suffers a setback after rushing back and is out ${sb.weeksRemaining} more week${sb.weeksRemaining > 1 ? 's' : ''}`,
+        };
+      }),
   ];
 
   const practiceNews: NewsItem[] = [];

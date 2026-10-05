@@ -170,6 +170,7 @@ export function App() {
     playSecondHalf,
     nil,
     retainWithNil,
+    rushInjuredPlayer,
     signNilDeal,
     enterTournament,
     simTournamentSemis,
@@ -522,6 +523,7 @@ export function App() {
       {view === 'week-hub' && (
         <WeekHubScreen
           onCoachGame={canCoachGame ? coachGame : undefined}
+          onRushInjury={rushInjuredPlayer}
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           userTeam={userTeam}
@@ -834,6 +836,7 @@ export function App() {
           injuryData={injuries.find(
             (inj) => inj.playerId === selectedPlayer.id && inj.teamId === dynasty.userTeamId,
           )}
+          onRushInjury={rushInjuredPlayer}
           playerStats={seasonStats[selectedPlayer.id]}
           career={careerStats[selectedPlayer.id]}
           seasonYear={dynasty.season.year}

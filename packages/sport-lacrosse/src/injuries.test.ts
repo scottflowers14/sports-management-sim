@@ -7,6 +7,10 @@ import {
   lacrosseInjuryProneness,
   rollLacrosseInjuries,
   type LacrosseInjury,
+  RUSH_SETBACK_CHANCE,
+  canRushInjury,
+  rushSetbackWeeks,
+  rushedWeeksOut,
 } from './injuries';
 import { makeLacrosseTeam } from './test-fixtures';
 
@@ -93,5 +97,24 @@ describe('lacrosseInjuryProneness', () => {
     const sturdy = { ...player!, ratings: { ...player!.ratings, stamina: 92, strength: 90 } };
     expect(lacrosseInjuryProneness(fragile)).toBeGreaterThan(lacrosseInjuryProneness(sturdy));
     expect(lacrosseInjuryProneness(sturdy)).toBeGreaterThanOrEqual(0.6);
+  });
+});
+
+describe('rushing a player back', () => {
+  it('halves the time left on injuries of two weeks or more, once', () => {
+    expect(canRushInjury(1, false)).toBe(false);
+    expect(canRushInjury(2, false)).toBe(true);
+    expect(canRushInjury(6, true)).toBe(false);
+    expect(rushedWeeksOut(2)).toBe(1);
+    expect(rushedWeeksOut(5)).toBe(3);
+  });
+
+  it('rolls a fixed setback that costs the weeks saved plus one', () => {
+    const rolls = Array.from({ length: 2000 }, (_, i) => rushSetbackWeeks(5, `p${i}`, 3, 42));
+    expect(rolls.every((w) => w === 0 || w === 3)).toBe(true);
+    const rate = rolls.filter((w) => w > 0).length / rolls.length;
+    expect(rate).toBeGreaterThan(RUSH_SETBACK_CHANCE - 0.04);
+    expect(rate).toBeLessThan(RUSH_SETBACK_CHANCE + 0.04);
+    expect(rushSetbackWeeks(5, 'p7', 3, 42)).toBe(rushSetbackWeeks(5, 'p7', 3, 42));
   });
 });

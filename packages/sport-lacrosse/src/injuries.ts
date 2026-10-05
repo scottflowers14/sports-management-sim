@@ -88,3 +88,33 @@ function pickInjuryType(random: RandomSource): InjuryType {
   }
   return LACROSSE_INJURY_TYPES[0]!;
 }
+
+/** Rushing a player back halves the time left, at a chance of a setback. */
+export const RUSH_SETBACK_CHANCE = 0.3;
+
+/** Only injuries with at least two weeks left can be rushed, and only once. */
+export function canRushInjury(weeksOut: number, alreadyRushed: boolean): boolean {
+  return !alreadyRushed && weeksOut >= 2;
+}
+
+export function rushedWeeksOut(weeksOut: number): number {
+  return Math.ceil(weeksOut / 2);
+}
+
+/**
+ * A fixed roll per player, injury week and dynasty, so a reload can't reroll it.
+ * Returns the weeks a setback costs when the player tries to return (the weeks
+ * saved plus one), or 0 when the rush works.
+ */
+export function rushSetbackWeeks(weeksOut: number, playerId: string, week: number, seed: number): number {
+  let h = (seed ^ Math.imul(week + 1, 0x9e3779b9)) >>> 0;
+  for (let i = 0; i < playerId.length; i += 1) {
+    h = Math.imul(h ^ playerId.charCodeAt(i), 0x85ebca6b) >>> 0;
+    h ^= h >>> 13;
+  }
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  const roll = (h >>> 0) / 0x1_0000_0000;
+  if (roll >= RUSH_SETBACK_CHANCE) return 0;
+  return weeksOut - rushedWeeksOut(weeksOut) + 1;
+}

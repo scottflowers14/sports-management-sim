@@ -5,6 +5,7 @@ import type { PlayerCareer } from '../career-stats';
 import { careerTotals } from '../career-stats';
 import { cardFromPlayer } from '../player-card-model';
 import { PlayerCardPanel } from './PlayerCard';
+import { RushBackButton } from './RushBackButton';
 import { gameLogColumns, type PlayerGameRow } from '../player-game-log';
 
 export function PlayerPanel({
@@ -16,6 +17,7 @@ export function PlayerPanel({
   seasonYear,
   gameLog = [],
   teamShort = (id) => id,
+  onRushInjury,
   onClose,
 }: {
   player: LacrossePlayer;
@@ -26,6 +28,7 @@ export function PlayerPanel({
   seasonYear: number;
   gameLog?: PlayerGameRow[];
   teamShort?: (teamId: string) => string;
+  onRushInjury?: (playerId: string) => void;
   onClose: () => void;
 }) {
   const data = cardFromPlayer(player, { injured: isInjured });
@@ -38,6 +41,8 @@ export function PlayerPanel({
         <p className="injury-status">
           Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}
           {injuryData.description ? ` (${injuryData.description})` : ''}
+          {injuryData.rushed ? ' · rushed back' : ''}
+          {onRushInjury && <RushBackButton injury={injuryData} onRush={onRushInjury} />}
         </p>
       )}
       {player.ratingHistory && player.ratingHistory.length > 0 && (
