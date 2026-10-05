@@ -3,9 +3,13 @@ import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { loadActiveDynastySave, listDynastySaves } from './persistence';
+
+// These drive the whole app through many simulated weeks, each with an
+// autosave; shared CI runners need more than the default five seconds.
+vi.setConfig({ testTimeout: 20000 });
 
 function installMockLocalStorage() {
   let store: Record<string, string> = {};

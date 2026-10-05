@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   applyRecruitPitch,
   applyScholarshipOffer,
@@ -231,6 +231,8 @@ export function useDynastyController() {
   // Set when the last save attempt didn't reach storage, so the shell can warn
   // that progress isn't being kept.
   const [saveError, setSaveError] = useState<string | null>(null);
+  // When start or load last wrote the slot, so the autosave right after can skip it.
+  const skipNextAutosave = useRef(0);
   const writeSave = useCallback((saveId: string, state: DynastySaveState): boolean => {
     try {
       saveDynastySlot({ saveId, state });
@@ -448,6 +450,7 @@ export function useDynastyController() {
       ...newStaff,
     };
     const saved = writeSave(saveId, state);
+    skipNextAutosave.current = saved ? Date.now() : 0;
     setActiveSaveId(saveId);
     refreshSaves();
     if (saved) setSaveStatus('New dynasty started');
@@ -509,6 +512,7 @@ export function useDynastyController() {
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
     const saved = writeSave(saveId, save);
+    skipNextAutosave.current = saved ? Date.now() : 0;
     setActiveSaveId(saveId);
     refreshSaves();
     if (saved) setSaveStatus('Loaded dynasty save');
@@ -537,6 +541,10 @@ export function useDynastyController() {
   // an existing save before the user has actually started or loaded a dynasty.
   useEffect(() => {
     if (!activeSaveId || screen === 'start') return undefined;
+    // Starting or loading a dynasty has just written the slot; don't write it again.
+    const justSaved = skipNextAutosave.current;
+    skipNextAutosave.current = 0;
+    if (Date.now() - justSaved < 1000) return undefined;
     const timeout = window.setTimeout(() => persistDynasty('Autosaved'), 300);
     return () => window.clearTimeout(timeout);
   }, [activeSaveId, persistDynasty, screen]);
