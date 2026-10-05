@@ -13,7 +13,7 @@ import {
   signCommittedRecruit,
   sortRecruitBoardForTeam,
 } from '@sports-management-sim/engine-core';
-import type { PortalMove, PortalReason, StandingsEntry } from '@sports-management-sim/engine-core';
+import type { PortalMove, PortalReason, ScheduledGame, StandingsEntry } from '@sports-management-sim/engine-core';
 import {
   canRushInjury,
   rushSetbackWeeks,
@@ -32,6 +32,8 @@ import {
   resolveLacrossePortal,
   runCoachingCarousel,
   ageProgram,
+  seasonAttendance,
+  selloutFanGain,
   applyInvestmentPlan,
   cpuInvestmentPlan,
   runProDraft,
@@ -574,7 +576,7 @@ export function runOffseason(
     productionByPlayerId: draftProductionByPlayer(season.teams, seasonStats),
   });
   const teamsWithPrestige = applyProDraftPrestige(carousel.teams, proDraft).map((team) => {
-    const aged = ageProgram(team);
+    const aged = ageProgram(withSelloutFans(team, season.schedule));
     return team.id === userTeamId ? aged : applyInvestmentPlan(aged, cpuInvestmentPlan(aged));
   });
 
@@ -878,4 +880,11 @@ function applyeCpuOffers(
   }
 
   return updated;
+}
+
+/** Sold-out home games grow the fan base before the year turns over. */
+export function withSelloutFans(team: LacrosseTeam, schedule: readonly ScheduledGame[]): LacrosseTeam {
+  const gain = selloutFanGain(seasonAttendance(schedule, team.id)?.sellouts ?? 0);
+  if (gain === 0) return team;
+  return { ...team, reputation: { ...team.reputation, fanSupport: Math.min(99, team.reputation.fanSupport + gain) } };
 }

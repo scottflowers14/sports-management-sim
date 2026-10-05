@@ -1,4 +1,5 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
+import { attendanceOf } from '@sports-management-sim/sport-lacrosse';
 import type { GameLog, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName } from '../ui/format';
 import type { BoxScoreData } from '../ui/types';
@@ -36,6 +37,7 @@ export function ResultRow({
       homeStats: result.teamStats.home as LacrosseTeamStats,
       awayStats: result.teamStats.away as LacrosseTeamStats,
       ...(log ? { log } : {}),
+      ...(attendanceOf(game) ? { attendance: attendanceOf(game)! } : {}),
     });
   };
 

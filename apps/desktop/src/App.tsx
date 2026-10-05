@@ -13,6 +13,7 @@ import {
   suggestRedshirts,
   teamCaptains,
   STAFF_ROLES,
+  seasonAttendance,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
 import { classNeedsByPosition } from '@sports-management-sim/engine-core';
@@ -871,6 +872,7 @@ export function App() {
           onSelectPlayer={setSelectedPlayerId}
           proDraftHistory={proDraftHistory}
           seriesFor={(id) => seriesByOpponent.get(id)}
+          attendanceFor={(id) => seasonAttendance(dynasty.season.schedule, id)}
         />
       )}
 

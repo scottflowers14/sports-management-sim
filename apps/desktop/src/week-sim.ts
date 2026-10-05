@@ -13,6 +13,7 @@ import {
 } from '@sports-management-sim/engine-core';
 import {
   applyCpuCaptains,
+  gameAttendance,
   dynastyRivalries,
   recordRivalryGame,
   rivalryForGame,
@@ -205,6 +206,8 @@ export function simulateOneWeek(
   const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
   const seasonBeforeGames = seasonReadyForWeek(dynasty);
+  const rivalries = dynastyRivalries(dynasty);
+  const rankBefore = new Map(state.rankings.map((r) => [r.teamId, r.rank]));
   const seasonAfterGames = advanceSeasonWeek(seasonBeforeGames, (game, homeTeam, awayTeam) => {
     const input = weekGameInput(state, homeTeam, awayTeam, userGamePlan);
     const coachedHere = coached && (homeTeam.id === dynasty.userTeamId || awayTeam.id === dynasty.userTeamId);
@@ -219,12 +222,16 @@ export function simulateOneWeek(
     });
     weekLogs.set(game.id, log);
     weekPlayerLines.set(game.id, [...players.home, ...players.away]);
-    return result;
+    if (game.neutralSite) return result;
+    const attendance = gameAttendance(game, homeTeam, awayTeam, {
+      visitorRank: rankBefore.get(awayTeam.id) ?? null,
+      rivalry: rivalryForGame(rivalries, game) !== null,
+    });
+    return { ...result, attendance };
   });
 
   // Every program practices after the week's games. CPU staffs run a normal
   // week with plans on their highest-upside young players.
-  const rivalries = dynastyRivalries(dynasty);
   let rivalrySeries = state.rivalrySeries ?? {};
   const rivalryNews: NewsItem[] = [];
   for (const game of seasonAfterGames.schedule) {
