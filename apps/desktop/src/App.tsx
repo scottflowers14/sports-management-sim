@@ -360,11 +360,11 @@ export function App() {
 
   const advance = (() => {
     if (offseasonSummary) {
-      if (view !== 'offseason') {
-        return { label: 'Offseason', title: 'Finish the offseason to start the new season', run: () => setView('offseason') };
-      }
       // A fired coach has to pick a new job first; that choice lives on the offseason screen.
-      if (pendingJobOffers) return null;
+      if (pendingJobOffers) {
+        if (view === 'offseason') return null;
+        return { label: 'Offseason', title: 'Pick your next job to start the new season', run: () => setView('offseason') };
+      }
       // The offseason already rolled the dynasty over to next year's season.
       return { label: `Season ${dynasty.season.year}`, title: 'Start the new season', run: startNewSeason };
     }

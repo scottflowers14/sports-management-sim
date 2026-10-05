@@ -318,6 +318,11 @@ describe('Desktop App', () => {
     await userEvent.click(within(pager).getByRole('button', { name: /Next/i }));
     expect(screen.getAllByRole('navigation', { name: /Recruit pages/i })[0]!).toHaveTextContent(/26–50 of/);
 
+    // New dynasties let the assistant make offers; turn that off to review them.
+    const autoOffers = screen.getByRole('checkbox', { name: /Assistant makes offers/i });
+    expect(autoOffers).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Auto each week/i })).toBeChecked();
+    await userEvent.click(autoOffers);
     await userEvent.click(screen.getByRole('button', { name: /^Run Assistant$/i }));
     const report = screen.getByLabelText(/Recruiting assistant report/i);
     expect(report).toHaveTextContent(/Scouting \(\d+\)/);
@@ -507,6 +512,11 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+
+    // From any other screen the top-bar Advance starts the season in one click.
+    await userEvent.click(screen.getByRole('button', { name: /^Recruiting/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Season 2029/i }));
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   }, 20000);
 
   it('hires and releases assistant coaches on the Staff screen', async () => {

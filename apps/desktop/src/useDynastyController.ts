@@ -383,8 +383,10 @@ export function useDynastyController() {
     setHalftime(null);
     setPressAnswers({});
     setPendingJobOffers(null);
-    setAutoRecruitingAssistant(false);
-    setAutoRecruitingOffers(false);
+    // New dynasties start with the recruiting staff working the board, so a
+    // coach who only sims games still signs a class. Either can be turned off.
+    setAutoRecruitingAssistant(true);
+    setAutoRecruitingOffers(true);
     setAssistantReport(null);
   }, []);
 
@@ -463,8 +465,8 @@ export function useDynastyController() {
       shortlistIds: [],
       recruitingActivity: emptyRecruitingActivity(),
       recruitTrends: {},
-      autoRecruitingAssistant: false,
-      autoRecruitingOffers: false,
+      autoRecruitingAssistant: true,
+      autoRecruitingOffers: true,
       ...newStaff,
     };
     const saved = writeSave(saveId, state);
