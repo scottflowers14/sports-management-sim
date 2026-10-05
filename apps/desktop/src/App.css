@@ -3379,6 +3379,56 @@ li span {
   margin: 0;
 }
 
+.scout-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 6px 0 4px;
+  font-size: 0.8rem;
+  color: #e6edf3;
+  font-variant-numeric: tabular-nums;
+}
+
+.scout-num-label {
+  color: #7d8ba0;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  margin-right: 3px;
+}
+
+.scout-keys {
+  margin: 6px 0 8px;
+  padding-left: 18px;
+  color: #c9d4e3;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.scout-keys li + li {
+  margin-top: 3px;
+}
+
+.scout-quiet {
+  font-size: 0.8rem;
+  margin: 6px 0 0;
+}
+
+.scout-plan-btn {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(123, 168, 255, 0.45);
+  background: rgba(71, 120, 255, 0.18);
+  color: #e6edf3;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scout-plan-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 /* ── Week Hub Screen ──────────────────────────────────────────────────────── */
 
 .week-hub-layout {

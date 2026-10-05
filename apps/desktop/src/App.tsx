@@ -1,6 +1,9 @@
 import {
   calculateLacrosseTeamRating,
   deriveCpuGamePlan,
+  leagueTendencies,
+  scoutingKeys,
+  teamTendencies,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
   dynastyRivalries,
@@ -308,8 +311,12 @@ export function App() {
         (t) => t.id === (nextUserGame.homeTeamId === dynasty.userTeamId ? nextUserGame.awayTeamId : nextUserGame.homeTeamId),
       )
     : undefined;
+  const league = leagueTendencies(dynasty.season.schedule);
+  const opponentTendencies = nextOpponentTeam ? teamTendencies(dynasty.season.schedule, nextOpponentTeam.id) : null;
   const nextOpponentScout = nextUserGame && nextOpponentTeam
     ? {
+        tendencies: opponentTendencies,
+        keys: opponentTendencies && league ? scoutingKeys(opponentTendencies, league) : [],
         week: nextUserGame.week,
         name: formatTeamName(nextOpponentTeam.name),
         isHome: nextUserGame.homeTeamId === dynasty.userTeamId,
