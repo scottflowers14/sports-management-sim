@@ -21,6 +21,7 @@ import type { WeeklyHonor } from './weekly-honors';
 import type { InvestmentPlan, NilState, ProDraftPick } from '@sports-management-sim/sport-lacrosse';
 import type { HalftimeState } from './halftime';
 import { formatTeamName } from './ui/format';
+import { decodeSave, encodeSave } from './save-codec';
 
 export const DYNASTY_SAVE_VERSION = 1;
 export const DYNASTY_SAVE_KEY = 'sports-management-sim:dynasty-save:v1';
@@ -163,7 +164,7 @@ export function loadActiveDynastySave(storage: Storage = window.localStorage): P
 export function loadDynastySaveSlot(saveId: string, storage: Storage = window.localStorage): PersistedDynastySave | null {
   const raw = storage.getItem(dynastySaveSlotKey(saveId));
   if (!raw) return null;
-  const parsed = parsePersistedSave(raw);
+  const parsed = parsePersistedSave(decodeStored(raw));
   return parsed ? { ...parsed, saveId } : null;
 }
 
@@ -241,6 +242,29 @@ function compactTournamentLogs(tournament: TournamentState, userTeamId: string):
   };
 }
 
+/** Thrown by saveDynastySlot when the browser's storage has no room left. */
+export class SaveStorageFullError extends Error {
+  constructor() {
+    super('Save failed: browser storage is full. Delete or export an old save to make room.');
+    this.name = 'SaveStorageFullError';
+  }
+}
+
+/** True for the quota errors browsers throw from localStorage.setItem. */
+export function isStorageFullError(error: unknown): boolean {
+  if (!(error instanceof Error) && !(typeof DOMException !== 'undefined' && error instanceof DOMException)) return false;
+  const { name, code } = error as { name?: string; code?: number };
+  return name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED' || code === 22 || code === 1014;
+}
+
+function decodeStored(raw: string): string {
+  try {
+    return decodeSave(raw);
+  } catch {
+    return '';
+  }
+}
+
 export function setActiveDynastySave(saveId: string, storage: Storage = window.localStorage): void {
   storage.setItem(ACTIVE_DYNASTY_SAVE_KEY, saveId);
 }
@@ -266,9 +290,15 @@ export function saveDynastySlot({
     name: saveName,
     ...state,
   };
-  storage.setItem(dynastySaveSlotKey(saveId), JSON.stringify(compactForStorage(save)));
-  upsertSaveMetadata(createSaveMetadata(state, saveId, saveName, existing?.createdAt ?? now, now), storage);
-  storage.setItem(ACTIVE_DYNASTY_SAVE_KEY, saveId);
+  // Write the slot first: if storage is full, the index and active save stay
+  // as they were and the caller hears about it.
+  try {
+    storage.setItem(dynastySaveSlotKey(saveId), encodeSave(JSON.stringify(compactForStorage(save))));
+    upsertSaveMetadata(createSaveMetadata(state, saveId, saveName, existing?.createdAt ?? now, now), storage);
+    storage.setItem(ACTIVE_DYNASTY_SAVE_KEY, saveId);
+  } catch (error) {
+    throw isStorageFullError(error) ? new SaveStorageFullError() : error;
+  }
   return save;
 }
 
@@ -290,7 +320,7 @@ function migrateLegacyDynastySave(storage: Storage): void {
   const saveId = createDynastySaveId(legacy.dynasty.seed, () => new Date(legacy.savedAt).getTime());
   const name = defaultSaveName(legacy.dynasty);
   const savedAt = legacy.savedAt;
-  storage.setItem(dynastySaveSlotKey(saveId), JSON.stringify({ ...legacy, saveId, name }));
+  storage.setItem(dynastySaveSlotKey(saveId), encodeSave(JSON.stringify({ ...legacy, saveId, name })));
   writeIndex(
     {
       version: DYNASTY_SAVE_VERSION,
@@ -357,7 +387,7 @@ function defaultSaveName(dynasty: LacrosseDynastyState): string {
 
 export function exportSaveAsJson(saveId: string, storage: Storage = window.localStorage): string | null {
   const raw = storage.getItem(dynastySaveSlotKey(saveId));
-  return raw ?? null;
+  return raw === null ? null : decodeStored(raw);
 }
 
 export function importSaveFromJson(
@@ -373,7 +403,8 @@ export function importSaveFromJson(
       ?? defaultSaveName(parsed.dynasty);
     saveDynastySlot({ saveId, name, state: parsed, storage });
     return { saveId };
-  } catch {
+  } catch (error) {
+    if (error instanceof SaveStorageFullError) return { error: error.message };
     return { error: 'Failed to parse save file.' };
   }
 }

@@ -138,6 +138,7 @@ import {
   loadActiveDynastySave,
   loadDynastySaveSlot,
   saveDynastySlot,
+  SaveStorageFullError,
   type DynastySaveMetadata,
   type DynastySaveState,
 } from './persistence';
@@ -227,6 +228,23 @@ export function useDynastyController() {
   const [seasonStats, setSeasonStats] = useState<SeasonStatsMap>(() => loadedSave?.seasonStats ?? emptySeasonStats());
   const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadedSave?.careerStats ?? emptyCareerStats());
   const [saveStatus, setSaveStatus] = useState(() => (loadedSave ? 'Loaded dynasty save' : 'Choose or create a dynasty'));
+  // Set when the last save attempt didn't reach storage, so the shell can warn
+  // that progress isn't being kept.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const writeSave = useCallback((saveId: string, state: DynastySaveState): boolean => {
+    try {
+      saveDynastySlot({ saveId, state });
+      setSaveError(null);
+      return true;
+    } catch (error) {
+      const message = error instanceof SaveStorageFullError
+        ? error.message
+        : `Save failed: ${error instanceof Error ? error.message : 'unknown error'}`;
+      setSaveError(message);
+      setSaveStatus('Save failed');
+      return false;
+    }
+  }, []);
   const [recruitPosFilter, setRecruitPosFilter] = useState<LacrossePosition | 'ALL'>('ALL');
   const [recruitTab, setRecruitTab] = useState<'board' | 'portal'>('board');
   const [shortlistIds, setShortlistIds] = useState<string[]>(() => loadedSave?.shortlistIds ?? []);
@@ -354,11 +372,11 @@ export function useDynastyController() {
 
   const persistDynasty = useCallback((status = 'Saved locally') => {
     const saveId = activeSaveId ?? createDynastySaveId(dynasty.seed);
-    saveDynastySlot({ saveId, state: saveState() });
+    const saved = writeSave(saveId, saveState());
     setActiveSaveId(saveId);
     refreshSaves();
-    setSaveStatus(status);
-  }, [activeSaveId, dynasty.seed, refreshSaves, saveState]);
+    if (saved) setSaveStatus(status);
+  }, [activeSaveId, dynasty.seed, refreshSaves, saveState, writeSave]);
 
   const startNewDynasty = useCallback(() => {
     const nextDynasty = createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId, ...(customTeams ? { customTeams } : {}) });
@@ -429,12 +447,12 @@ export function useDynastyController() {
       autoRecruitingOffers: false,
       ...newStaff,
     };
-    saveDynastySlot({ saveId, state });
+    const saved = writeSave(saveId, state);
     setActiveSaveId(saveId);
     refreshSaves();
-    setSaveStatus('New dynasty started');
+    if (saved) setSaveStatus('New dynasty started');
     setScreen('game');
-  }, [customTeams, refreshSaves, resetUiState, selectedNewTeamId, selectedNewCoachName]);
+  }, [customTeams, refreshSaves, resetUiState, selectedNewTeamId, selectedNewCoachName, writeSave]);
 
   const loadSave = useCallback((saveId: string) => {
     const save = loadDynastySaveSlot(saveId);
@@ -490,12 +508,12 @@ export function useDynastyController() {
     setView(save.offseasonSummary ? 'offseason' : 'week-hub');
     setRecruitPosFilter('ALL');
     setRecruitTab('board');
-    saveDynastySlot({ saveId, state: save });
+    const saved = writeSave(saveId, save);
     setActiveSaveId(saveId);
     refreshSaves();
-    setSaveStatus('Loaded dynasty save');
+    if (saved) setSaveStatus('Loaded dynasty save');
     setScreen('game');
-  }, [refreshSaves]);
+  }, [refreshSaves, writeSave]);
 
   const deleteSave = useCallback((saveId: string) => {
     deleteDynastySave(saveId);
@@ -1730,6 +1748,7 @@ export function useDynastyController() {
     seasonStats,
     careerStats,
     saveStatus,
+    saveError,
     recruitPosFilter,
     setRecruitPosFilter,
     recruitTab,

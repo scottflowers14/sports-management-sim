@@ -106,6 +106,7 @@ export function App() {
     scheduleEditable,
     swapNonConferenceGame,
     saveStatus,
+    saveError,
     recruitPosFilter,
     setRecruitPosFilter,
     recruitTab,
@@ -471,9 +472,20 @@ export function App() {
           <button type="button" onClick={resetDynasty}>
             New Dynasty
           </button>
-          <span>{saveStatus}</span>
+          <span className={saveError ? 'save-status save-status-failed' : 'save-status'} title={saveStatus}>
+            {saveStatus}
+          </span>
         </div>
       </header>
+      {saveError && (
+        <div className="save-error-banner" role="alert">
+          <strong>{saveError}</strong>
+          <span>Your latest progress is not saved yet. Autosave keeps trying after every change.</span>
+          <button type="button" onClick={() => setScreen('start')}>
+            Manage saves
+          </button>
+        </div>
+      )}
 
       <div className="shell-body">
         <aside className="side-nav">

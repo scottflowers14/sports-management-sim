@@ -238,6 +238,47 @@ h2 {
   font-size: 0.75rem;
 }
 
+/* Long status lines ("Offered Jason Hoffman a 50% scholarship") used to
+   squeeze the phase label; they now truncate with the full text on hover. */
+.save-actions .save-status {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-actions .save-status-failed {
+  color: #ff8a8a;
+  font-weight: 800;
+}
+
+.save-error-banner {
+  align-items: center;
+  background: rgba(255, 92, 92, 0.12);
+  border-bottom: 1px solid rgba(255, 92, 92, 0.45);
+  color: #ffd2d2;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  gap: 8px 14px;
+  padding: 10px 18px;
+}
+
+.save-error-banner strong {
+  color: #ff8a8a;
+}
+
+.save-error-banner button {
+  background: rgba(255, 92, 92, 0.16);
+  border: 1px solid rgba(255, 92, 92, 0.5);
+  border-radius: 10px;
+  color: #ffd2d2;
+  cursor: pointer;
+  font-weight: 800;
+  margin-left: auto;
+  padding: 6px 12px;
+}
+
 .metric {
   margin-bottom: 4px;
   font-size: 2rem;
