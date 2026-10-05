@@ -45,6 +45,7 @@ export function SeasonScreen({
   tournament,
   lastSimWeek,
   lastWeekGames,
+  rankOf,
   newsItems,
   userTeam,
   userInjuries,
@@ -74,6 +75,8 @@ export function SeasonScreen({
   tournament: TournamentState | null;
   lastSimWeek: number | null;
   lastWeekGames: ScheduledGame[];
+  /** Current national rank, shown on results. */
+  rankOf?: (teamId: string) => number | null;
   newsItems: NewsItem[];
   userTeam: LacrosseTeam;
   userInjuries: Set<string>;
@@ -145,6 +148,7 @@ export function SeasonScreen({
                     userTeamId={userTeamId}
                     gameLogs={gameLogs}
                     onBoxScore={onBoxScore}
+                    rankOf={rankOf}
                   />
                 ))}
               </ul>
