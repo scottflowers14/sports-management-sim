@@ -194,7 +194,9 @@ describe('practice during the season', () => {
 
 describe('morale during the season', () => {
   it('sours a benched star and says so in the news', () => {
-    const base = { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 42 }) };
+    // fixedDynasty, not createFreshLacrosseDynasty({ now }): the factory never reissues a seed, so `now` alone
+    // gave a different league every run and the star sometimes kept his morale up.
+    const base = freshStateWith(fixedDynasty());
     const userId = base.dynasty.userTeamId;
     const team = base.dynasty.season.teams.find((t) => t.id === userId)!;
     const attack = team.roster.filter((p) => p.position === 'ATT').sort((a, b) => b.ratings.overall - a.ratings.overall);
@@ -218,7 +220,7 @@ describe('morale during the season', () => {
 
 describe('redshirts during the season', () => {
   it('sits a redshirting player out of every game and lets CPU staffs redshirt before the opener', () => {
-    const base = { ...freshState(), dynasty: createFreshLacrosseDynasty({ now: () => 7 }) };
+    const base = freshStateWith(fixedDynasty());
     const userId = base.dynasty.userTeamId;
     const team = base.dynasty.season.teams.find((t) => t.id === userId)!;
     const star = [...team.roster].filter((p) => p.position === 'ATT').sort((a, b) => b.ratings.overall - a.ratings.overall)[0]!;
