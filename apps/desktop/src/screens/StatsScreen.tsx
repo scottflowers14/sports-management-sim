@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import type { LacrosseSeason } from '@sports-management-sim/sport-lacrosse';
+import { splitGames, splitWinPct, teamSplits } from '@sports-management-sim/sport-lacrosse';
+import type { LacrosseSeason, Rivalry } from '@sports-management-sim/sport-lacrosse';
 import { AWARD_RACE_KEYS, AWARD_RACE_LABELS, computeAwardsRace } from '../awards';
 import type { SeasonStatsMap, PlayerSeasonStats } from '../stats';
 import { formatTeamShort } from '../ui/format';
 import { WEEKLY_HONOR_LABELS, weeklyHonorCounts } from '../weekly-honors';
 import type { WeeklyHonor } from '../weekly-honors';
 
-type StatCategory = 'scoring' | 'goalkeeping' | 'faceoffs' | 'defense' | 'awards';
+type StatCategory = 'scoring' | 'goalkeeping' | 'faceoffs' | 'defense' | 'awards' | 'splits';
 
 const CATEGORY_LABELS: Record<StatCategory, string> = {
   scoring: 'Scoring',
@@ -14,6 +15,7 @@ const CATEGORY_LABELS: Record<StatCategory, string> = {
   faceoffs: 'Faceoffs',
   defense: 'Defense',
   awards: 'Awards Race',
+  splits: 'Team Splits',
 };
 
 type StatColumn =
@@ -26,12 +28,14 @@ export function StatsScreen({
   userTeamId,
   season,
   weeklyHonors = [],
+  rivalries = [],
 }: {
   seasonStats: SeasonStatsMap;
   playerLookup: Map<string, { name: string; teamName: string; position: string; teamId: string }>;
   userTeamId: string;
   season?: LacrosseSeason;
   weeklyHonors?: WeeklyHonor[];
+  rivalries?: Rivalry[];
 }) {
   const [category, setCategory] = useState<StatCategory>('scoring');
 
@@ -47,7 +51,7 @@ export function StatsScreen({
   }
 
   const categories: StatCategory[] = season
-    ? ['scoring', 'goalkeeping', 'faceoffs', 'defense', 'awards']
+    ? ['scoring', 'goalkeeping', 'faceoffs', 'defense', 'awards', 'splits']
     : ['scoring', 'goalkeeping', 'faceoffs', 'defense'];
 
   return (
@@ -154,6 +158,10 @@ export function StatsScreen({
           playerLookup={playerLookup}
           userTeamId={userTeamId}
         />
+      )}
+
+      {category === 'splits' && season && (
+        <TeamSplitsPanel season={season} userTeamId={userTeamId} rivalries={rivalries} />
       )}
     </div>
   );
@@ -305,6 +313,79 @@ function StatTable({
           })}
         </tbody>
       </table>
+    </article>
+  );
+}
+
+function TeamSplitsPanel({
+  season,
+  userTeamId,
+  rivalries,
+}: {
+  season: LacrosseSeason;
+  userTeamId: string;
+  rivalries: Rivalry[];
+}) {
+  const [teamId, setTeamId] = useState(userTeamId);
+  const teams = useMemo(() => [...season.teams].sort((a, b) => a.name.localeCompare(b.name)), [season.teams]);
+  const splits = useMemo(
+    () => teamSplits(season.schedule, teamId, rivalries),
+    [season.schedule, teamId, rivalries],
+  );
+  const overall = splits.find((s) => s.key === 'overall')!;
+
+  return (
+    <article className="card" aria-label="Team splits">
+      <div className="card-head-row">
+        <h2>Team Splits</h2>
+        <label className="splits-team-picker">
+          <span className="dim">Team</span>
+          <select value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+                {t.id === userTeamId ? ' (you)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {splitGames(overall) === 0 ? (
+        <p className="dim">No games played yet this season.</p>
+      ) : (
+        <table className="standings-table stats-table splits-table">
+          <thead>
+            <tr>
+              <th>Split</th>
+              <th>W-L</th>
+              <th>Pct</th>
+              <th>GF/G</th>
+              <th>GA/G</th>
+              <th>Diff</th>
+            </tr>
+          </thead>
+          <tbody>
+            {splits.map((split) => {
+              const games = splitGames(split);
+              const diff = split.goalsFor - split.goalsAgainst;
+              return (
+                <tr key={split.key} className={games === 0 ? 'dim' : ''}>
+                  <td>{split.label}</td>
+                  <td className="stat-val">
+                    {split.wins}-{split.losses}
+                  </td>
+                  <td>{games === 0 ? '-' : splitWinPct(split).toFixed(3).replace(/^0/, '')}</td>
+                  <td>{games === 0 ? '-' : (split.goalsFor / games).toFixed(1)}</td>
+                  <td>{games === 0 ? '-' : (split.goalsAgainst / games).toFixed(1)}</td>
+                  <td className={diff > 0 ? 'game-log-win' : diff < 0 ? 'game-log-loss' : ''}>
+                    {games === 0 ? '-' : `${diff > 0 ? '+' : ''}${diff}`}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </article>
   );
 }
