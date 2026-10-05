@@ -273,3 +273,20 @@ describe('coached games', () => {
     expect(unchanged.gameLogs.get(preview.game.id)!.events).toEqual(preview.log.events);
   });
 });
+
+describe('pregame team talk', () => {
+  it('adds its edge to the user game only in the week it was given', () => {
+    const state = freshStateWith(fixedDynasty());
+    const plan = { tempo: 'balanced', defense: 'balanced', ride: 'standard', rotation: 'balanced' } as const;
+    const { year, currentWeek } = state.dynasty.season;
+    // An outsized edge so the effect shows up in a single game.
+    const result = { reaction: 'positive' as const, edge: { offense: 0.3, defense: 0.3 } };
+    const userGoals = (s: WeekSimState) =>
+      previewUserGame(s, plan, 99)!.log.events.filter((e) => e.type === 'goal' && e.teamId === s.dynasty.userTeamId).length;
+    const base = userGoals(state);
+    const talked = userGoals({ ...state, teamTalk: { year, week: currentWeek, tone: 'fire_up', result } });
+    const stale = userGoals({ ...state, teamTalk: { year: year - 1, week: currentWeek, tone: 'fire_up', result } });
+    expect(talked).toBeGreaterThan(base);
+    expect(stale).toBe(base);
+  });
+});

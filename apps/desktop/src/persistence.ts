@@ -2,7 +2,7 @@ import { compactGameLog, normalizeGamePlan } from '@sports-management-sim/sport-
 import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, LacrossePortalEntry, LacrossePracticePlan, LacrosseStaff, RivalrySeriesMap, StaffMember } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
-import type { PracticeLogEntry } from './week-sim';
+import type { PracticeLogEntry, PregameTalk } from './week-sim';
 import type { LockerRoomState } from './locker-room';
 import type { HallOfFameEntry, RecordBookArchive } from './records';
 import type { SeasonPreview } from './preseason';
@@ -74,6 +74,8 @@ export interface DynastySaveState {
   halftime?: HalftimeState | null;
   /** Press conference answers by game id, recent games only. */
   pressAnswers?: Record<string, string>;
+  /** This week's pregame team talk, if given. */
+  teamTalk?: PregameTalk | null;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */

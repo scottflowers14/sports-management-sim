@@ -41,6 +41,12 @@ import {
   type LacrossePlayerGameStats,
   type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
+import {
+  addCoachingEdge,
+  type CoachingEdge,
+  type TeamTalkResult,
+  type TeamTalkTone,
+} from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, processInjuries } from './dynasty-helpers';
 import { formatTeamName } from './ui/format';
 import type { InjuredPlayer } from './dynasty-helpers';
@@ -83,6 +89,23 @@ export interface WeekSimState {
   rivalrySeries?: RivalrySeriesMap;
   /** This season's Player of the Week honors, oldest first. */
   weeklyHonors?: WeeklyHonor[];
+  /** The pregame talk for the user's game; only counts in the week it was given. */
+  teamTalk?: PregameTalk | null;
+}
+
+/** A talk only counts in the season and week it was given. */
+export function isCurrentTalk(
+  talk: PregameTalk | null | undefined,
+  season: { year: number; currentWeek: number },
+): boolean {
+  return !!talk && talk.year === season.year && talk.week === season.currentWeek;
+}
+
+export interface PregameTalk {
+  year: number;
+  week: number;
+  tone: TeamTalkTone;
+  result: TeamTalkResult;
 }
 
 export interface PracticeLogEntry extends PracticeGain {
@@ -115,6 +138,9 @@ function weekGameInput(state: WeekSimState, homeTeam: LacrosseTeam, awayTeam: La
   const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
   const planFor = (team: LacrosseTeam): LacrosseGamePlan => (team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team));
+  const talk = isCurrentTalk(state.teamTalk, dynasty.season) ? state.teamTalk!.result.edge : null;
+  const withTalk = (team: LacrosseTeam, edge: CoachingEdge): CoachingEdge =>
+    talk && team.id === dynasty.userTeamId ? addCoachingEdge(edge, talk) : edge;
   // Injured and redshirting players sit: the depth chart promotes the next man up for the
   // rating, the game plan, and the box score.
   const home = withoutUnavailable(homeTeam, injuredIds);
@@ -124,8 +150,8 @@ function weekGameInput(state: WeekSimState, homeTeam: LacrosseTeam, awayTeam: La
     awayTeam: away,
     homeGamePlan: planFor(home),
     awayGamePlan: planFor(away),
-    homeCoaching: programCoachingEdge(home, staffOwner),
-    awayCoaching: programCoachingEdge(away, staffOwner),
+    homeCoaching: withTalk(home, programCoachingEdge(home, staffOwner)),
+    awayCoaching: withTalk(away, programCoachingEdge(away, staffOwner)),
   };
 }
 

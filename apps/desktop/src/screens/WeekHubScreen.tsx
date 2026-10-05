@@ -229,6 +229,7 @@ export function WeekHubScreen({
   previewCard,
   onRushInjury,
   bracketStatus,
+  teamTalkCard,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -262,6 +263,8 @@ export function WeekHubScreen({
   onRushInjury?: (playerId: string) => void;
   /** Bracketology line for the user, e.g. "Projected #4 seed (at-large)". */
   bracketStatus?: string | undefined;
+  /** Pregame talk for this week's game. */
+  teamTalkCard?: ReactNode;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -376,6 +379,8 @@ export function WeekHubScreen({
           ))}
         </div>
       )}
+
+      {teamTalkCard}
 
       {previewCard}
 
