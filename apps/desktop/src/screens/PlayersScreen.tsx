@@ -11,6 +11,7 @@ import {
 import { RatingCell } from '../components/RatingCell';
 import { SortHeader, nextSort, type SortState } from '../components/SortHeader';
 import { formatTeamName } from '../ui/format';
+import { PlayerCompareCard } from '../components/PlayerCompareCard';
 
 const PAGE_SIZE = 50;
 const POSITIONS: Array<LacrossePosition | 'ALL'> = ['ALL', 'ATT', 'MID', 'DEF', 'LSM', 'GK', 'FOGO'];
@@ -39,6 +40,15 @@ export function PlayersScreen({
   const [teamId, setTeamId] = useState('ALL');
   const [sort, setSort] = useState<SortState<PlayerSortKey>>({ key: 'overall', direction: 'desc' });
   const [page, setPage] = useState(0);
+  // Up to two players to compare; ticking a third drops the oldest pick.
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const toggleCompare = (id: string) =>
+    setCompareIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id].slice(-2)));
+  const playersById = useMemo(() => new Map(teams.flatMap((t) => t.roster.map((p) => [p.id, { player: p, team: t }] as const))), [teams]);
+  const comparePicks = compareIds.flatMap((id) => {
+    const found = playersById.get(id);
+    return found ? [found] : [];
+  });
 
   const allRows = useMemo(() => buildPlayerRows(teams, seasonStats, userTeamId), [teams, seasonStats, userTeamId]);
   const filtered = useMemo(
@@ -64,6 +74,15 @@ export function PlayersScreen({
   );
 
   return (
+    <>
+    {comparePicks.length > 0 && (
+      <PlayerCompareCard
+        picks={comparePicks}
+        seasonStats={seasonStats}
+        onRemove={(id) => setCompareIds((ids) => ids.filter((x) => x !== id))}
+        onClear={() => setCompareIds([])}
+      />
+    )}
     <article className="card dense-card">
       <div className="screen-toolbar">
         <div>
@@ -116,6 +135,7 @@ export function PlayersScreen({
         <table className="data-grid">
           <thead>
             <tr>
+              <th title="Tick two players to compare them">Cmp</th>
               {h('Player', 'name')}
               {h('Program', 'teamName')}
               {h('POS', 'position')}
@@ -138,6 +158,14 @@ export function PlayersScreen({
           <tbody>
             {pageRows.map((r) => (
               <tr key={r.playerId} className={r.isUser ? 'user-row clickable-row' : 'clickable-row'} onClick={() => onSelectPlayer(r.playerId)}>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={compareIds.includes(r.playerId)}
+                    onChange={() => toggleCompare(r.playerId)}
+                    aria-label={`Compare ${r.name}`}
+                  />
+                </td>
                 <td>{r.name}</td>
                 <td>
                   <button type="button" className="link-btn" onClick={(e) => { e.stopPropagation(); onOpenProgram(r.teamId); }}>
@@ -177,5 +205,6 @@ export function PlayersScreen({
         <button type="button" className="ghost-btn" disabled={safePage >= pageCount - 1} onClick={() => setPage(safePage + 1)}>Next ›</button>
       </div>
     </article>
+    </>
   );
 }
