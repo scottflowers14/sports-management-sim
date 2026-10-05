@@ -110,7 +110,7 @@ import {
 } from './tournament';
 import type { TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
-import { deriveSeasonLeader, toSeasonAwardRecords } from './history';
+import { deriveSeasonLeader, toAllAmericaRecords, toSeasonAwardRecords } from './history';
 import {
   createScoutingState,
   scoutRecruit as scoutRecruitFn,
@@ -1044,6 +1044,7 @@ export function useDynastyController() {
     const proDraft = summary.proDraft ?? [];
     const userDraftPicks = proDraft.filter((p) => p.collegeTeamId === dynasty.userTeamId);
 
+    const allAmericans = toAllAmericaRecords(summary.awards, dynasty.userTeamId);
     const historyRecord: DynastySeasonRecord = {
       year: dynasty.season.year,
       wins: summary.userRecord.wins,
@@ -1057,6 +1058,7 @@ export function useDynastyController() {
       ...(userTeamThisSeason ? { teamName: userTeamThisSeason.name } : {}),
       ...(nationalChampionTeam ? { nationalChampionName: nationalChampionTeam.name } : {}),
       awards: toSeasonAwardRecords(summary.awards),
+      ...(allAmericans.length > 0 ? { allAmericans } : {}),
       ...(teamLeader ? { teamLeader } : {}),
       ...(seasonPreview?.year === dynasty.season.year && predictedFinish(seasonPreview, dynasty.userTeamId) !== null
         ? { predictedConfFinish: predictedFinish(seasonPreview, dynasty.userTeamId)! }
@@ -1171,7 +1173,7 @@ export function useDynastyController() {
       const departing = userTeamThisSeason.roster.filter((p) => isGraduating(p));
       const awardsByPlayer = new Map<string, string[]>();
       for (const record of [historyRecord, ...dynastyHistory]) {
-        for (const award of record.awards ?? []) {
+        for (const award of [...(record.awards ?? []), ...(record.allAmericans ?? [])]) {
           if (award.teamName !== userProgramName) continue;
           const player = departing.find((p) => `${p.name.first} ${p.name.last}` === award.playerName);
           if (player) awardsByPlayer.set(player.id, [...(awardsByPlayer.get(player.id) ?? []), `${award.award} ${record.year}`]);

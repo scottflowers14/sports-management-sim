@@ -1,5 +1,5 @@
 import type { LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
-import type { SeasonAwards } from './awards';
+import { ALL_AMERICA_TIER_LABELS, programAllAmericans, type SeasonAwards } from './awards';
 import type { SeasonStatsMap } from './stats';
 import type { SeasonGameRecord } from './series-history';
 
@@ -42,6 +42,8 @@ export interface DynastySeasonRecord {
   nationalChampionName?: string;
   /** National award winners (MVP, OPOY, DPOY, Freshman). */
   awards?: SeasonAwardRecord[];
+  /** The user program's All-Americans; award is the tier label. */
+  allAmericans?: SeasonAwardRecord[];
   /** The user program's leading scorer that season. */
   teamLeader?: SeasonLeaderRecord;
   /** Where the preseason poll picked the program to finish in its conference. */
@@ -66,6 +68,14 @@ export function toSeasonAwardRecords(awards: SeasonAwards | null): SeasonAwardRe
     records.push({ award: 'Freshman of the Year', ...pickFields(awards.freshmanOfYear) });
   }
   return records;
+}
+
+/** The program's All-Americans as slim history records, best tier first. */
+export function toAllAmericaRecords(awards: SeasonAwards | null, teamId: string): SeasonAwardRecord[] {
+  return programAllAmericans(awards?.allAmerica, teamId).map(({ tier, winner }) => ({
+    award: ALL_AMERICA_TIER_LABELS[tier],
+    ...pickFields(winner),
+  }));
 }
 
 function pickFields(winner: SeasonAwards['mvp']): Omit<SeasonAwardRecord, 'award'> {
