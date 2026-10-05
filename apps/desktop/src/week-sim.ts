@@ -1,4 +1,6 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
+import { seededGameRandom } from './halftime';
+export { seededGameRandom } from './halftime';
 import {
   advanceSeasonWeek,
   applyCampusVisit,
@@ -95,18 +97,6 @@ export interface CoachedGame {
   /** Seeds the game's dice, so the first half replays exactly as previewed. */
   seed: number;
   secondHalfPlan: LacrosseGamePlan;
-}
-
-/** The dice for a coached game: the same seed always rolls the same game. */
-export function seededGameRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /** CPU staffs name captains and make their redshirt calls before the opener. */

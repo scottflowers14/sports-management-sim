@@ -29,14 +29,15 @@ const STAT_ROWS: Array<{ key: keyof HalfSideStats; label: string }> = [
  */
 export function HalftimeModal({
   log,
-  week,
+  label,
   userTeamId,
   teamMap,
   gamePlan,
   onPlaySecondHalf,
 }: {
   log: GameLog;
-  week: number;
+  /** What the game is: "Week 3", "NCAA Quarterfinal". */
+  label: string;
   userTeamId: string;
   teamMap: Map<string, string>;
   gamePlan: LacrosseGamePlan;
@@ -68,7 +69,7 @@ export function HalftimeModal({
   return createPortal(
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="halftime-title">
       <div className="modal-panel card halftime-panel">
-        <p className="eyebrow">Week {week} · Halftime</p>
+        <p className="eyebrow">{label} · Halftime</p>
         <h2 id="halftime-title" className="halftime-score">
           <span>{name(log.awayTeamId)}</span> <strong>{report.awayScore}</strong>
           <span className="dim"> at </span>

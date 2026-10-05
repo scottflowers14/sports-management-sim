@@ -36,6 +36,7 @@ import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
 import { recruitingPipelines } from './pipelines';
+import { TOURNAMENT_ROUND_LABELS } from './tournament';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
@@ -683,6 +684,7 @@ export function App() {
 
       {view === 'tournament' && (
         <TournamentScreen
+          onCoachGame={canCoachGame ? coachGame : undefined}
           tournament={tournament}
           teamMap={teamMap}
           userTeamId={dynasty.userTeamId}
@@ -851,7 +853,7 @@ export function App() {
       {halftime && (
         <HalftimeModal
           log={halftime.log}
-          week={halftime.week}
+          label={halftime.tournamentPhase ? TOURNAMENT_ROUND_LABELS[halftime.tournamentPhase] : `Week ${halftime.week}`}
           userTeamId={dynasty.userTeamId}
           teamMap={teamMap}
           gamePlan={gamePlan}
