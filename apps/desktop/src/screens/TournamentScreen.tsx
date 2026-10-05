@@ -228,7 +228,7 @@ function NcaaSection({
         <div className="ncaa-field">
           <table className="data-grid">
             <thead>
-              <tr><th>Seed</th><th>Team</th><th>Bid</th><th>RPI</th></tr>
+              <tr><th>Seed</th><th>Team</th><th>Bid</th><th>RPI</th><th title="Wins over top-quarter RPI teams">QW</th><th title="Losses to bottom-half RPI teams">BL</th></tr>
             </thead>
             <tbody>
               {[...field].sort((a, b) => a.seed - b.seed).map((e) => (
@@ -237,6 +237,8 @@ function NcaaSection({
                   <td>{name(e.teamId)}{e.seed <= 4 && <span className="conf-tag" title="First-round bye">BYE</span>}</td>
                   <td>{e.bid === 'auto' ? 'AQ' : 'At-large'}</td>
                   <td className="num">{e.rpi.toFixed(3).replace(/^0/, '')}</td>
+                  <td className="num">{e.qualityWins ?? '–'}</td>
+                  <td className="num">{e.badLosses ?? '–'}</td>
                 </tr>
               ))}
             </tbody>

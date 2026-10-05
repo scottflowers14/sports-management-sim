@@ -166,7 +166,7 @@ function BracketologyCard({
         </span>
       </div>
       <p className="dim bracket-note">
-        If the season ended today. Conference leaders take the auto bids; the rest go by RPI.
+        If the season ended today. Conference leaders take the auto bids. At-large teams need a .500 record, and the committee seeds by RPI plus quality wins (QW, over top-quarter RPI teams) minus bad losses (BL, to bottom-half teams).
       </p>
       <table className="standings-table">
         <thead>
@@ -176,6 +176,8 @@ function BracketologyCard({
             <th>Bid</th>
             <th>W-L</th>
             <th>RPI</th>
+            <th title="Wins over top-quarter RPI teams">QW</th>
+            <th title="Losses to bottom-half RPI teams">BL</th>
           </tr>
         </thead>
         <tbody>
@@ -186,11 +188,13 @@ function BracketologyCard({
               <td>{e.bid === 'auto' ? <span className="honor-pill">AQ</span> : <span className="dim">At-large</span>}</td>
               <td>{record(e.teamId)}</td>
               <td>{e.rpi.toFixed(3).replace(/^0/, '')}</td>
+              <td>{e.qualityWins ?? '–'}</td>
+              <td>{e.badLosses ?? '–'}</td>
             </tr>
           ))}
           {projection.firstOut.length > 0 && (
             <tr className="bracket-divider">
-              <td colSpan={5} className="section-label">First Four Out</td>
+              <td colSpan={7} className="section-label">First Four Out</td>
             </tr>
           )}
           {projection.firstOut.map((e) => (
@@ -200,6 +204,8 @@ function BracketologyCard({
               <td />
               <td>{record(e.teamId)}</td>
               <td>{e.rpi.toFixed(3).replace(/^0/, '')}</td>
+              <td>{e.qualityWins ?? '–'}</td>
+              <td>{e.badLosses ?? '–'}</td>
             </tr>
           ))}
         </tbody>

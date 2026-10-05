@@ -155,11 +155,17 @@ export interface NcaaEntry {
   seed: number;
   bid: 'auto' | 'at-large';
   rpi: number;
+  /** Wins over top-quarter RPI teams. Missing on older saves. */
+  qualityWins?: number;
+  /** Losses to bottom-half RPI teams. Missing on older saves. */
+  badLosses?: number;
 }
 
 export interface NcaaBubbleEntry {
   teamId: string;
   rpi: number;
+  qualityWins?: number;
+  badLosses?: number;
 }
 
 export interface TournamentState {
@@ -324,36 +330,95 @@ function winPct(team: LacrosseTeam): number {
   return games > 0 ? team.record.wins / games : 0;
 }
 
+/** What the selection committee weighs beyond RPI. */
+export interface SelectionResume {
+  rpi: number;
+  /** Wins over teams in the top quarter of the RPI. */
+  qualityWins: number;
+  /** Losses to teams in the bottom half of the RPI. */
+  badLosses: number;
+  /** RPI plus a bump per quality win, minus one per bad loss. Orders the field. */
+  score: number;
+}
+
+/** Each quality win or bad loss moves a resume this much, about a few RPI spots. */
+export const RESUME_GAME_WEIGHT = 0.01;
+
+/**
+ * The committee's resume for every team: RPI, quality wins and bad losses
+ * from the regular season, rolled into one selection score.
+ */
+export function selectionResumes(teams: LacrosseTeam[], schedule: ScheduledGame[]): Map<string, SelectionResume> {
+  const rpi = computeRpi(teams, schedule);
+  const order = [...rpi.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  const rank = new Map(order.map((id, i) => [id, i + 1]));
+  const qualityCut = Math.ceil(order.length / 4);
+  const badCut = order.length / 2;
+  const qualityWins = new Map<string, number>();
+  const badLosses = new Map<string, number>();
+  const bump = (m: Map<string, number>, id: string) => m.set(id, (m.get(id) ?? 0) + 1);
+  for (const g of schedule) {
+    if (g.status !== 'final' || !g.result) continue;
+    const winner = g.result.winnerTeamId;
+    const loser = winner === g.homeTeamId ? g.awayTeamId : g.homeTeamId;
+    if ((rank.get(loser) ?? Infinity) <= qualityCut) bump(qualityWins, winner);
+    if ((rank.get(winner) ?? 0) > badCut) bump(badLosses, loser);
+  }
+  return new Map(
+    teams.map((t) => {
+      const r = rpi.get(t.id) ?? 0;
+      const qw = qualityWins.get(t.id) ?? 0;
+      const bl = badLosses.get(t.id) ?? 0;
+      return [t.id, { rpi: r, qualityWins: qw, badLosses: bl, score: r + RESUME_GAME_WEIGHT * (qw - bl) }];
+    }),
+  );
+}
+
+/** NCAA rule: a team needs a .500 record or better to earn an at-large bid. */
+export function atLargeEligible(team: Pick<LacrosseTeam, 'record'>): boolean {
+  return team.record.wins >= team.record.losses;
+}
+
 /**
  * Selection day: conference champions get automatic bids, the best remaining
- * RPIs fill the at-large spots, and the whole field is seeded by RPI.
+ * resumes among .500-or-better teams fill the at-large spots (losing teams
+ * only if there aren't enough), and the whole field is seeded by resume:
+ * RPI, plus quality wins, minus bad losses.
  */
 export function selectNcaaField(
   champions: string[],
   teams: LacrosseTeam[],
   schedule: ScheduledGame[],
 ): { field: NcaaEntry[]; firstOut: NcaaBubbleEntry[] } {
-  const rpi = computeRpi(teams, schedule);
+  const resumes = selectionResumes(teams, schedule);
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const pct = (id: string) => {
     const t = teamById.get(id);
     return t ? winPct(t) : 0;
   };
-  const byRpi = (a: string, b: string) => (rpi.get(b) ?? 0) - (rpi.get(a) ?? 0) || pct(b) - pct(a);
+  const score = (id: string) => resumes.get(id)?.score ?? 0;
+  const byResume = (a: string, b: string) => score(b) - score(a) || pct(b) - pct(a);
+  const resumeOf = (teamId: string) => {
+    const r = resumes.get(teamId);
+    return { rpi: r?.rpi ?? 0, qualityWins: r?.qualityWins ?? 0, badLosses: r?.badLosses ?? 0 };
+  };
 
   const auto = [...new Set(champions)];
   const autoSet = new Set(auto);
-  const pool = teams.map((t) => t.id).filter((id) => !autoSet.has(id)).sort(byRpi);
+  const others = teams.filter((t) => !autoSet.has(t.id));
+  // Losing teams only come in if the bracket can't be filled without them.
+  const pool = [
+    ...others.filter(atLargeEligible).map((t) => t.id).sort(byResume),
+    ...others.filter((t) => !atLargeEligible(t)).map((t) => t.id).sort(byResume),
+  ];
   const atLargeCount = Math.max(0, ncaaFieldSize(teams.length) - auto.length);
-  const firstOut = pool
-    .slice(atLargeCount, atLargeCount + 4)
-    .map((teamId) => ({ teamId, rpi: rpi.get(teamId) ?? 0 }));
+  const firstOut = pool.slice(atLargeCount, atLargeCount + 4).map((teamId) => ({ teamId, ...resumeOf(teamId) }));
 
-  const field = [...auto, ...pool.slice(0, atLargeCount)].sort(byRpi).map((teamId, i) => ({
+  const field = [...auto, ...pool.slice(0, atLargeCount)].sort(byResume).map((teamId, i) => ({
     teamId,
     seed: i + 1,
     bid: autoSet.has(teamId) ? ('auto' as const) : ('at-large' as const),
-    rpi: rpi.get(teamId) ?? 0,
+    ...resumeOf(teamId),
   }));
   return { field, firstOut };
 }
