@@ -16,6 +16,8 @@ import {
   initTournament,
   ncaaFieldSize,
   projectNcaaField,
+  bracketMovementHeadline,
+  type NcaaProjection,
   projectionStatus,
   compareConferenceStanding,
   selectNcaaField,
@@ -213,5 +215,35 @@ describe('bracketology', () => {
     const out = teams.find((t) => !listed.has(t.id))!;
     expect(projectionStatus(projection, out.id)).toBe(`Out of the field (RPI #${projection.rpiRank.get(out.id)})`);
     expect([...projection.rpiRank.values()].sort((a, b) => a - b)).toEqual(teams.map((_, i) => i + 1));
+  });
+});
+
+describe('bubble watch headlines', () => {
+  const projection = (field: Array<[string, number]>, firstOut: string[] = []): NcaaProjection => ({
+    field: field.map(([teamId, seed]) => ({ teamId, seed, bid: 'at-large' as const, rpi: 0.5 })),
+    firstOut: firstOut.map((teamId) => ({ teamId, rpi: 0.4 })),
+    leaders: new Map(),
+    rpiRank: new Map(),
+  });
+
+  it('reports moving into and out of the field', () => {
+    expect(bracketMovementHeadline(projection([]), projection([['us', 9]]), 'us', 'Us')).toBe(
+      'Bubble watch: Us plays its way into the projected NCAA field as the #9 seed',
+    );
+    expect(bracketMovementHeadline(projection([['us', 12]]), projection([], ['us']), 'us', 'Us')).toBe(
+      'Bubble watch: Us falls out of the projected NCAA field and into the first four out',
+    );
+    expect(bracketMovementHeadline(projection([['us', 12]]), projection([]), 'us', 'Us')).toBe(
+      'Bubble watch: Us falls out of the projected NCAA field',
+    );
+  });
+
+  it('reports seed swings of three or more and stays quiet otherwise', () => {
+    expect(bracketMovementHeadline(projection([['us', 8]]), projection([['us', 4]]), 'us', 'Us')).toBe(
+      'Bracketology: Us climbs from a projected #8 to a #4 seed',
+    );
+    expect(bracketMovementHeadline(projection([['us', 2]]), projection([['us', 6]]), 'us', 'Us')).toMatch(/slides from a projected #2 to a #6/);
+    expect(bracketMovementHeadline(projection([['us', 5]]), projection([['us', 3]]), 'us', 'Us')).toBeNull();
+    expect(bracketMovementHeadline(projection([]), projection([]), 'us', 'Us')).toBeNull();
   });
 });

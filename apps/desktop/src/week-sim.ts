@@ -1,5 +1,6 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { seededGameRandom } from './halftime';
+import { bracketMovementHeadline, projectNcaaField } from './tournament';
 export { seededGameRandom } from './halftime';
 import {
   advanceSeasonWeek,
@@ -62,6 +63,8 @@ import { updateSeasonStats } from './stats';
 import { pickWeeklyHonors, weeklyHonorNews } from './weekly-honors';
 import type { WeeklyHonor } from './weekly-honors';
 import type { SeasonStatsMap } from './stats';
+
+const BRACKET_NEWS_FIRST_WEEK = 3;
 
 // About ten items a week, so this keeps the whole regular season.
 const MAX_NEWS_ITEMS = 120;
@@ -337,6 +340,21 @@ export function simulateOneWeek(
   const newDynasty = { ...dynasty, season: newSeason, recruits: newRecruits, recruitBoard: newBoard };
 
   const newRankings = computeNationalRankings(newSeason.teams, state.rankings);
+  const bracketNews: NewsItem[] = [];
+  // Bubble watch starts once a few weeks of results make the projection mean something.
+  if (weekToSim >= BRACKET_NEWS_FIRST_WEEK) {
+    const project = (season: typeof newSeason) =>
+      projectNcaaField(season.teams, season.conferences, season.standings, season.schedule);
+    const headline = bracketMovementHeadline(
+      project(dynasty.season),
+      project(newSeason),
+      dynasty.userTeamId,
+      formatTeamName(teamMap.get(dynasty.userTeamId) ?? dynasty.userTeamId),
+    );
+    if (headline) {
+      bracketNews.push({ id: `bracket-${weekToSim}`, week: weekToSim, category: 'rankings', featured: true, headline });
+    }
+  }
   const userInjuryRisk = PRACTICE_INTENSITIES[userPractice.intensity].injuryRisk;
   const { injuries: newInjuries, newlyInjured, recovered, setbacks } = processInjuries(
     state.injuries,
@@ -485,7 +503,7 @@ export function simulateOneWeek(
     rankings: newRankings,
     injuries: newInjuries,
     rivalrySeries,
-    newsItems: [...rivalryNews, ...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
+    newsItems: [...rivalryNews, ...bracketNews, ...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
     scouting: advanceScoutingWeek(state.scouting),
     recruitingActivity: emptyRecruitingActivity(),
     recruitTrends,
