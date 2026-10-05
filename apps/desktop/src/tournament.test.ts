@@ -21,6 +21,9 @@ import {
   projectionStatus,
   compareConferenceStanding,
   selectNcaaField,
+  selectionResumes,
+  atLargeEligible,
+  RESUME_GAME_WEIGHT,
   advanceTournamentPhase,
   teamGameThisRound,
   tournamentGames,
@@ -64,7 +67,7 @@ describe('NCAA tournament', () => {
   );
   const field = afterConf.ncaaField!;
 
-  it('selects every conference champion plus at-large teams, seeded by RPI', () => {
+  it('selects every conference champion plus at-large teams, seeded by resume', () => {
     expect(afterConf.phase).toBe('ncaa_first_round');
     expect(field).toHaveLength(NCAA_FIELD_SIZE);
     const champions = afterConf.conferenceBrackets.map((b) => b.champion!);
@@ -73,13 +76,17 @@ describe('NCAA tournament', () => {
     }
     expect(field.filter((e) => e.bid === 'at-large')).toHaveLength(NCAA_FIELD_SIZE - new Set(champions).size);
     expect(field.map((e) => e.seed)).toEqual(Array.from({ length: NCAA_FIELD_SIZE }, (_, i) => i + 1));
-    for (let i = 1; i < field.length; i += 1) expect(field[i - 1]!.rpi).toBeGreaterThanOrEqual(field[i]!.rpi);
+    const score = (e: { rpi: number; qualityWins?: number; badLosses?: number }) =>
+      e.rpi + RESUME_GAME_WEIGHT * ((e.qualityWins ?? 0) - (e.badLosses ?? 0));
+    for (let i = 1; i < field.length; i += 1) expect(score(field[i - 1]!)).toBeGreaterThanOrEqual(score(field[i]!));
   });
 
-  it('leaves out only teams whose RPI trails every at-large pick', () => {
-    const lowestAtLarge = Math.min(...field.filter((e) => e.bid === 'at-large').map((e) => e.rpi));
+  it('leaves out only teams whose resume trails every at-large pick', () => {
+    const score = (e: { rpi: number; qualityWins?: number; badLosses?: number }) =>
+      e.rpi + RESUME_GAME_WEIGHT * ((e.qualityWins ?? 0) - (e.badLosses ?? 0));
+    const lowestAtLarge = Math.min(...field.filter((e) => e.bid === 'at-large').map(score));
     expect(afterConf.ncaaFirstOut).toHaveLength(4);
-    for (const out of afterConf.ncaaFirstOut!) expect(out.rpi).toBeLessThanOrEqual(lowestAtLarge);
+    for (const out of afterConf.ncaaFirstOut!) expect(score(out)).toBeLessThanOrEqual(lowestAtLarge);
   });
 
   it('gives the top four seeds byes and plays the bracket down to one champion', () => {
@@ -245,5 +252,71 @@ describe('bubble watch headlines', () => {
     expect(bracketMovementHeadline(projection([['us', 2]]), projection([['us', 6]]), 'us', 'Us')).toMatch(/slides from a projected #2 to a #6/);
     expect(bracketMovementHeadline(projection([['us', 5]]), projection([['us', 3]]), 'us', 'Us')).toBeNull();
     expect(bracketMovementHeadline(projection([]), projection([]), 'us', 'Us')).toBeNull();
+  });
+});
+
+describe('selection committee resume', () => {
+  const season = finishedSeason();
+  const template = season.schedule.find((g) => g.status === 'final' && g.result)!;
+  const teams = season.teams.slice(0, 8).map((t) => ({ ...t, record: { ...t.record, wins: 0, losses: 0 } }));
+  const [a, b, c, d, e, f, g, h] = teams.map((t) => t.id) as [string, string, string, string, string, string, string, string];
+  let n = 0;
+  const game = (winner: string, loser: string) => ({
+    ...template,
+    id: `syn-${n++}`,
+    homeTeamId: winner,
+    awayTeamId: loser,
+    status: 'final' as const,
+    result: { ...template.result!, winnerTeamId: winner, loserTeamId: loser },
+  });
+  // a sweeps the league; h loses everything.
+  const schedule = [
+    game(a, b), game(a, c), game(a, d), game(a, h),
+    game(b, c), game(b, d), game(h, b),
+    game(c, d), game(c, e), game(f, c),
+    game(e, f), game(e, g), game(d, e),
+    game(f, g), game(g, h), game(f, h),
+  ];
+  for (const s of schedule) {
+    const w = teams.find((t) => t.id === s.result.winnerTeamId)!;
+    const l = teams.find((t) => t.id === s.result.loserTeamId)!;
+    w.record.wins += 1;
+    l.record.losses += 1;
+  }
+
+  it('counts quality wins over the top quarter and bad losses to the bottom half', () => {
+    const resumes = selectionResumes(teams, schedule);
+    const rpi = computeRpi(teams, schedule);
+    const order = [...rpi.entries()].sort((x, y) => y[1] - x[1]).map(([id]) => id);
+    const top = new Set(order.slice(0, 2));
+    const bottom = new Set(order.slice(4));
+    for (const t of teams) {
+      const r = resumes.get(t.id)!;
+      const wins = schedule.filter((s) => s.result.winnerTeamId === t.id);
+      const losses = schedule.filter((s) => s.result.loserTeamId === t.id);
+      expect(r.qualityWins).toBe(wins.filter((s) => top.has(s.result.loserTeamId)).length);
+      expect(r.badLosses).toBe(losses.filter((s) => bottom.has(s.result.winnerTeamId)).length);
+      expect(r.score).toBeCloseTo(r.rpi + RESUME_GAME_WEIGHT * (r.qualityWins - r.badLosses));
+    }
+    // b's loss to winless-but-for-one h is a bad loss.
+    expect(resumes.get(b)!.badLosses).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps losing teams out of at-large spots and seeds by resume', () => {
+    const { field } = selectNcaaField([h], teams, schedule);
+    const atLarge = field.filter((x) => x.bid === 'at-large');
+    expect(atLarge).toHaveLength(3);
+    for (const x of atLarge) expect(atLargeEligible(teams.find((y) => y.id === x.teamId)!)).toBe(true);
+    const resumes = selectionResumes(teams, schedule);
+    const scores = field.map((x) => resumes.get(x.teamId)!.score);
+    expect(scores).toEqual([...scores].sort((x, y) => y - x));
+    expect(field.every((x) => x.qualityWins !== undefined && x.badLosses !== undefined)).toBe(true);
+  });
+
+  it('fills the bracket with losing teams only when it has to', () => {
+    // Everyone below .500 but the champion: the field still fills.
+    const losers = teams.map((t) => ({ ...t, record: { ...t.record, wins: 1, losses: 5 } }));
+    const { field } = selectNcaaField([a], losers, schedule);
+    expect(field).toHaveLength(4);
   });
 });

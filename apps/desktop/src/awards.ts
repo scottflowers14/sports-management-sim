@@ -2,6 +2,8 @@ import type { LacrosseSeason } from '@sports-management-sim/sport-lacrosse';
 import type { PlayerSeasonStats, SeasonStatsMap } from './stats';
 
 export interface AwardWinner {
+  playerId?: string;
+  teamId?: string;
   playerName: string;
   teamName: string;
   position: string;
@@ -17,6 +19,118 @@ export interface SeasonAwards {
   defensivePlayer: AwardWinner;
   freshmanOfYear: AwardWinner | null;
   allConference: AwardWinner[];
+  /** First, second and third team All-America; absent on older saves. */
+  allAmerica?: AllAmericaTeams;
+  /** Every league's All-Conference teams and Player of the Year; absent on older saves. */
+  conferenceHonors?: ConferenceHonors[];
+}
+
+export interface AllAmericaTeams {
+  first: AwardWinner[];
+  second: AwardWinner[];
+  third: AwardWinner[];
+}
+
+export type AllAmericaTier = keyof AllAmericaTeams;
+
+export const ALL_AMERICA_TIERS: AllAmericaTier[] = ['first', 'second', 'third'];
+
+export const ALL_AMERICA_TIER_LABELS: Record<AllAmericaTier, string> = {
+  first: '1st Team All-America',
+  second: '2nd Team All-America',
+  third: '3rd Team All-America',
+};
+
+/** Seats per position on each All-America team: twelve players a team. */
+export const ALL_AMERICA_SLOTS: ReadonlyArray<[string, number]> = [
+  ['ATT', 3],
+  ['MID', 3],
+  ['DEF', 3],
+  ['LSM', 1],
+  ['GK', 1],
+  ['FOGO', 1],
+];
+
+type HonorPick = (position: string) => { score: (e: PlayerWithTeam) => number; line?: (e: PlayerWithTeam) => string };
+
+/**
+ * Honor teams by position: the best at each position fill the first team's
+ * seats, the next best the second, and so on.
+ */
+function rankHonorTeams(players: PlayerWithTeam[], pick: HonorPick, teamCount: number): AwardWinner[][] {
+  const teams: AwardWinner[][] = Array.from({ length: teamCount }, () => []);
+  for (const [position, seats] of ALL_AMERICA_SLOTS) {
+    const { score, line } = pick(position);
+    const ranked = players
+      .filter((e) => e.player.position === position)
+      .map((e) => ({ e, score: score(e) }))
+      .sort((a, b) => b.score - a.score || b.e.player.ratings.overall - a.e.player.ratings.overall);
+    teams.forEach((team, t) => {
+      for (const { e } of ranked.slice(t * seats, (t + 1) * seats)) team.push(buildAwardWinner(e, line?.(e)));
+    });
+  }
+  return teams;
+}
+
+function buildAllAmerica(allPlayers: PlayerWithTeam[], pick: HonorPick): AllAmericaTeams {
+  const [first = [], second = [], third = []] = rankHonorTeams(allPlayers, pick, 3);
+  return { first, second, third };
+}
+
+/** One league's postseason honors. */
+export interface ConferenceHonors {
+  conferenceId: string;
+  playerOfYear: AwardWinner | null;
+  first: AwardWinner[];
+  second: AwardWinner[];
+}
+
+export type ConferenceTier = 'first' | 'second';
+
+export const CONFERENCE_TIER_LABELS: Record<ConferenceTier, string> = {
+  first: '1st Team All-Conference',
+  second: '2nd Team All-Conference',
+};
+
+/** First and second team All-Conference and a Player of the Year in every league. */
+function buildConferenceHonors(
+  allPlayers: PlayerWithTeam[],
+  pick: HonorPick,
+  playerOfYear: { score: (e: PlayerWithTeam) => number; line?: (e: PlayerWithTeam) => string },
+): ConferenceHonors[] {
+  const byConference = new Map<string, PlayerWithTeam[]>();
+  for (const e of allPlayers) byConference.set(e.team.conferenceId, [...(byConference.get(e.team.conferenceId) ?? []), e]);
+  return [...byConference].map(([conferenceId, players]) => {
+    const [first = [], second = []] = rankHonorTeams(players, pick, 2);
+    const poy = maxBy(players, playerOfYear.score);
+    return {
+      conferenceId,
+      playerOfYear: poy ? buildAwardWinner(poy, playerOfYear.line?.(poy)) : null,
+      first,
+      second,
+    };
+  });
+}
+
+/** A program's All-Conference picks, first team first. */
+export function programAllConference(
+  honors: readonly ConferenceHonors[] | undefined,
+  teamId: string,
+): Array<{ tier: ConferenceTier; winner: AwardWinner }> {
+  const league = honors?.find((h) => [...h.first, ...h.second].some((w) => w.teamId === teamId));
+  if (!league) return [];
+  return (['first', 'second'] as const).flatMap((tier) =>
+    league[tier].filter((w) => w.teamId === teamId).map((winner) => ({ tier, winner })),
+  );
+}
+
+/** A program's All-Americans, best tier first. */
+export function programAllAmericans(
+  teams: AllAmericaTeams | undefined,
+  teamId: string,
+): Array<{ tier: AllAmericaTier; winner: AwardWinner }> {
+  if (!teams) return [];
+  return ALL_AMERICA_TIERS.flatMap((tier) => teams[tier].filter((w) => w.teamId === teamId).map((winner) => ({ tier, winner })));
 }
 
 type PlayerWithTeam = {
@@ -119,6 +233,11 @@ function computeStatBasedAwards(season: LacrosseSeason, allPlayers: PlayerWithTe
     const best = maxBy(allPlayers.filter((e) => e.player.position === pos), scoreFn);
     if (best) allConference.push(buildAwardWinner(best, lineFn(best)));
   }
+  const votes: HonorPick = (position) => {
+    const [, score, line] = positionPicks.find(([pos]) => pos === position)!;
+    // Voters lean a little toward winners: from 0.8x on a winless team to 1.2x unbeaten.
+    return { score: (e) => score(e) * (0.8 + 0.4 * (winPctByTeam.get(e.team.id) ?? 0)), line };
+  };
 
   return {
     seasonYear: season.year,
@@ -127,6 +246,8 @@ function computeStatBasedAwards(season: LacrosseSeason, allPlayers: PlayerWithTe
     defensivePlayer: buildAwardWinner(defEntry, defensiveLine(defEntry)),
     freshmanOfYear: freshmanEntry ? buildAwardWinner(freshmanEntry, scoringLine(freshmanEntry)) : null,
     allConference,
+    allAmerica: buildAllAmerica(allPlayers, votes),
+    conferenceHonors: buildConferenceHonors(allPlayers, votes, races.mvp),
   };
 }
 
@@ -288,6 +409,8 @@ function computeRatingBasedAwards(season: LacrosseSeason, allPlayers: PlayerWith
     defensivePlayer: buildAwardWinner(defEntry),
     freshmanOfYear: freshmanEntry ? buildAwardWinner(freshmanEntry) : null,
     allConference,
+    allAmerica: buildAllAmerica(allPlayers, () => ({ score: overall })),
+    conferenceHonors: buildConferenceHonors(allPlayers, () => ({ score: overall }), { score: overall }),
   };
 }
 
@@ -295,6 +418,8 @@ function computeRatingBasedAwards(season: LacrosseSeason, allPlayers: PlayerWith
 
 function buildAwardWinner(entry: PlayerWithTeam, statLine?: string): AwardWinner {
   return {
+    playerId: entry.player.id,
+    teamId: entry.team.id,
     playerName: `${entry.player.name.first} ${entry.player.name.last}`,
     teamName: entry.team.name,
     position: entry.player.position,

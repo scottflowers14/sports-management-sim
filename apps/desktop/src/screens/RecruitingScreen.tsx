@@ -236,7 +236,7 @@ function VisitButton({
           ? 'No home game this week to host a visit'
           : hoursAvailable < HOURS_COST.visit
             ? `Not enough recruiting hours (${HOURS_COST.visit}h)`
-            : `Invite to this week's home game (${HOURS_COST.visit}h) — a big win sells the program`
+            : `Invite to this week's home game (${HOURS_COST.visit}h) — a big win and a packed house sell the program`
       }
       onClick={() => onToggleVisitInvite(recruit.id)}
     >

@@ -11,6 +11,8 @@ import {
 } from '@sports-management-sim/sport-lacrosse';
 import { DepthChart } from '../components/DepthChart';
 import { Lineups } from '../components/Lineups';
+import { FormBadge } from '../components/FormWatchCard';
+import type { PlayerForm } from '../player-form';
 import { formatTeamName } from '../ui/format';
 
 const POSITION_ORDER: LacrossePosition[] = ['ATT', 'MID', 'DEF', 'LSM', 'GK', 'FOGO'];
@@ -114,6 +116,7 @@ export function TeamScreen({
   onDepthChartChange,
   onResetDepthChart,
   redshirts,
+  form,
 }: {
   team: LacrosseTeam;
   injuries: Set<string>;
@@ -124,6 +127,8 @@ export function TeamScreen({
   onDepthChartChange: (position: LacrossePosition, slotIndex: number, playerId: string) => void;
   onResetDepthChart?: () => void;
   redshirts?: TeamRedshirtControls;
+  /** Players currently hot or cold. */
+  form?: ReadonlyMap<string, PlayerForm>;
 }) {
   const rosterGroups = POSITION_ORDER.map((pos) => ({
     position: pos,
@@ -230,6 +235,7 @@ export function TeamScreen({
                   >
                     <td>
                       <strong>{player.name.first} {player.name.last}</strong>
+                      <FormBadge form={form?.get(player.id)} />
                     </td>
                     <td>{classLabel(player)}</td>
                     <td>{player.ratings.overall}</td>

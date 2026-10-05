@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { Conference, StandingsEntry } from '@sports-management-sim/engine-core';
 import type { RankingEntry } from '../rankings';
+import type { PowerRankingBlurb } from '../power-rankings';
 import { compareConferenceStanding, projectionStatus, type NcaaProjection } from '../tournament';
 import { formatTeamName } from '../ui/format';
 
@@ -14,6 +15,7 @@ export function StandingsScreen({
   teamMap,
   onOpenProgram,
   projection = null,
+  powerRankings = [],
 }: {
   rankings: RankingEntry[];
   sortedStandings: StandingsEntry[];
@@ -24,6 +26,8 @@ export function StandingsScreen({
   onOpenProgram: (teamId: string) => void;
   /** In-season projected NCAA field; null once the postseason starts. */
   projection?: NcaaProjection | null;
+  /** This week's top-ten write-ups; empty before any games. */
+  powerRankings?: PowerRankingBlurb[];
 }) {
   const teamLink = (teamId: string) => (
     <button type="button" className="link-btn" onClick={() => onOpenProgram(teamId)}>
@@ -40,6 +44,35 @@ export function StandingsScreen({
           userTeamId={userTeamId}
           teamLink={teamLink}
         />
+      )}
+      {powerRankings.length > 0 && (
+        <article className="card power-rankings-card" aria-label="Power rankings">
+          <h2>Power Rankings</h2>
+          <ol className="power-rankings-list">
+            {powerRankings.map((p) => (
+              <li key={p.teamId} className={p.teamId === userTeamId ? 'power-row user-row' : 'power-row'}>
+                <span className="power-rank">{p.rank}</span>
+                <div>
+                  <div className="power-team">
+                    {teamLink(p.teamId)}
+                    <span className="power-record">
+                      {(() => {
+                        const r = sortedStandings.find((s) => s.teamId === p.teamId)?.record;
+                        return r ? `${r.wins}–${r.losses}` : '';
+                      })()}
+                    </span>
+                    {p.change > 0 ? (
+                      <span className="rank-change rank-up">▲{p.change}</span>
+                    ) : p.change < 0 ? (
+                      <span className="rank-change rank-down">▼{-p.change}</span>
+                    ) : null}
+                  </div>
+                  <p className="power-blurb">{p.blurb}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </article>
       )}
       <article className="card">
         <h2>National Rankings</h2>
@@ -166,7 +199,7 @@ function BracketologyCard({
         </span>
       </div>
       <p className="dim bracket-note">
-        If the season ended today. Conference leaders take the auto bids; the rest go by RPI.
+        If the season ended today. Conference leaders take the auto bids. At-large teams need a .500 record, and the committee seeds by RPI plus quality wins (QW, over top-quarter RPI teams) minus bad losses (BL, to bottom-half teams).
       </p>
       <table className="standings-table">
         <thead>
@@ -176,6 +209,8 @@ function BracketologyCard({
             <th>Bid</th>
             <th>W-L</th>
             <th>RPI</th>
+            <th title="Wins over top-quarter RPI teams">QW</th>
+            <th title="Losses to bottom-half RPI teams">BL</th>
           </tr>
         </thead>
         <tbody>
@@ -186,11 +221,13 @@ function BracketologyCard({
               <td>{e.bid === 'auto' ? <span className="honor-pill">AQ</span> : <span className="dim">At-large</span>}</td>
               <td>{record(e.teamId)}</td>
               <td>{e.rpi.toFixed(3).replace(/^0/, '')}</td>
+              <td>{e.qualityWins ?? '–'}</td>
+              <td>{e.badLosses ?? '–'}</td>
             </tr>
           ))}
           {projection.firstOut.length > 0 && (
             <tr className="bracket-divider">
-              <td colSpan={5} className="section-label">First Four Out</td>
+              <td colSpan={7} className="section-label">First Four Out</td>
             </tr>
           )}
           {projection.firstOut.map((e) => (
@@ -200,6 +237,8 @@ function BracketologyCard({
               <td />
               <td>{record(e.teamId)}</td>
               <td>{e.rpi.toFixed(3).replace(/^0/, '')}</td>
+              <td>{e.qualityWins ?? '–'}</td>
+              <td>{e.badLosses ?? '–'}</td>
             </tr>
           ))}
         </tbody>

@@ -4,6 +4,9 @@ import {
   ROTATION_LABELS,
   TEMPO_LABELS,
   describeGamePlan,
+  scoutedGamePlan,
+  type ScoutKey,
+  type TeamTendencies,
   type DefensiveStyle,
   type GameLog,
   type LacrosseGamePlan,
@@ -20,6 +23,10 @@ export interface OpponentScout {
   isHome: boolean;
   plan: LacrosseGamePlan;
   rating: number;
+  /** Their per-game averages this season; null before their first box score. */
+  tendencies: TeamTendencies | null;
+  /** The scout's keys to the game, strongest first. */
+  keys: ScoutKey[];
 }
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { DepthChart } from '../components/DepthChart';
@@ -38,6 +45,7 @@ export function SeasonScreen({
   tournament,
   lastSimWeek,
   lastWeekGames,
+  rankOf,
   newsItems,
   userTeam,
   userInjuries,
@@ -67,6 +75,8 @@ export function SeasonScreen({
   tournament: TournamentState | null;
   lastSimWeek: number | null;
   lastWeekGames: ScheduledGame[];
+  /** Current national rank, shown on results. */
+  rankOf?: (teamId: string) => number | null;
   newsItems: NewsItem[];
   userTeam: LacrosseTeam;
   userInjuries: Set<string>;
@@ -138,6 +148,7 @@ export function SeasonScreen({
                     userTeamId={userTeamId}
                     gameLogs={gameLogs}
                     onBoxScore={onBoxScore}
+                    rankOf={rankOf}
                   />
                 ))}
               </ul>
@@ -174,6 +185,23 @@ export function SeasonScreen({
                 <span className="scout-ovr"> · {nextOpponentScout.rating} OVR</span>
               </p>
               <p className="scout-tendencies">Tendencies: {describeGamePlan(nextOpponentScout.plan)}</p>
+              {nextOpponentScout.tendencies && <ScoutNumbers t={nextOpponentScout.tendencies} />}
+              {nextOpponentScout.keys.length > 0 ? (
+                <>
+                  <ul className="scout-keys" aria-label="Keys to the game">
+                    {nextOpponentScout.keys.map((k) => (
+                      <li key={k.axis}>{k.note}</li>
+                    ))}
+                  </ul>
+                  <ScoutPlanButton keys={nextOpponentScout.keys} gamePlan={gamePlan} onGamePlanChange={onGamePlanChange} />
+                </>
+              ) : (
+                <p className="scout-quiet dim">
+                  {nextOpponentScout.tendencies && nextOpponentScout.tendencies.games >= 2
+                    ? 'Nothing jumps off the film. Play your game.'
+                    : 'Not enough film yet for keys to the game.'}
+                </p>
+              )}
             </div>
           )}
           <label className="gameplan-row">
@@ -310,5 +338,49 @@ export function SeasonScreen({
         </article>
       </div>
     </div>
+  );
+}
+
+function ScoutNumbers({ t }: { t: TeamTendencies }) {
+  const pct = (n: number) => `${Math.round(n * 100)}%`;
+  const stats = [
+    ['GF', t.goalsFor.toFixed(1)],
+    ['GA', t.goalsAgainst.toFixed(1)],
+    ['SH%', pct(t.shootingPct)],
+    ['FO%', pct(t.faceoffPct)],
+    ['CLR%', pct(t.clearPct)],
+    ['TO', t.turnovers.toFixed(1)],
+  ];
+  return (
+    <div className="scout-numbers" aria-label="Opponent per-game averages">
+      {stats.map(([label, value]) => (
+        <span key={label} className="scout-num">
+          <span className="scout-num-label">{label}</span>
+          {value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ScoutPlanButton({
+  keys,
+  gamePlan,
+  onGamePlanChange,
+}: {
+  keys: ScoutKey[];
+  gamePlan: LacrosseGamePlan;
+  onGamePlanChange: (plan: LacrosseGamePlan) => void;
+}) {
+  const scouted = scoutedGamePlan(keys, gamePlan);
+  const applied = keys.every((k) => gamePlan[k.axis] === k.value);
+  return (
+    <button
+      className="scout-plan-btn"
+      disabled={applied}
+      onClick={() => onGamePlanChange(scouted)}
+    >
+      {applied ? "Scout's plan in place" : "Use the scout's plan"}
+    </button>
   );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildWeeklyHub, winProbability } from './weekly-hub';
+import { FEATURED_RESULTS, buildWeeklyHub, featuredResults, winProbability } from './weekly-hub';
+import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { emptySeasonStats } from './stats';
 
@@ -55,5 +56,38 @@ describe('buildWeeklyHub', () => {
       seasonStats: emptySeasonStats(),
     });
     expect(hub).toBeNull();
+  });
+});
+
+describe('featuredResults', () => {
+  const game = (id: string, home: string, away: string, homeScore: number, awayScore: number): ScheduledGame => ({
+    id,
+    seasonYear: 2028,
+    week: 3,
+    homeTeamId: home,
+    awayTeamId: away,
+    conferenceGame: false,
+    status: 'final',
+    result: { homeScore, awayScore, winnerTeamId: homeScore > awayScore ? home : away, loserTeamId: homeScore > awayScore ? away : home, overtime: false },
+  });
+  const ranks: Record<string, number> = { r1: 1, r5: 5, r25: 25 };
+  const rankOf = (id: string) => ranks[id] ?? null;
+
+  it('leads with your game, then ranked teams by rank, then the closest finishes', () => {
+    const games = [
+      game('blowout', 'x1', 'x2', 20, 5),
+      game('close', 'x3', 'x4', 9, 8),
+      game('top5', 'r5', 'x5', 12, 6),
+      game('mine', 'x6', 'me', 4, 15),
+      game('top1', 'x7', 'r1', 3, 18),
+      game('unranked25', 'r25', 'x8', 10, 7),
+    ];
+    expect(featuredResults(games, 'me', rankOf, 5).map((g) => g.id)).toEqual(['mine', 'top1', 'top5', 'close', 'unranked25']);
+  });
+
+  it('keeps short weeks whole and caps long ones', () => {
+    const many = Array.from({ length: 18 }, (_, i) => game(`g${i}`, `h${i}`, `a${i}`, 10, i % 5));
+    expect(featuredResults(many, 'me', rankOf)).toHaveLength(FEATURED_RESULTS);
+    expect(featuredResults(many.slice(0, 3), 'me', rankOf)).toHaveLength(3);
   });
 });

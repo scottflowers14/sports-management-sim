@@ -13,6 +13,9 @@ import {
 } from '@sports-management-sim/engine-core';
 import {
   applyCpuCaptains,
+  attendanceOf,
+  gameAttendance,
+  isSellout,
   dynastyRivalries,
   recordRivalryGame,
   rivalryForGame,
@@ -205,6 +208,8 @@ export function simulateOneWeek(
   const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
   const seasonBeforeGames = seasonReadyForWeek(dynasty);
+  const rivalries = dynastyRivalries(dynasty);
+  const rankBefore = new Map(state.rankings.map((r) => [r.teamId, r.rank]));
   const seasonAfterGames = advanceSeasonWeek(seasonBeforeGames, (game, homeTeam, awayTeam) => {
     const input = weekGameInput(state, homeTeam, awayTeam, userGamePlan);
     const coachedHere = coached && (homeTeam.id === dynasty.userTeamId || awayTeam.id === dynasty.userTeamId);
@@ -219,12 +224,16 @@ export function simulateOneWeek(
     });
     weekLogs.set(game.id, log);
     weekPlayerLines.set(game.id, [...players.home, ...players.away]);
-    return result;
+    if (game.neutralSite) return result;
+    const attendance = gameAttendance(game, homeTeam, awayTeam, {
+      visitorRank: rankBefore.get(awayTeam.id) ?? null,
+      rivalry: rivalryForGame(rivalries, game) !== null,
+    });
+    return { ...result, attendance };
   });
 
   // Every program practices after the week's games. CPU staffs run a normal
   // week with plans on their highest-upside young players.
-  const rivalries = dynastyRivalries(dynasty);
   let rivalrySeries = state.rivalrySeries ?? {};
   const rivalryNews: NewsItem[] = [];
   for (const game of seasonAfterGames.schedule) {
@@ -310,6 +319,8 @@ export function simulateOneWeek(
       : null;
     const opponentRank = opponentRankRaw !== null && opponentRankRaw <= 20 ? opponentRankRaw : null;
     const visitIdSet = new Set(state.recruitingActivity.visitIds);
+    const gate = hostedHome ? attendanceOf(userGame) : undefined;
+    const crowdShare = gate ? gate.count / gate.capacity : null;
 
     recruitsAfterVisits = dynasty.recruits.map((recruit) => {
       if (!visitIdSet.has(recruit.id) || recruit.status !== 'open') return recruit;
@@ -317,6 +328,7 @@ export function simulateOneWeek(
         won,
         opponentRank,
         facilities: updatedUserTeam.reputation.facilities,
+        crowdShare,
         interestMultiplier: recruitPrestigeMultiplier(
           recruit.starRating,
           updatedUserTeam.reputation.nationalPrestige,
@@ -328,8 +340,9 @@ export function simulateOneWeek(
           : outcome.impression === 'positive'
             ? 'enjoyed the visit'
             : 'left underwhelmed';
+      const crowdText = gate && isSellout(gate) ? ' in front of a sellout crowd' : '';
       const gameText = hostedHome && opponentId !== null
-        ? ` after the ${won ? 'win over' : 'loss to'} ${opponentRank !== null ? `#${opponentRank} ` : ''}${teamMap.get(opponentId) ?? opponentId}`
+        ? ` after the ${won ? 'win over' : 'loss to'} ${opponentRank !== null ? `#${opponentRank} ` : ''}${teamMap.get(opponentId) ?? opponentId}${crowdText}`
         : '';
       visitNews.push({
         id: `visit-${weekToSim}-${visitNews.length}`,

@@ -1,6 +1,9 @@
 import {
   calculateLacrosseTeamRating,
   deriveCpuGamePlan,
+  leagueTendencies,
+  scoutingKeys,
+  teamTendencies,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
   dynastyRivalries,
@@ -10,6 +13,7 @@ import {
   suggestRedshirts,
   teamCaptains,
   STAFF_ROLES,
+  seasonAttendance,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
 import { classNeedsByPosition } from '@sports-management-sim/engine-core';
@@ -39,6 +43,7 @@ import { recruitingPipelines } from './pipelines';
 import { playerGameLog } from './player-game-log';
 import { TeamTalkCard } from './components/TeamTalkCard';
 import { allSeries, userSeasonGames } from './series-history';
+import { playerHonors } from './history';
 import { TOURNAMENT_ROUND_LABELS, projectNcaaField, projectionStatus } from './tournament';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
@@ -46,6 +51,9 @@ import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
 import { PlayersScreen } from './screens/PlayersScreen';
 import { useState } from 'react';
+import { FormWatchCard } from './components/FormWatchCard';
+import { rosterForm } from './player-form';
+import { powerRankingBlurbs } from './power-rankings';
 import { formatTeamName, formatTeamShort } from './ui/format';
 import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
@@ -224,6 +232,9 @@ export function App() {
   const hasScheduledGames = dynasty.season.schedule.some((g) => g.status === 'scheduled');
   const seasonComplete = !hasScheduledGames;
 
+  const rankById = new Map(rankings.map((r) => [r.teamId, r.rank]));
+  const rankOf = (teamId: string) => rankById.get(teamId) ?? null;
+
   const lastWeekGames =
     lastSimWeek !== null
       ? dynasty.season.schedule.filter((g) => g.week === lastSimWeek && g.status === 'final')
@@ -308,8 +319,13 @@ export function App() {
         (t) => t.id === (nextUserGame.homeTeamId === dynasty.userTeamId ? nextUserGame.awayTeamId : nextUserGame.homeTeamId),
       )
     : undefined;
+  const userForm = rosterForm(userTeam.roster, dynasty.season.schedule, gameLogs);
+  const league = leagueTendencies(dynasty.season.schedule);
+  const opponentTendencies = nextOpponentTeam ? teamTendencies(dynasty.season.schedule, nextOpponentTeam.id) : null;
   const nextOpponentScout = nextUserGame && nextOpponentTeam
     ? {
+        tendencies: opponentTendencies,
+        keys: opponentTendencies && league ? scoutingKeys(opponentTendencies, league) : [],
         week: nextUserGame.week,
         name: formatTeamName(nextOpponentTeam.name),
         isHome: nextUserGame.homeTeamId === dynasty.userTeamId,
@@ -541,6 +557,7 @@ export function App() {
           onCoachGame={canCoachGame ? coachGame : undefined}
           onRushInjury={rushInjuredPlayer}
           bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          formCard={<FormWatchCard roster={userTeam.roster} form={userForm} onSelectPlayer={setSelectedPlayerId} />}
           teamTalkCard={
             // Hidden at halftime: a talk given then would change a first half already shown.
             weeklyHub && !seasonComplete && !tournament && !halftime ? (
@@ -570,6 +587,7 @@ export function App() {
           userTeamId={dynasty.userTeamId}
           lastSimWeek={lastSimWeek}
           lastWeekGames={lastWeekGames}
+          rankOf={rankOf}
           gameLogs={gameLogs}
           onSimWeek={simWeek}
           onBoxScore={setSelectedBoxScore}
@@ -605,6 +623,7 @@ export function App() {
           tournament={tournament}
           lastSimWeek={lastSimWeek}
           lastWeekGames={lastWeekGames}
+          rankOf={rankOf}
           newsItems={newsItems}
           userTeam={userTeam}
           userInjuries={userInjuries}
@@ -641,6 +660,7 @@ export function App() {
           onDepthChartChange={updateDepthChartSlot}
           onResetDepthChart={resetDepthChart}
           redshirts={{ open: redshirtsOpen, gamesPlayedFor, onSetRedshirt: setRedshirt }}
+          form={userForm}
         />
       )}
 
@@ -715,6 +735,11 @@ export function App() {
           teamMap={teamMap}
           onOpenProgram={openProgram}
           projection={ncaaProjection}
+          powerRankings={
+            dynasty.season.schedule.some((g) => g.status === 'final')
+              ? powerRankingBlurbs(rankings, dynasty.season.schedule, (id) => formatTeamName(teamMap.get(id) ?? id), dynasty.season.currentWeek)
+              : []
+          }
         />
       )}
 
@@ -853,6 +878,7 @@ export function App() {
           onSelectPlayer={setSelectedPlayerId}
           proDraftHistory={proDraftHistory}
           seriesFor={(id) => seriesByOpponent.get(id)}
+          attendanceFor={(id) => seasonAttendance(dynasty.season.schedule, id)}
         />
       )}
 
@@ -877,10 +903,12 @@ export function App() {
             (inj) => inj.playerId === selectedPlayer.id && inj.teamId === dynasty.userTeamId,
           )}
           onRushInjury={rushInjuredPlayer}
-          playerStats={seasonStats[selectedPlayer.id]}
+          // Last season is already in the career book during the offseason; don't count it twice.
+          playerStats={offseasonSummary ? undefined : seasonStats[selectedPlayer.id]}
           career={careerStats[selectedPlayer.id]}
           seasonYear={dynasty.season.year}
           gameLog={playerGameLog(selectedPlayer.id, dynasty.season.schedule, gameLogs)}
+          honors={playerHonors(dynastyHistory, selectedPlayer.id)}
           teamShort={(id) => formatTeamShort(teamMap.get(id) ?? id)}
           onClose={() => setSelectedPlayerId(null)}
         />

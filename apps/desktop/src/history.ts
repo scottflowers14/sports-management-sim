@@ -1,5 +1,11 @@
 import type { LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
-import type { SeasonAwards } from './awards';
+import {
+  ALL_AMERICA_TIER_LABELS,
+  CONFERENCE_TIER_LABELS,
+  programAllAmericans,
+  programAllConference,
+  type SeasonAwards,
+} from './awards';
 import type { SeasonStatsMap } from './stats';
 import type { SeasonGameRecord } from './series-history';
 
@@ -7,6 +13,8 @@ import type { SeasonGameRecord } from './series-history';
 export interface SeasonAwardRecord {
   /** Short award label, e.g. "MVP", "Offensive POY". */
   award: string;
+  /** Absent on records saved before players were tracked by id. */
+  playerId?: string;
   playerName: string;
   /** Raw team name/id — format with formatTeamName for display. */
   teamName: string;
@@ -42,6 +50,10 @@ export interface DynastySeasonRecord {
   nationalChampionName?: string;
   /** National award winners (MVP, OPOY, DPOY, Freshman). */
   awards?: SeasonAwardRecord[];
+  /** The user program's All-Americans; award is the tier label. */
+  allAmericans?: SeasonAwardRecord[];
+  /** The user program's All-Conference picks and Conference Player of the Year. */
+  allConference?: SeasonAwardRecord[];
   /** The user program's leading scorer that season. */
   teamLeader?: SeasonLeaderRecord;
   /** Where the preseason poll picked the program to finish in its conference. */
@@ -68,13 +80,55 @@ export function toSeasonAwardRecords(awards: SeasonAwards | null): SeasonAwardRe
   return records;
 }
 
+/** The program's All-Americans as slim history records, best tier first. */
+export function toAllAmericaRecords(awards: SeasonAwards | null, teamId: string): SeasonAwardRecord[] {
+  return programAllAmericans(awards?.allAmerica, teamId).map(({ tier, winner }) => ({
+    award: ALL_AMERICA_TIER_LABELS[tier],
+    ...pickFields(winner),
+  }));
+}
+
+export const CONFERENCE_POY_LABEL = 'Conference Player of the Year';
+
+/** The program's conference honors: Player of the Year first, then the All-Conference teams. */
+export function toAllConferenceRecords(awards: SeasonAwards | null, teamId: string): SeasonAwardRecord[] {
+  const league = awards?.conferenceHonors?.find((h) => h.playerOfYear?.teamId === teamId);
+  return [
+    ...(league?.playerOfYear ? [{ award: CONFERENCE_POY_LABEL, ...pickFields(league.playerOfYear) }] : []),
+    ...programAllConference(awards?.conferenceHonors, teamId).map(({ tier, winner }) => ({
+      award: CONFERENCE_TIER_LABELS[tier],
+      ...pickFields(winner),
+    })),
+  ];
+}
+
 function pickFields(winner: SeasonAwards['mvp']): Omit<SeasonAwardRecord, 'award'> {
   return {
+    ...(winner.playerId !== undefined ? { playerId: winner.playerId } : {}),
     playerName: winner.playerName,
     teamName: winner.teamName,
     position: winner.position,
     ...(winner.statLine !== undefined ? { statLine: winner.statLine } : {}),
   };
+}
+
+export interface PlayerHonor {
+  year: number;
+  award: string;
+}
+
+/**
+ * Every honor a player has won in the dynasty, newest first: national awards,
+ * All-America and All-Conference picks.
+ */
+export function playerHonors(history: readonly DynastySeasonRecord[], playerId: string): PlayerHonor[] {
+  return [...history]
+    .sort((a, b) => b.year - a.year)
+    .flatMap((record) =>
+      [...(record.awards ?? []), ...(record.allAmericans ?? []), ...(record.allConference ?? [])]
+        .filter((a) => a.playerId === playerId)
+        .map((a) => ({ year: record.year, award: a.award })),
+    );
 }
 
 /** Find the user program's leading scorer (goals + assists) for the season. */

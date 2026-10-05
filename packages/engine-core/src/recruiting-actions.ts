@@ -86,6 +86,22 @@ export interface VisitContext {
   facilities: number;
   /** Prestige-gap dampener, same convention as applyScholarshipOffer. */
   interestMultiplier?: number;
+  /** Share of the home stadium filled for the game, 0-1. A packed house sells the program. */
+  crowdShare?: number | null;
+}
+
+/** A full house: every seat sold. */
+export const VISIT_SELLOUT_BOOST = 4;
+/** Nine in ten seats filled still feels big. */
+export const VISIT_PACKED_BOOST = 2;
+export const VISIT_PACKED_SHARE = 0.9;
+
+/** Interest a crowd adds to a visit; a half-empty stadium costs a point. */
+export function visitCrowdBoost(crowdShare: number | null | undefined): number {
+  if (crowdShare === null || crowdShare === undefined) return 0;
+  if (crowdShare >= 1) return VISIT_SELLOUT_BOOST;
+  if (crowdShare >= VISIT_PACKED_SHARE) return VISIT_PACKED_BOOST;
+  return crowdShare < 0.5 ? -1 : 0;
 }
 
 export interface VisitOutcome<Position extends string = string, SportTraits = unknown> {
@@ -104,7 +120,7 @@ export function applyCampusVisit<Position extends string, SportTraits>(
   teamId: ID,
   context: VisitContext,
 ): VisitOutcome<Position, SportTraits> {
-  const { won, opponentRank = null, facilities, interestMultiplier = 1 } = context;
+  const { won, opponentRank = null, facilities, interestMultiplier = 1, crowdShare = null } = context;
 
   let boost = 7;
   boost += won ? 7 : 1;
@@ -114,6 +130,7 @@ export function applyCampusVisit<Position extends string, SportTraits>(
     boost += won ? 3 : 1;
   }
   boost += Math.round((facilities - 50) / 10);
+  boost += visitCrowdBoost(crowdShare);
 
   const topMotivations = topRecruitMotivations(recruit.preferences, 2);
   if (topMotivations.includes('prestige') && won && opponentRank !== null) {

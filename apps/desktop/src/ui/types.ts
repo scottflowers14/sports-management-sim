@@ -1,4 +1,4 @@
-import type { GameLog, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { GameAttendance, GameLog, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 
 export interface BoxScoreData {
   title: string;
@@ -10,4 +10,6 @@ export interface BoxScoreData {
   homeStats: LacrosseTeamStats;
   awayStats: LacrosseTeamStats;
   log?: GameLog;
+  /** The home crowd; absent for neutral sites, the postseason and older saves. */
+  attendance?: GameAttendance;
 }

@@ -6,7 +6,10 @@ import { careerTotals } from '../career-stats';
 import { cardFromPlayer } from '../player-card-model';
 import { PlayerCardPanel } from './PlayerCard';
 import { RushBackButton } from './RushBackButton';
+import { FormBadge } from './FormWatchCard';
+import { playerFormFromLog } from '../player-form';
 import { gameLogColumns, starCounts, type PlayerGameRow } from '../player-game-log';
+import type { PlayerHonor } from '../history';
 
 export function PlayerPanel({
   player,
@@ -16,6 +19,7 @@ export function PlayerPanel({
   career,
   seasonYear,
   gameLog = [],
+  honors = [],
   teamShort = (id) => id,
   onRushInjury,
   onClose,
@@ -27,6 +31,8 @@ export function PlayerPanel({
   career: PlayerCareer | undefined;
   seasonYear: number;
   gameLog?: PlayerGameRow[];
+  /** Honors won in the dynasty, newest first. */
+  honors?: PlayerHonor[];
   teamShort?: (teamId: string) => string;
   onRushInjury?: (playerId: string) => void;
   onClose: () => void;
@@ -34,9 +40,33 @@ export function PlayerPanel({
   const data = cardFromPlayer(player, { injured: isInjured });
   const hasLiveStats = Boolean(playerStats && playerStats.gamesPlayed > 0);
   const liveStats = hasLiveStats ? playerStats : undefined;
+  // Before this season's first game, show the last one he finished.
+  const lastSeason = liveStats
+    ? undefined
+    : [...(career?.seasons ?? [])].sort((a, b) => b.year - a.year).find((line) => line.stats.gamesPlayed > 0);
+
+  const form = playerFormFromLog(gameLog, player.position);
 
   const footer = (
     <>
+      {honors.length > 0 && (
+        <div className="player-honors" aria-label="Honors">
+          <p className="section-label">Honors</p>
+          <ul>
+            {honors.map((h) => (
+              <li key={`${h.year}-${h.award}`} className={`honor-chip${/All-America|MVP|POY|Freshman/.test(h.award) ? ' national' : ''}`}>
+                {h.year} {h.award}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {form && (
+        <p className={`form-status form-status-${form.trend}`}>
+          <FormBadge form={form} />
+          {form.trend === 'hot' ? 'On a heater' : 'In a slump'}: {form.line}
+        </p>
+      )}
       {isInjured && injuryData && (
         <p className="injury-status">
           Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}
@@ -49,6 +79,7 @@ export function PlayerPanel({
         <RatingHistorySection player={player} seasonYear={seasonYear} />
       )}
       {liveStats && <PlayerStatsSection stats={liveStats} position={player.position} seasonYear={seasonYear} />}
+      {lastSeason && <PlayerStatsSection stats={lastSeason.stats} position={player.position} seasonYear={lastSeason.year} />}
       {gameLog.length > 0 && <GameLogSection rows={gameLog} position={player.position} teamShort={teamShort} />}
       {((career && career.seasons.length > 0) || liveStats) && (
         <CareerSection

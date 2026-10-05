@@ -976,9 +976,16 @@ li span {
 }
 
 .conf-group {
-  display: flex;
-  flex-direction: column;
+  /* Every league side by side across the full width, wrapping as space runs out. */
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
   gap: 16px;
+  align-items: start;
+}
+
+.conf-group th {
+  white-space: nowrap;
 }
 
 /* ── Player panel ─────────────────────────────────────────── */
@@ -3379,6 +3386,56 @@ li span {
   margin: 0;
 }
 
+.scout-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 6px 0 4px;
+  font-size: 0.8rem;
+  color: #e6edf3;
+  font-variant-numeric: tabular-nums;
+}
+
+.scout-num-label {
+  color: #7d8ba0;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  margin-right: 3px;
+}
+
+.scout-keys {
+  margin: 6px 0 8px;
+  padding-left: 18px;
+  color: #c9d4e3;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.scout-keys li + li {
+  margin-top: 3px;
+}
+
+.scout-quiet {
+  font-size: 0.8rem;
+  margin: 6px 0 0;
+}
+
+.scout-plan-btn {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(123, 168, 255, 0.45);
+  background: rgba(71, 120, 255, 0.18);
+  color: #e6edf3;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scout-plan-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 /* ── Week Hub Screen ──────────────────────────────────────────────────────── */
 
 .week-hub-layout {
@@ -5737,6 +5794,16 @@ li span {
 }
 
 /* Program investments */
+.investments-gate {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: #aab8ca;
+}
+
+.investments-gate strong {
+  color: #72f2c6;
+}
+
 .investments-budget {
   margin: 8px 0 12px;
   font-size: 0.9rem;
@@ -6335,4 +6402,186 @@ li span {
 .game-log-star {
   white-space: nowrap;
   font-size: 0.7rem;
+}
+
+/* ── Hot & cold streaks ───────────────────────────────────── */
+
+.form-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+.form-hot {
+  background: rgba(255, 122, 69, 0.18);
+  color: #ff9a6b;
+  border: 1px solid rgba(255, 122, 69, 0.45);
+}
+
+.form-cold {
+  background: rgba(96, 165, 250, 0.16);
+  color: #8cc4ff;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+}
+
+.form-watch-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+.form-watch-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: none;
+  color: #e6edf3;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.form-watch-row .form-badge {
+  margin-left: 0;
+  min-width: 42px;
+  text-align: center;
+}
+
+.form-watch-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.form-watch-line {
+  grid-column: 2;
+  color: #aab8ca;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.form-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: #e6edf3;
+}
+
+.form-status .form-badge {
+  margin-left: 0;
+}
+
+.form-watch-name .hub-injury-pos {
+  display: inline-block;
+  width: auto;
+  margin-left: 6px;
+}
+
+/* ── Power rankings ───────────────────────────────────────── */
+
+.power-rankings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.power-row {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.power-row:last-child {
+  border-bottom: none;
+}
+
+.power-rank {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #7ba8ff;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.power-team {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.power-record {
+  color: #aab8ca;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.power-blurb {
+  margin: 3px 0 0;
+  color: #c9d4e3;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+/* All-Conference */
+.all-conference {
+  margin-top: 16px;
+}
+
+.conference-poy {
+  margin: 4px 0 8px;
+  font-size: 0.9rem;
+  color: #aab8ca;
+}
+
+.conference-poy.ours strong {
+  color: #72f2c6;
+}
+
+/* Player honors */
+.player-honors ul {
+  list-style: none;
+  margin: 4px 0 10px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.honor-chip {
+  font-size: 0.78rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(170, 184, 202, 0.35);
+  color: #aab8ca;
+}
+
+.honor-chip.national {
+  border-color: rgba(242, 196, 114, 0.6);
+  color: #f2c472;
+}
+
+.results-toggle {
+  margin-top: 8px;
+}
+
+.result-rank {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f2c472;
+  margin-right: 4px;
 }
