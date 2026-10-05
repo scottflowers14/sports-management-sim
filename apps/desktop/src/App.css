@@ -976,9 +976,16 @@ li span {
 }
 
 .conf-group {
-  display: flex;
-  flex-direction: column;
+  /* Every league side by side across the full width, wrapping as space runs out. */
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
   gap: 16px;
+  align-items: start;
+}
+
+.conf-group th {
+  white-space: nowrap;
 }
 
 /* ── Player panel ─────────────────────────────────────────── */
