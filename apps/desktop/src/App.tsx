@@ -43,6 +43,7 @@ import { recruitingPipelines } from './pipelines';
 import { playerGameLog } from './player-game-log';
 import { TeamTalkCard } from './components/TeamTalkCard';
 import { allSeries, userSeasonGames } from './series-history';
+import { playerHonors } from './history';
 import { TOURNAMENT_ROUND_LABELS, projectNcaaField, projectionStatus } from './tournament';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
@@ -897,10 +898,12 @@ export function App() {
             (inj) => inj.playerId === selectedPlayer.id && inj.teamId === dynasty.userTeamId,
           )}
           onRushInjury={rushInjuredPlayer}
-          playerStats={seasonStats[selectedPlayer.id]}
+          // Last season is already in the career book during the offseason; don't count it twice.
+          playerStats={offseasonSummary ? undefined : seasonStats[selectedPlayer.id]}
           career={careerStats[selectedPlayer.id]}
           seasonYear={dynasty.season.year}
           gameLog={playerGameLog(selectedPlayer.id, dynasty.season.schedule, gameLogs)}
+          honors={playerHonors(dynastyHistory, selectedPlayer.id)}
           teamShort={(id) => formatTeamShort(teamMap.get(id) ?? id)}
           onClose={() => setSelectedPlayerId(null)}
         />

@@ -13,6 +13,8 @@ import type { SeasonGameRecord } from './series-history';
 export interface SeasonAwardRecord {
   /** Short award label, e.g. "MVP", "Offensive POY". */
   award: string;
+  /** Absent on records saved before players were tracked by id. */
+  playerId?: string;
   playerName: string;
   /** Raw team name/id — format with formatTeamName for display. */
   teamName: string;
@@ -102,11 +104,31 @@ export function toAllConferenceRecords(awards: SeasonAwards | null, teamId: stri
 
 function pickFields(winner: SeasonAwards['mvp']): Omit<SeasonAwardRecord, 'award'> {
   return {
+    ...(winner.playerId !== undefined ? { playerId: winner.playerId } : {}),
     playerName: winner.playerName,
     teamName: winner.teamName,
     position: winner.position,
     ...(winner.statLine !== undefined ? { statLine: winner.statLine } : {}),
   };
+}
+
+export interface PlayerHonor {
+  year: number;
+  award: string;
+}
+
+/**
+ * Every honor a player has won in the dynasty, newest first: national awards,
+ * All-America and All-Conference picks.
+ */
+export function playerHonors(history: readonly DynastySeasonRecord[], playerId: string): PlayerHonor[] {
+  return [...history]
+    .sort((a, b) => b.year - a.year)
+    .flatMap((record) =>
+      [...(record.awards ?? []), ...(record.allAmericans ?? []), ...(record.allConference ?? [])]
+        .filter((a) => a.playerId === playerId)
+        .map((a) => ({ year: record.year, award: a.award })),
+    );
 }
 
 /** Find the user program's leading scorer (goals + assists) for the season. */

@@ -6544,3 +6544,26 @@ li span {
 .conference-poy.ours strong {
   color: #72f2c6;
 }
+
+/* Player honors */
+.player-honors ul {
+  list-style: none;
+  margin: 4px 0 10px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.honor-chip {
+  font-size: 0.78rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(170, 184, 202, 0.35);
+  color: #aab8ca;
+}
+
+.honor-chip.national {
+  border-color: rgba(242, 196, 114, 0.6);
+  color: #f2c472;
+}
