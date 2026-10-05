@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRecordBook,
   deriveSeasonLeader,
+  playerHonors,
   toSeasonAwardRecords,
   type DynastySeasonRecord,
 } from './history';
@@ -111,3 +112,37 @@ function blank(playerId: string, over: Partial<SeasonStatsMap[string]>): SeasonS
     ...over,
   };
 }
+
+describe('playerHonors', () => {
+  const pick = (award: string, playerId?: string) => ({
+    award,
+    ...(playerId ? { playerId } : {}),
+    playerName: 'Ty Clark',
+    teamName: 'maryland-state',
+    position: 'ATT',
+  });
+
+  it('gathers a player’s awards and honor teams, newest season first', () => {
+    const history = [
+      record({ year: 2028, allConference: [pick('2nd Team All-Conference', 'p1'), pick('1st Team All-Conference', 'p2')] }),
+      record({
+        year: 2029,
+        awards: [pick('MVP', 'p1')],
+        allAmericans: [pick('1st Team All-America', 'p1')],
+        allConference: [pick('Conference Player of the Year', 'p1'), pick('1st Team All-Conference', 'p1')],
+      }),
+    ];
+    expect(playerHonors(history, 'p1')).toEqual([
+      { year: 2029, award: 'MVP' },
+      { year: 2029, award: '1st Team All-America' },
+      { year: 2029, award: 'Conference Player of the Year' },
+      { year: 2029, award: '1st Team All-Conference' },
+      { year: 2028, award: '2nd Team All-Conference' },
+    ]);
+    expect(playerHonors(history, 'p2')).toEqual([{ year: 2028, award: '1st Team All-Conference' }]);
+  });
+
+  it('skips old records saved without player ids', () => {
+    expect(playerHonors([record({ year: 2027, awards: [pick('MVP')] })], 'p1')).toEqual([]);
+  });
+});
