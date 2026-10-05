@@ -60,6 +60,16 @@ export function predictedFinish(preview: SeasonPreview | null, teamId: string): 
   return null;
 }
 
+/** The preseason pick and conference size, for setting the AD's goals. */
+export function seasonOutlook(preview: SeasonPreview | null, teamId: string): { pickedFinish: number; conferenceSize: number } | undefined {
+  if (!preview) return undefined;
+  for (const order of Object.values(preview.conferenceOrder)) {
+    const index = order.indexOf(teamId);
+    if (index !== -1) return { pickedFinish: index + 1, conferenceSize: order.length };
+  }
+  return undefined;
+}
+
 export function formatOrdinal(n: number): string {
   const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
   return `${n}${suffix}`;

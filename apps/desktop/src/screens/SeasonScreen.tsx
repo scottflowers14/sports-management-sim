@@ -60,6 +60,8 @@ export function SeasonScreen({
   nextOpponentScout,
   weeklyHub,
   onGamePlanChange,
+  autoGamePlan,
+  onUseStaffPlan,
   onTrainingFocusChange,
   onSimWeek,
   onCoachGame,
@@ -91,6 +93,10 @@ export function SeasonScreen({
   nextOpponentScout: OpponentScout | null;
   weeklyHub: WeeklyHubData | null;
   onGamePlanChange: (plan: LacrosseGamePlan) => void;
+  /** The staff is setting the plan from the roster. */
+  autoGamePlan?: boolean;
+  /** Hand the plan back to the staff. */
+  onUseStaffPlan?: () => void;
   onTrainingFocusChange: (focus: TrainingFocus) => void;
   onSimWeek: () => void;
   /** Play the user's game to halftime and adjust; absent when there's no game to coach. */
@@ -200,6 +206,24 @@ export function SeasonScreen({
                   {nextOpponentScout.tendencies && nextOpponentScout.tendencies.games >= 2
                     ? 'Nothing jumps off the film. Play your game.'
                     : 'Not enough film yet for keys to the game.'}
+                </p>
+              )}
+            </div>
+          )}
+          {onUseStaffPlan && (
+            <div className="staff-plan-row" aria-label="Game plan source">
+              {autoGamePlan ? (
+                <p>
+                  <strong>Staff plan</strong>
+                  <span className="dim"> · built around your roster each week. Change a setting to call your own.</span>
+                </p>
+              ) : (
+                <p>
+                  <strong>Your plan</strong>
+                  <span className="dim"> · the staff&apos;s plan fits the roster best unless you&apos;re scheming for an opponent. </span>
+                  <button type="button" className="ghost-btn" onClick={onUseStaffPlan}>
+                    Use staff plan
+                  </button>
                 </p>
               )}
             </div>

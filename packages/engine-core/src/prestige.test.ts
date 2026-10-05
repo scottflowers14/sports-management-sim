@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StandingsEntry } from './models';
-import { evolveProgramPrestige, PRESTIGE_CENTER } from './prestige';
+import { evolveProgramPrestige, PRESTIGE_CENTER, prestigeDrift, prestigeHeadroom } from './prestige';
 import { makeTeam } from './test-fixtures';
 
 function teamWith(id: string, nationalPrestige: number, recentSuccess = 60) {
@@ -61,5 +61,32 @@ describe('program prestige', () => {
     const fell = PRESTIGE_CENTER + 25 - blueBlood!.reputation.nationalPrestige;
     const rose = bottom!.reputation.nationalPrestige - (PRESTIGE_CENTER - 25);
     expect(fell).toBe(rose);
+  });
+
+  it('keeps even a perennial champion off the 99 cap', () => {
+    let team: ReturnType<typeof makeTeam> = teamWith('a', 80);
+    const path: number[] = [];
+    for (let year = 0; year < 15; year += 1) {
+      team = evolveProgramPrestige([team], [standing('a', 15, 1)], 'a')[0]!;
+      path.push(team.reputation.nationalPrestige);
+    }
+    expect(Math.max(...path)).toBeLessThan(99);
+    expect(Math.max(...path)).toBeGreaterThanOrEqual(90);
+  });
+
+  it('shrinks gains and strengthens the pull back above the elite line', () => {
+    expect(prestigeHeadroom(80)).toBe(1);
+    expect(prestigeHeadroom(92)).toBeCloseTo(0.5);
+    expect(prestigeHeadroom(99)).toBe(0.25);
+    expect(prestigeDrift(95)).toBeLessThan(prestigeDrift(84) - 1);
+  });
+
+  it('costs a winless program more than a merely losing one', () => {
+    const [winless, losing] = evolveProgramPrestige(
+      [teamWith('w', 65), teamWith('l', 65)],
+      [standing('w', 1, 11), standing('l', 4, 9)],
+    );
+    expect(winless!.reputation.nationalPrestige).toBe(63);
+    expect(losing!.reputation.nationalPrestige).toBe(64);
   });
 });

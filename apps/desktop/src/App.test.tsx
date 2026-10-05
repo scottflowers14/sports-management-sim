@@ -136,8 +136,12 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
 
     expect(screen.getByRole('heading', { name: /^Coaching$/i })).toBeInTheDocument();
+    // New dynasties start on the staff's roster-built plan.
+    expect(screen.getByLabelText(/Game plan source/i)).toHaveTextContent(/Staff plan/i);
 
     await userEvent.selectOptions(screen.getByLabelText(/Offensive Tempo/i), 'uptempo');
+    expect(screen.getByLabelText(/Game plan source/i)).toHaveTextContent(/Your plan/i);
+    await userEvent.selectOptions(screen.getByLabelText(/Defensive Style/i), 'balanced');
     await userEvent.selectOptions(screen.getByLabelText(/^Ride$/i), 'aggressive');
     await userEvent.selectOptions(screen.getByLabelText(/Midfield Rotation/i), 'tight');
     await userEvent.selectOptions(screen.getByLabelText(/Training Focus/i), 'goalies');
@@ -149,6 +153,10 @@ describe('Desktop App', () => {
       expect(loadActiveDynastySave()?.gamePlan).toEqual({ tempo: 'uptempo', defense: 'balanced', ride: 'aggressive', rotation: 'tight' });
       expect(loadActiveDynastySave()?.trainingFocus).toBe('goalies');
     });
+
+    await userEvent.click(screen.getByRole('button', { name: /Use staff plan/i }));
+    expect(screen.getByLabelText(/Game plan source/i)).toHaveTextContent(/Staff plan/i);
+    await waitFor(() => expect(loadActiveDynastySave()?.autoGamePlan).toBe(true));
   });
 
   it('switches to the team tab and shows the full roster/depth chart screen', async () => {
@@ -572,7 +580,9 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
     const again = screen.getByRole('dialog');
     expect(within(again).getByRole('heading').textContent).toBe(score);
-    await userEvent.selectOptions(within(again).getByLabelText('Second half Offensive Tempo'), 'uptempo');
+    // The staff plan follows the roster, so switch to whichever tempo it isn't using.
+    const tempo = within(again).getByLabelText<HTMLSelectElement>('Second half Offensive Tempo');
+    await userEvent.selectOptions(tempo, tempo.value === 'uptempo' ? 'patient' : 'uptempo');
     await userEvent.click(within(again).getByRole('button', { name: /Play Second Half \(1 adjustment\)/ }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => {

@@ -6626,3 +6626,12 @@ li span {
   color: #f2c472;
   margin-right: 4px;
 }
+
+.staff-plan-row p {
+  font-size: 0.8rem;
+  margin: 0 0 10px;
+}
+
+.staff-plan-row .ghost-btn {
+  margin-left: 4px;
+}
