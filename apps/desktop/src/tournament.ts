@@ -535,3 +535,31 @@ export function projectionStatus(projection: NcaaProjection, teamId: string): st
   if (bubble >= 0) return `First four out (#${bubble + 1})`;
   return `Out of the field (RPI #${projection.rpiRank.get(teamId) ?? '?'})`;
 }
+
+/** Seed swings smaller than this aren't news. */
+const BRACKET_NEWS_SEED_SWING = 3;
+
+/**
+ * Bubble watch: a headline when a week moves a team into or out of the
+ * projected field, or swings its projected seed by three or more.
+ */
+export function bracketMovementHeadline(
+  before: NcaaProjection,
+  after: NcaaProjection,
+  teamId: string,
+  teamName: string,
+): string | null {
+  const was = before.field.find((e) => e.teamId === teamId);
+  const now = after.field.find((e) => e.teamId === teamId);
+  if (!was && now) return `Bubble watch: ${teamName} plays its way into the projected NCAA field as the #${now.seed} seed`;
+  if (was && !now) {
+    const bubble = after.firstOut.some((e) => e.teamId === teamId);
+    return `Bubble watch: ${teamName} falls out of the projected NCAA field${bubble ? ' and into the first four out' : ''}`;
+  }
+  if (was && now && Math.abs(was.seed - now.seed) >= BRACKET_NEWS_SEED_SWING) {
+    return now.seed < was.seed
+      ? `Bracketology: ${teamName} climbs from a projected #${was.seed} to a #${now.seed} seed`
+      : `Bracketology: ${teamName} slides from a projected #${was.seed} to a #${now.seed} seed`;
+  }
+  return null;
+}
