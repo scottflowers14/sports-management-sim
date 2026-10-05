@@ -67,6 +67,7 @@ import { addCoachXp, availablePoints, seasonCoachXp, upgradeAbility, withCoachAb
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
+import { careerMilestonesForWeek } from './career-milestones';
 import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { isCurrentTalk, previewUserGame, simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
@@ -637,10 +638,23 @@ export function useDynastyController() {
           headline,
         }))
       : [];
+    const userRoster = result.dynasty.season.teams.find((t) => t.id === result.dynasty.userTeamId)?.roster ?? [];
+    const milestoneNews: NewsItem[] = careerMilestonesForWeek(userRoster, careerStats, seasonStats, result.seasonStats).map(
+      (m, i) => {
+        const player = userRoster.find((p) => p.id === m.playerId)!;
+        return {
+          id: `milestone-${result.dynasty.season.year}-${result.lastSimWeek ?? 0}-${i}`,
+          week: result.lastSimWeek ?? result.dynasty.season.currentWeek,
+          category: 'award' as const,
+          featured: true,
+          headline: `Milestone: ${player.position} ${player.name.first} ${player.name.last} reaches ${m.mark} ${m.label}`,
+        };
+      },
+    );
     setDynasty(result.dynasty);
     setRankings(result.rankings);
     setInjuries(result.injuries);
-    setNewsItems([...promiseNews, ...recordNews, ...result.newsItems]);
+    setNewsItems([...promiseNews, ...recordNews, ...milestoneNews, ...result.newsItems]);
     setScouting(result.scouting);
     setRecruitingActivity(result.recruitingActivity);
     setRecruitTrends(result.recruitTrends);
