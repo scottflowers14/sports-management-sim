@@ -416,6 +416,9 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Long Island Tech$/i }));
     expect(screen.getByText(/Program Page/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Roster \(\d+\)/i })).toBeInTheDocument();
+    // No games yet, so no series with them.
+    expect(screen.getByText('Your Series')).toBeInTheDocument();
+    expect(screen.getByText('Never met')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /All Programs/i }));
     expect(screen.getByText(/36 programs/i)).toBeInTheDocument();
