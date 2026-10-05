@@ -36,6 +36,7 @@ import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
 import { recruitingPipelines } from './pipelines';
+import { playerGameLog } from './player-game-log';
 import { TOURNAMENT_ROUND_LABELS } from './tournament';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
@@ -43,7 +44,7 @@ import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
 import { PlayersScreen } from './screens/PlayersScreen';
 import { useState } from 'react';
-import { formatTeamName } from './ui/format';
+import { formatTeamName, formatTeamShort } from './ui/format';
 import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
 
@@ -835,6 +836,8 @@ export function App() {
           playerStats={seasonStats[selectedPlayer.id]}
           career={careerStats[selectedPlayer.id]}
           seasonYear={dynasty.season.year}
+          gameLog={playerGameLog(selectedPlayer.id, dynasty.season.schedule, gameLogs)}
+          teamShort={(id) => formatTeamShort(teamMap.get(id) ?? id)}
           onClose={() => setSelectedPlayerId(null)}
         />
       )}
