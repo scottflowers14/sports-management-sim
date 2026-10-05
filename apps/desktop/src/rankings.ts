@@ -29,3 +29,20 @@ export function computeNationalRankings(
     };
   });
 }
+
+/**
+ * The final poll, voted after the title game: the national champion is #1
+ * and everyone it passed slides down a spot.
+ */
+export function finalPollRank(
+  rankings: readonly Pick<RankingEntry, 'teamId' | 'rank'>[],
+  teamId: string,
+  championId: string | null | undefined,
+): number | null {
+  const rank = rankings.find((r) => r.teamId === teamId)?.rank ?? null;
+  if (!championId) return rank;
+  if (teamId === championId) return 1;
+  if (rank === null) return null;
+  const championRank = rankings.find((r) => r.teamId === championId)?.rank ?? Infinity;
+  return championRank > rank ? rank + 1 : rank;
+}

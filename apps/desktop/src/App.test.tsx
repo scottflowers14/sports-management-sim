@@ -80,7 +80,9 @@ describe('Desktop App', () => {
   it('simulates a week and shows results', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
-    expect(screen.getByText(/Results/i)).toBeInTheDocument();
+    expect(screen.getByText(/Week 1 Results/i)).toBeInTheDocument();
+    // The hub leads with the headline games and folds away the rest.
+    expect(screen.getByRole('button', { name: /Show all \d+ results/ })).toBeInTheDocument();
   });
 
   it('simulates the rest of the season with Sim to End', async () => {

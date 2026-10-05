@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { GameLog, LacrosseTeam, LacrossePortalEntry, LacrossePosition, LacrossePlayerTraits } from '@sports-management-sim/sport-lacrosse';
 import type { PositionNeed, RecruitBoardEntry, ScheduledGame } from '@sports-management-sim/engine-core';
 import type { InjuredPlayer } from '../dynasty-helpers';
@@ -8,6 +8,7 @@ import type { ScoutingState } from '../scouting';
 import type { WeeklyHubData } from '../weekly-hub';
 import type { BoxScoreData } from '../ui/types';
 import { ResultRow } from '../components/ResultRow';
+import { featuredResults } from '../weekly-hub';
 import { RushBackButton } from '../components/RushBackButton';
 import { formatTeamName } from '../ui/format';
 
@@ -214,6 +215,7 @@ export function WeekHubScreen({
   userTeamId,
   lastSimWeek,
   lastWeekGames,
+  rankOf = () => null,
   gameLogs,
   onSimWeek,
   onCoachGame,
@@ -246,6 +248,8 @@ export function WeekHubScreen({
   userTeamId: string;
   lastSimWeek: number | null;
   lastWeekGames: ScheduledGame[];
+  /** Current national rank, for picking the headline results. */
+  rankOf?: (teamId: string) => number | null;
   gameLogs: Map<string, GameLog>;
   onSimWeek: () => void;
   /** Play the user's game to halftime and adjust; absent when there's no game to coach. */
@@ -269,6 +273,7 @@ export function WeekHubScreen({
   /** Hot and cold streaks on the roster. */
   formCard?: ReactNode;
 }) {
+  const [showAllResults, setShowAllResults] = useState(false);
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
     (e) => e.status === 'committed' && e.committedTeamId === userTeamId,
@@ -392,7 +397,7 @@ export function WeekHubScreen({
         <article className="card hub-results-card">
           <p className="section-label">Week {lastSimWeek} Results</p>
           <ul className="result-list">
-            {lastWeekGames.map((game) => (
+            {(showAllResults ? lastWeekGames : featuredResults(lastWeekGames, userTeamId, rankOf)).map((game) => (
               <ResultRow
                 key={game.id}
                 game={game}
@@ -403,6 +408,11 @@ export function WeekHubScreen({
               />
             ))}
           </ul>
+          {lastWeekGames.length > featuredResults(lastWeekGames, userTeamId, rankOf).length && (
+            <button type="button" className="ghost-btn results-toggle" onClick={() => setShowAllResults((v) => !v)}>
+              {showAllResults ? 'Show top results' : `Show all ${lastWeekGames.length} results`}
+            </button>
+          )}
         </article>
       )}
 
