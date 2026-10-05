@@ -87,6 +87,8 @@ import {
   evaluateSeasonGoals,
   updateADConfidence,
   advanceCoachTenure,
+  contractNewsHeadline,
+  reviewCoachContract,
   shouldFireCoach,
   generateJobOffers,
 } from './coach-profile';
@@ -1281,27 +1283,46 @@ export function useDynastyController() {
           ...prev,
         ]);
       }
+      const fired = shouldFireCoach(newConfidence, advancedCoach.tenureSeasons);
+      const contract = fired ? null : reviewCoachContract(advancedCoach, newConfidence);
+      const teamLabel = userTeamData ? formatTeamName(userTeamData.name) : 'The program';
+      const contractHeadline = contract ? contractNewsHeadline(contract, teamLabel, dynasty.season.year) : null;
+      if (contractHeadline) {
+        setNewsItems((prev) => [
+          {
+            id: `contract-${dynasty.season.year}`,
+            week: dynasty.season.currentWeek,
+            category: 'coaching' as const,
+            featured: true,
+            headline: contractHeadline,
+          },
+          ...prev,
+        ]);
+      }
       setSeasonGoals(evaluated);
       setAdConfidence(newConfidence);
-      setCoachProfile(advancedCoach);
+      setCoachProfile(contract?.profile ?? advancedCoach);
 
-      if (shouldFireCoach(newConfidence, advancedCoach.tenureSeasons)) {
+      if (fired || contract?.decision === 'not-renewed') {
         const offers = generateJobOffers(
           dynasty.season.teams,
           dynasty.userTeamId,
           dynasty.seed + dynasty.season.year,
         );
         setPendingJobOffers(offers);
-        const teamName = userTeamData ? formatTeamName(userTeamData.name) : 'the program';
-        setNewsItems((prev) => [
-          {
-            id: `fired-${dynasty.season.year}`,
-            week: dynasty.season.currentWeek,
-            category: 'coaching' as const,
-            headline: `${advancedCoach.name} has been relieved of his duties at ${teamName}`,
-          },
-          ...prev,
-        ]);
+        // A contract left to run out already has its own headline.
+        if (fired) {
+          const teamName = userTeamData ? formatTeamName(userTeamData.name) : 'the program';
+          setNewsItems((prev) => [
+            {
+              id: `fired-${dynasty.season.year}`,
+              week: dynasty.season.currentWeek,
+              category: 'coaching' as const,
+              headline: `${advancedCoach.name} has been relieved of duties at ${teamName}`,
+            },
+            ...prev,
+          ]);
+        }
       }
     }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateJobOffers, generateSeasonGoals, shouldFireCoach } from './coach-profile';
+import { advanceCoachTenure, contractNewsHeadline, createCoachProfile, generateJobOffers, generateSeasonGoals, reviewCoachContract, shouldFireCoach } from './coach-profile';
 
 describe('generateSeasonGoals', () => {
   it('scales the win target to the actual schedule length', () => {
@@ -85,5 +85,40 @@ describe('generateJobOffers', () => {
     const offers = generateJobOffers([makeTeam('a', 60), makeTeam('b', 50)], 'a', 1);
     expect(offers).toHaveLength(1);
     expect(offers[0]!.teamId).toBe('b');
+  });
+});
+
+describe('reviewCoachContract', () => {
+  const coach = (left: number) => ({ ...createCoachProfile('Pat Reyes'), contractYearsRemaining: left });
+
+  it('gives a coach on extension watch a fresh five-year deal once two years or fewer remain', () => {
+    expect(reviewCoachContract(coach(2), 85)).toMatchObject({ decision: 'extended', yearsAdded: 3, profile: { contractYearsRemaining: 5 } });
+    expect(reviewCoachContract(coach(0), 100)).toMatchObject({ decision: 'extended', profile: { contractYearsRemaining: 5 } });
+  });
+
+  it('leaves a contract with years to run alone', () => {
+    expect(reviewCoachContract(coach(3), 95)).toMatchObject({ decision: null, yearsAdded: 0, profile: { contractYearsRemaining: 3 } });
+    expect(reviewCoachContract(coach(1), 50)).toMatchObject({ decision: null });
+  });
+
+  it('renews, offers a prove-it year, or lets an expiring deal lapse by confidence', () => {
+    expect(reviewCoachContract(coach(0), 65)).toMatchObject({ decision: 'renewed', profile: { contractYearsRemaining: 3 } });
+    expect(reviewCoachContract(coach(0), 45)).toMatchObject({ decision: 'prove-it', profile: { contractYearsRemaining: 1 } });
+    expect(reviewCoachContract(coach(0), 30)).toMatchObject({ decision: 'not-renewed', profile: { contractYearsRemaining: 0 } });
+  });
+
+  it('never lets a long, successful tenure count down to zero', () => {
+    let profile = createCoachProfile('Pat Reyes');
+    for (let year = 0; year < 15; year += 1) {
+      profile = reviewCoachContract(advanceCoachTenure(profile), 100).profile;
+      expect(profile.contractYearsRemaining).toBeGreaterThanOrEqual(2);
+    }
+    expect(profile.tenureSeasons).toBe(15);
+  });
+
+  it('writes a headline with the year the new deal runs through', () => {
+    const review = reviewCoachContract(coach(1), 90);
+    expect(contractNewsHeadline(review, 'Capital City', 2031)).toBe('Capital City extends Pat Reyes through 2036, a 5-year deal');
+    expect(contractNewsHeadline(reviewCoachContract(coach(3), 90), 'Capital City', 2031)).toBeNull();
   });
 });
