@@ -3,6 +3,8 @@ import {
   applyScholarshipOffer,
   calculateRecruitFitScore,
   classScholarshipBudgetUsed,
+  pipelineCounts,
+  pipelineTier,
   recruitPrestigeMultiplier,
   topRecruitMotivations,
   type Recruit,
@@ -232,5 +234,42 @@ describe('topRecruitMotivations', () => {
       },
     });
     expect(calculateRecruitFitScore(indifferent, makeTeam())).toBe(50);
+  });
+});
+
+describe('recruiting pipelines', () => {
+  type P = Team<'GENERIC'>['roster'][number];
+  const player = (i: number, regionId: string, extra: Partial<P> = {}): P =>
+    ({
+      id: `p${i}`,
+      regionId,
+      isWalkOn: false,
+      recruitingProfile: { starRating: 3 },
+      ...extra,
+    }) as P;
+
+  it('counts recruited scholarship players from outside the home region', () => {
+    const roster = [
+      ...[0, 1].map((i) => player(i, 'long-island')),
+      player(3, 'long-island', { isWalkOn: true }),
+      { ...player(4, 'long-island'), recruitingProfile: undefined } as unknown as P,
+      ...[5, 6].map((i) => player(i, 'mid-atlantic')),
+    ];
+    const team = makeTeam({ roster });
+    expect(pipelineCounts(team).get('long-island')).toBe(2);
+    expect(pipelineCounts(team).has('mid-atlantic')).toBe(false);
+    expect(pipelineTier(team, 'long-island')).toBe(1);
+    expect(pipelineTier(team, 'mid-atlantic')).toBe(0);
+  });
+
+  it('makes a pipeline region feel closer to home', () => {
+    const recruit = makeRecruit({ regionId: 'long-island' });
+    const none = calculateRecruitFitScore(recruit, makeTeam());
+    const tier1 = calculateRecruitFitScore(recruit, makeTeam({ roster: [0, 1].map((i) => player(i, 'long-island')) }));
+    const tier3 = calculateRecruitFitScore(recruit, makeTeam({ roster: Array.from({ length: 8 }, (_, i) => player(i, 'long-island')) }));
+    const home = calculateRecruitFitScore(makeRecruit(), makeTeam());
+    expect(tier1).toBeGreaterThan(none);
+    expect(tier3).toBeGreaterThan(tier1);
+    expect(home).toBeGreaterThan(tier3);
   });
 });

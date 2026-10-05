@@ -35,6 +35,7 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
+import { recruitingPipelines } from './pipelines';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
@@ -622,6 +623,7 @@ export function App() {
       {view === 'recruiting' && (
         <RecruitingScreen
           classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
+          pipelines={recruitingPipelines(userTeam, dynasty.season.regions)}
           recruitBoard={dynasty.recruitBoard}
           portalEntries={dynasty.portalEntries}
           scouting={scouting}

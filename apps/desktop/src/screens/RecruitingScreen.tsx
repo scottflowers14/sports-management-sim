@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import type { PipelineRow } from '../pipelines';
 import { OfferControl } from '../components/OfferControl';
 import { PortalBoard, type PortalNilProps } from './PortalBoard';
 import type { LacrossePlayerTraits, LacrossePortalEntry, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
@@ -44,6 +45,36 @@ function starsArePublic(entry: LacrosseBoardEntry): boolean {
 function revealedMotivations(entry: LacrosseBoardEntry, tier: 'none' | 'partial' | 'full'): RecruitMotivation[] {
   if (tier === 'none') return [];
   return topRecruitMotivations(entry.recruit.preferences, tier === 'full' ? 2 : 1);
+}
+
+/** The user's recruiting pipelines by region, for the recruit rows' chips. */
+const PipelineContext = createContext<Map<string, PipelineRow>>(new Map());
+
+function PipelineChip({ regionId }: { regionId: string }) {
+  const row = useContext(PipelineContext).get(regionId);
+  if (!row || row.tier === 0) return null;
+  return (
+    <span className="pipeline-chip" title={`${row.count} of our players came from ${row.name}: recruits there treat us closer to home`}>
+      Pipeline {'★'.repeat(row.tier)}
+    </span>
+  );
+}
+
+function PipelinesBar({ pipelines }: { pipelines: PipelineRow[] }) {
+  return (
+    <div className="pipelines-bar" aria-label="Recruiting pipelines">
+      <span className="section-label">Pipelines</span>
+      {pipelines.length === 0 ? (
+        <span className="dim">None yet. Sign two scholarship players from one region outside your own to open a pipeline.</span>
+      ) : (
+        pipelines.map((p) => (
+          <span key={p.regionId} className={`pipeline-pill${p.tier === 0 ? ' pipeline-pill-building' : ''}`} title={`${p.count} recruited players on the roster`}>
+            {p.name} {p.tier > 0 ? '★'.repeat(p.tier) : '(1 signee away)'}
+          </span>
+        ))
+      )}
+    </div>
+  );
 }
 
 function TrendArrow({ delta }: { delta: number | undefined }) {
@@ -253,6 +284,7 @@ export function RecruitingScreen({
   autoOffers,
   onAutoOffersChange,
   classNeeds,
+  pipelines,
 }: {
   recruitBoard: LacrosseBoardEntry[];
   portalEntries: LacrossePortalEntry[];
@@ -292,6 +324,7 @@ export function RecruitingScreen({
   autoOffers?: boolean;
   onAutoOffersChange?: (on: boolean) => void;
   classNeeds?: PositionNeed[];
+  pipelines?: PipelineRow[];
 }) {
   const [boardSort, setBoardSort] = useState<BoardSort>('rank');
   const [hideCommitted, setHideCommitted] = useState(false);
@@ -304,7 +337,10 @@ export function RecruitingScreen({
   const matchesPosFilter = (entry: LacrosseBoardEntry) =>
     recruitPosFilter === 'ALL' || entry.recruit.position === recruitPosFilter;
 
+  const pipelineMap = new Map((pipelines ?? []).map((p) => [p.regionId, p]));
+
   return (
+    <PipelineContext.Provider value={pipelineMap}>
     <div className="recruit-layout">
       <div className="recruit-top-bar">
         <div className="recruit-tabs">
@@ -376,6 +412,8 @@ export function RecruitingScreen({
           onSelectRecruit={onSelectRecruit}
           onMakeOffers={onMakeOffers ?? ((offers) => offers.forEach((o) => onOfferScholarship(o.recruitId, o.scholarshipPercent)))}
         />}
+
+      {recruitTab === 'board' && pipelines && <PipelinesBar pipelines={pipelines} />}
 
       {recruitTab === 'board' && (
         <>
@@ -510,6 +548,7 @@ export function RecruitingScreen({
         />
       )}
     </div>
+    </PipelineContext.Provider>
   );
 }
 
@@ -755,6 +794,7 @@ function AllRecruitsList({
                   <span className="hidden-stat">? stars</span>
                 )}{' '}
                 · {recruit.hometown}
+                <PipelineChip regionId={recruit.regionId} />
                 {(tier !== 'none' || starsArePublic(entry)) && (
                   <DecisionChip entry={entry} currentWeek={currentWeek} finalWeek={finalWeek} userTeamId={userTeamId} />
                 )}
@@ -1068,6 +1108,7 @@ function RecruitCard({
                 <DecisionChip entry={entry} currentWeek={currentWeek} finalWeek={finalWeek} userTeamId={userTeamId} />
               </>
             )}
+            <PipelineChip regionId={recruit.regionId} />
           </p>
         </div>
         <div className="recruit-header-side">
