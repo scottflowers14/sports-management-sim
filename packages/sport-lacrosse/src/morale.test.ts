@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { decidePortalEntry, portalMoraleMultiplier } from '@sports-management-sim/engine-core';
 import type { LacrossePlayer, LacrosseTeam } from './models';
 import {
+  SENIOR_DAY_BOOST,
+  isSeniorDay,
   canPromisePlayingTime,
   makePlayingTimePromise,
   PROMISE_BOOST,
@@ -257,5 +259,27 @@ describe('ties on the depth chart', () => {
         expect(['starter', 'rotation'].indexOf(status.actual)).toBeLessThanOrEqual(['starter', 'rotation'].indexOf(status.expected));
       }
     }
+  });
+});
+
+describe('Senior Day', () => {
+  const game = (week: number, homeTeamId: string, awayTeamId: string, neutralSite = false) => ({ week, homeTeamId, awayTeamId, neutralSite });
+
+  it('falls on the last regular-season home game, not a neutral site', () => {
+    const schedule = [game(1, 'us', 'a'), game(4, 'us', 'b'), game(6, 'c', 'us'), game(7, 'us', 'd', true)];
+    expect(isSeniorDay(schedule, 'us', 4)).toBe(true);
+    expect(isSeniorDay(schedule, 'us', 1)).toBe(false);
+    expect(isSeniorDay(schedule, 'us', 6)).toBe(false);
+    expect(isSeniorDay(schedule, 'us', 7)).toBe(false);
+    expect(isSeniorDay([game(2, 'a', 'us')], 'us', 2)).toBe(false);
+  });
+
+  it('lifts seniors only', () => {
+    const status = { expected: 'starter', actual: 'starter' } as const;
+    const input = { won: null, intensity: 'normal' as const };
+    const senior = { ...makeLacrossePlayer(1, 'ATT'), classYear: 'SR' as const, traits: [] };
+    const freshman = { ...makeLacrossePlayer(2, 'ATT'), classYear: 'FR' as const, traits: [] };
+    expect(weeklyMoraleChange(senior, status, { ...input, seniorDay: true }) - weeklyMoraleChange(senior, status, input)).toBe(SENIOR_DAY_BOOST);
+    expect(weeklyMoraleChange(freshman, status, { ...input, seniorDay: true })).toBe(weeklyMoraleChange(freshman, status, input));
   });
 });

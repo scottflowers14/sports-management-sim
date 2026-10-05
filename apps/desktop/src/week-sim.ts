@@ -22,6 +22,7 @@ import {
   moodLabel,
   moraleReason,
   runMoraleWeek,
+  isSeniorDay,
   DEFAULT_GAME_PLAN,
   DEFAULT_PRACTICE_PLAN,
   deriveCpuGamePlan,
@@ -252,6 +253,7 @@ export function simulateOneWeek(
   const userPractice = state.practicePlan ?? DEFAULT_PRACTICE_PLAN;
   const practiceGains: PracticeGain[] = [];
   const moraleChanges: MoraleChange[] = [];
+  const seniorDayNews: NewsItem[] = [];
   const newSeason = {
     ...seasonAfterGames,
     teams: seasonAfterGames.teams.map((team) => {
@@ -269,7 +271,19 @@ export function simulateOneWeek(
       );
       const won = game?.result ? game.result.winnerTeamId === team.id : null;
       const rivalry = game ? rivalryForGame(rivalries, game) !== null : false;
-      const mood = runMoraleWeek(practiced.team, { won, intensity: plan.intensity, rivalry });
+      // Senior Day only means something if the team actually played at home.
+      const seniorDay = game?.homeTeamId === team.id && isSeniorDay(seasonAfterGames.schedule, team.id, weekToSim);
+      if (isUser && seniorDay) {
+        const seniors = practiced.team.roster.filter((p) => p.classYear === 'SR' || p.classYear === 'GR').length;
+        if (seniors > 0) seniorDayNews.push({
+          id: `senior-day-${weekToSim}`,
+          week: weekToSim,
+          category: 'game',
+          featured: true,
+          headline: `Senior Day: ${formatTeamName(team.name)} honors ${seniors} senior${seniors > 1 ? 's' : ''} before the home finale`,
+        });
+      }
+      const mood = runMoraleWeek(practiced.team, { won, intensity: plan.intensity, rivalry, seniorDay });
       if (isUser) moraleChanges.push(...mood.changes);
       return mood.team;
     }),
@@ -503,7 +517,7 @@ export function simulateOneWeek(
     rankings: newRankings,
     injuries: newInjuries,
     rivalrySeries,
-    newsItems: [...rivalryNews, ...bracketNews, ...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
+    newsItems: [...rivalryNews, ...seniorDayNews, ...bracketNews, ...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
     scouting: advanceScoutingWeek(state.scouting),
     recruitingActivity: emptyRecruitingActivity(),
     recruitTrends,
