@@ -8,6 +8,7 @@ import type { ScoutingState } from '../scouting';
 import type { WeeklyHubData } from '../weekly-hub';
 import type { BoxScoreData } from '../ui/types';
 import { ResultRow } from '../components/ResultRow';
+import { RushBackButton } from '../components/RushBackButton';
 import { formatTeamName } from '../ui/format';
 
 interface ActionItem {
@@ -226,6 +227,7 @@ export function WeekHubScreen({
   captainCount,
   rivalryWeek,
   previewCard,
+  onRushInjury,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -256,6 +258,7 @@ export function WeekHubScreen({
   rivalryWeek?: string;
   /** Shown before the opener. */
   previewCard?: ReactNode;
+  onRushInjury?: (playerId: string) => void;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -449,6 +452,8 @@ export function WeekHubScreen({
                     </div>
                     <div className="hub-injury-weeks">
                       Out {inj.weeksRemaining} wk{inj.weeksRemaining > 1 ? 's' : ''}
+                      {inj.rushed && <span className="hub-injury-type">rushed</span>}
+                      {onRushInjury && <RushBackButton injury={inj} onRush={onRushInjury} />}
                     </div>
                   </li>
                 );

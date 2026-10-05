@@ -3671,7 +3671,7 @@ li span {
   padding: 1px 5px;
 }
 
-.hub-injury-weeks { font-size: 0.78rem; font-weight: 700; color: #f28472; }
+.hub-injury-weeks { font-size: 0.78rem; font-weight: 700; color: #f28472; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; white-space: nowrap; }
 .hub-no-items { font-size: 0.85rem; margin: 0; }
 
 .hub-scout-bar { display: flex; align-items: center; gap: 8px; }
@@ -6130,4 +6130,23 @@ li span {
 
 .splits-table td:first-child {
   white-space: nowrap;
+}
+
+.rush-back-btn {
+  white-space: nowrap;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  border: 1px solid var(--warning, #d9a441);
+  background: transparent;
+  color: var(--warning, #d9a441);
+  cursor: pointer;
+}
+
+.rush-back-btn:hover {
+  background: rgba(217, 164, 65, 0.15);
+}
+
+.injury-status .rush-back-btn {
+  margin-left: 8px;
 }
