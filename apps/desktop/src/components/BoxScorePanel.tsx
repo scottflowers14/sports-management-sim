@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { LacrossePlayerGameStats, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
-import { formatEventTime, isScoringEvent } from '@sports-management-sim/sport-lacrosse';
+import { formatEventTime, isScoringEvent, threeStars } from '@sports-management-sim/sport-lacrosse';
+import type { GameStar } from '@sports-management-sim/sport-lacrosse';
 import type { GameEvent, GamePeriod } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName, formatTeamShort } from '../ui/format';
 import type { BoxScoreData } from '../ui/types';
@@ -84,6 +85,18 @@ export function BoxScorePanel({
               Play-by-Play
             </button>
           </div>
+        )}
+
+        {tab === 'box' && hasPlayers && data.log && (
+          <ThreeStarsStrip
+            stars={threeStars(
+              data.log.playerLines!,
+              data.homeScore > data.awayScore ? data.log.homeTeamId : data.log.awayTeamId,
+            )}
+            teamShort={(teamId) => formatTeamShort(teamId === data.log!.homeTeamId ? data.homeTeamName : data.awayTeamName)}
+            playerName={playerName!}
+            playerPosition={playerPosition}
+          />
         )}
 
         {tab === 'box' && (
@@ -350,6 +363,37 @@ function PlayByPlay({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+const STAR_LABELS = ['1st Star', '2nd Star', '3rd Star'];
+
+function ThreeStarsStrip({
+  stars,
+  teamShort,
+  playerName,
+  playerPosition,
+}: {
+  stars: GameStar[];
+  teamShort: (teamId: string) => string;
+  playerName: (playerId: string) => string | undefined;
+  playerPosition?: ((playerId: string) => string | undefined) | undefined;
+}) {
+  if (stars.length === 0) return null;
+  return (
+    <div className="three-stars" aria-label="Three stars">
+      {stars.map((star, i) => (
+        <div key={star.playerId} className="three-star">
+          <span className="three-star-rank">{'★'.repeat(3 - i)} {STAR_LABELS[i]}</span>
+          <strong>
+            {playerPosition?.(star.playerId) ?? ''} {playerName(star.playerId) ?? 'Unknown'}
+          </strong>
+          <span className="dim">
+            {teamShort(star.teamId)} · {star.line}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
