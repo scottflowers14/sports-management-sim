@@ -6086,3 +6086,30 @@ li span {
   font-size: 0.78rem;
   color: #8fe3b1;
 }
+
+.game-log-win {
+  color: #6fdc9b;
+}
+
+.game-log-loss {
+  color: #f08c8c;
+}
+
+.game-log-table td,
+.game-log-table th {
+  white-space: nowrap;
+}
+
+.game-log-wrap {
+  overflow-x: auto;
+}
+
+.game-log-table {
+  font-size: 0.8rem;
+}
+
+.game-log-table td,
+.game-log-table th {
+  padding-left: 6px;
+  padding-right: 6px;
+}

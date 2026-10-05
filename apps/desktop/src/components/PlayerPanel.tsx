@@ -5,6 +5,7 @@ import type { PlayerCareer } from '../career-stats';
 import { careerTotals } from '../career-stats';
 import { cardFromPlayer } from '../player-card-model';
 import { PlayerCardPanel } from './PlayerCard';
+import { gameLogColumns, type PlayerGameRow } from '../player-game-log';
 
 export function PlayerPanel({
   player,
@@ -13,6 +14,8 @@ export function PlayerPanel({
   playerStats,
   career,
   seasonYear,
+  gameLog = [],
+  teamShort = (id) => id,
   onClose,
 }: {
   player: LacrossePlayer;
@@ -21,6 +24,8 @@ export function PlayerPanel({
   playerStats: PlayerSeasonStats | undefined;
   career: PlayerCareer | undefined;
   seasonYear: number;
+  gameLog?: PlayerGameRow[];
+  teamShort?: (teamId: string) => string;
   onClose: () => void;
 }) {
   const data = cardFromPlayer(player, { injured: isInjured });
@@ -39,6 +44,7 @@ export function PlayerPanel({
         <RatingHistorySection player={player} seasonYear={seasonYear} />
       )}
       {liveStats && <PlayerStatsSection stats={liveStats} position={player.position} seasonYear={seasonYear} />}
+      {gameLog.length > 0 && <GameLogSection rows={gameLog} position={player.position} teamShort={teamShort} />}
       {((career && career.seasons.length > 0) || liveStats) && (
         <CareerSection
           career={career}
@@ -83,6 +89,49 @@ function RatingHistorySection({ player, seasonYear }: { player: LacrossePlayer; 
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function GameLogSection({ rows, position, teamShort }: { rows: PlayerGameRow[]; position: string; teamShort: (id: string) => string }) {
+  const columns = gameLogColumns(position);
+  return (
+    <div className="player-stats-section" aria-label="Game log">
+      <p className="section-label">Game Log</p>
+      <div className="game-log-wrap">
+      <table className="standings-table career-table game-log-table">
+        <thead>
+          <tr>
+            <th>Wk</th>
+            <th>Opp</th>
+            <th>Result</th>
+            {columns.map((c) => (
+              <th key={c.label}>{c.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.gameId}>
+              <td className="rank">{r.week}</td>
+              <td>
+                {r.home ? '' : '@'}
+                {teamShort(r.opponentId)}
+              </td>
+              <td className={r.won ? 'game-log-win' : 'game-log-loss'}>
+                {r.won ? 'W' : 'L'} {r.score}
+                {r.overtime ? ' OT' : ''}
+              </td>
+              {columns.map((c) => (
+                <td key={c.label} className="stat-val">
+                  {c.value(r.line)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
       </div>
     </div>
   );
