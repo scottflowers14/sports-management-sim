@@ -19,6 +19,13 @@ export interface SimulateLacrosseGameInput {
   /** Coordinator quality for each side (see coachingEdge); omitted means average. */
   homeCoaching?: CoachingEdge;
   awayCoaching?: CoachingEdge;
+  /**
+   * Halftime adjustments: each side switches to this plan for the third
+   * quarter on. With the same random source, the first half plays out exactly
+   * as it would have without them.
+   */
+  homeSecondHalfPlan?: Partial<LacrosseGamePlan>;
+  awaySecondHalfPlan?: Partial<LacrosseGamePlan>;
 }
 
 export type LacrosseGameResult = GameResult<LacrosseTeamStats>;
@@ -184,6 +191,10 @@ export function simulatePossessionGame(input: SimulateLacrosseGameInput): Lacros
   };
 
   for (let q = 1; q <= 4; q += 1) {
+    if (q === 3) {
+      if (input.homeSecondHalfPlan) switchPlan(home, input.homeSecondHalfPlan);
+      if (input.awaySecondHalfPlan) switchPlan(away, input.awaySecondHalfPlan);
+    }
     playPeriod({ period: q as GamePeriod, periodIndex: q - 1, elapsed: 0, periodLength: PERIOD_SECONDS }, false);
   }
   for (let ot = 0; ot < MAX_OVERTIMES && home.score === away.score; ot += 1) {
@@ -700,6 +711,13 @@ function makeSide(team: LacrosseTeam, isHome: boolean, planInput: Partial<Lacros
     score: 0,
     midLine: 0,
   };
+}
+
+function switchPlan(side: Side, planInput: Partial<LacrosseGamePlan>): void {
+  const plan = normalizeGamePlan(planInput);
+  side.plan = plan;
+  side.effects = getTacticEffects(plan);
+  side.lineShares = midfieldLineShares(side.lineup.midfieldLines.length, plan.rotation);
 }
 
 function rollLine(side: Side, random: RandomSource): LacrossePlayer[] {

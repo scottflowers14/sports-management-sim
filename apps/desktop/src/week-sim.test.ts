@@ -4,7 +4,7 @@ import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
-import { simulateOneWeek, simulateRemainingWeeks, type WeekSimState } from './week-sim';
+import { previewUserGame, simulateOneWeek, simulateRemainingWeeks, type WeekSimState } from './week-sim';
 import { healInjuriesOneWeek } from './dynasty-helpers';
 import { createProgramStaff } from './program-staff';
 
@@ -250,5 +250,24 @@ describe('rivalries during the season', () => {
     expect(series.length).toBeGreaterThanOrEqual(15);
     expect(series.every((s) => Object.values(s.wins).reduce((a, b) => a + b, 0) === 1 && s.holderId !== null)).toBe(true);
     expect(state.newsItems.some((n) => /^Rivalry: .+ wins The \w+ \w+, beating .+ \d+-\d+ \(leads the series 1-0\)$/.test(n.headline))).toBe(true);
+  });
+});
+
+describe('coached games', () => {
+  it('plays the first half exactly as previewed at halftime', () => {
+    const state = freshStateWith(fixedDynasty());
+    const plan = { tempo: 'balanced', defense: 'balanced', ride: 'standard', rotation: 'balanced' } as const;
+    const preview = previewUserGame(state, plan, 1234)!;
+    expect(preview).not.toBeNull();
+    const half = (events: { period: unknown }[]) => events.filter((e) => e.period === 1 || e.period === 2);
+    const after = simulateOneWeek(state, plan, Math.random, {
+      seed: 1234,
+      secondHalfPlan: { ...plan, tempo: 'uptempo', defense: 'pressure' },
+    });
+    const played = after.gameLogs.get(preview.game.id)!;
+    expect(half(played.events)).toEqual(half(preview.log.events));
+    // Same seed, same plan after the break: the whole game matches the preview.
+    const unchanged = simulateOneWeek(state, plan, Math.random, { seed: 1234, secondHalfPlan: plan });
+    expect(unchanged.gameLogs.get(preview.game.id)!.events).toEqual(preview.log.events);
   });
 });

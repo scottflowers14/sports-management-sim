@@ -65,7 +65,8 @@ import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { healInjuriesOneWeek, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
-import { simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
+import { previewUserGame, simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
+import type { HalftimeState } from './halftime';
 import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, WeekSimState } from './week-sim';
@@ -244,6 +245,7 @@ export function useDynastyController() {
   const [hallOfFame, setHallOfFame] = useState<HallOfFameEntry[]>(() => loadedSave?.hallOfFame ?? []);
   const [proDraftHistory, setProDraftHistory] = useState<ProDraftPick[]>(() => loadedSave?.proDraftHistory ?? []);
   const [nilSaved, setNil] = useState<NilState | null>(() => loadedSave?.nil ?? null);
+  const [halftime, setHalftime] = useState<HalftimeState | null>(() => loadedSave?.halftime ?? null);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
@@ -278,6 +280,7 @@ export function useDynastyController() {
     hallOfFame,
     proDraftHistory,
     nil: nilSaved,
+    halftime,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -286,7 +289,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -327,6 +330,7 @@ export function useDynastyController() {
     setHallOfFame([]);
     setProDraftHistory([]);
     setNil(null);
+    setHalftime(null);
     setPendingJobOffers(null);
     setAutoRecruitingAssistant(false);
     setAutoRecruitingOffers(false);
@@ -398,6 +402,7 @@ export function useDynastyController() {
       hallOfFame: [],
       proDraftHistory: [],
       nil: null,
+      halftime: null,
       seasonPreview: preview,
       pendingJobOffers: null,
       shortlistIds: [],
@@ -459,6 +464,7 @@ export function useDynastyController() {
     setHallOfFame(save.hallOfFame ?? []);
     setProDraftHistory(save.proDraftHistory ?? []);
     setNil(save.nil ?? null);
+    setHalftime(save.halftime ?? null);
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -648,6 +654,34 @@ export function useDynastyController() {
       : buildWeekSimState();
     applyWeekSimResult(simulateOneWeek(start, gamePlan));
   }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
+
+  // Coach the game: play the user's game to the half with a fixed seed, then
+  // sim the week once the second-half plan is set.
+  const canCoachGame =
+    offseasonSummary === null &&
+    tournament === null &&
+    dynasty.season.schedule.some(
+      (g) =>
+        g.week === dynasty.season.currentWeek &&
+        g.status === 'scheduled' &&
+        (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
+    );
+  const coachGame = useCallback(() => {
+    if (!canCoachGame || halftime) return;
+    const seed = Math.floor(Math.random() * 2 ** 31);
+    const preview = previewUserGame(buildWeekSimState(), gamePlan, seed);
+    if (!preview) return;
+    setHalftime({ seed, week: dynasty.season.currentWeek, gameId: preview.game.id, log: preview.log });
+  }, [canCoachGame, halftime, buildWeekSimState, gamePlan, dynasty.season.currentWeek]);
+
+  const playSecondHalf = useCallback((secondHalfPlan: LacrosseGamePlan) => {
+    if (!halftime) return;
+    const start = autoRecruitingAssistant
+      ? applyAssistantToWeekState(buildWeekSimState(), shortlistIds, Math.random, { autoOffer: autoRecruitingOffers }).state
+      : buildWeekSimState();
+    setHalftime(null);
+    applyWeekSimResult(simulateOneWeek(start, gamePlan, Math.random, { seed: halftime.seed, secondHalfPlan }));
+  }, [halftime, applyWeekSimResult, buildWeekSimState, gamePlan, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
 
   const simToEnd = useCallback(() => {
     if (offseasonSummary) {
@@ -1520,6 +1554,10 @@ export function useDynastyController() {
     scheduleEditable,
     swapNonConferenceGame,
     answerRealignmentInvite,
+    canCoachGame,
+    coachGame,
+    halftime,
+    playSecondHalf,
     nil,
     retainWithNil,
     signNilDeal,

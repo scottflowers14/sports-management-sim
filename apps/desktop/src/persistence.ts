@@ -19,6 +19,7 @@ import type { CareerStatsMap } from './career-stats';
 import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
 import type { WeeklyHonor } from './weekly-honors';
 import type { InvestmentPlan, NilState, ProDraftPick } from '@sports-management-sim/sport-lacrosse';
+import type { HalftimeState } from './halftime';
 import { formatTeamName } from './ui/format';
 
 export const DYNASTY_SAVE_VERSION = 1;
@@ -69,6 +70,8 @@ export interface DynastySaveState {
   proDraftHistory?: ProDraftPick[];
   /** The NIL collective's money and deals for the current portal. */
   nil?: NilState | null;
+  /** A coached game paused at halftime; reloading returns to the locker room. */
+  halftime?: HalftimeState | null;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */
