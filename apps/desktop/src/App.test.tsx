@@ -590,7 +590,9 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
     const again = screen.getByRole('dialog');
     expect(within(again).getByRole('heading').textContent).toBe(score);
-    await userEvent.selectOptions(within(again).getByLabelText('Second half Offensive Tempo'), 'uptempo');
+    // The staff plan follows the roster, so switch to whichever tempo it isn't using.
+    const tempo = within(again).getByLabelText<HTMLSelectElement>('Second half Offensive Tempo');
+    await userEvent.selectOptions(tempo, tempo.value === 'uptempo' ? 'patient' : 'uptempo');
     await userEvent.click(within(again).getByRole('button', { name: /Play Second Half \(1 adjustment\)/ }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => {
