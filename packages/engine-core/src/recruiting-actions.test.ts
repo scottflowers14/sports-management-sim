@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   applyCampusVisit,
   applyRecruitPitch,
+  VISIT_PACKED_BOOST,
+  VISIT_SELLOUT_BOOST,
+  visitCrowdBoost,
   chooseCommitTeam,
   finalistTeamIds,
   isFinalistPhase,
@@ -137,6 +140,16 @@ describe('applyRecruitPitch', () => {
 });
 
 describe('applyCampusVisit', () => {
+  it('sells the program harder in front of a packed house', () => {
+    const base = { won: true, opponentRank: null, facilities: 50 };
+    const quiet = applyCampusVisit(makeRecruit(), 'team-1', base).interestChange;
+    expect(applyCampusVisit(makeRecruit(), 'team-1', { ...base, crowdShare: 1 }).interestChange).toBe(quiet + VISIT_SELLOUT_BOOST);
+    expect(applyCampusVisit(makeRecruit(), 'team-1', { ...base, crowdShare: 0.92 }).interestChange).toBe(quiet + VISIT_PACKED_BOOST);
+    expect(applyCampusVisit(makeRecruit(), 'team-1', { ...base, crowdShare: 0.7 }).interestChange).toBe(quiet);
+    expect(applyCampusVisit(makeRecruit(), 'team-1', { ...base, crowdShare: 0.4 }).interestChange).toBe(quiet - 1);
+    expect(visitCrowdBoost(null)).toBe(0);
+  });
+
   it('rewards a ranked home win far more than a bad loss', () => {
     const bigWin = applyCampusVisit(makeRecruit(), 'team-1', {
       won: true,

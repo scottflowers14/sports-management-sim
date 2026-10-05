@@ -13,7 +13,9 @@ import {
 } from '@sports-management-sim/engine-core';
 import {
   applyCpuCaptains,
+  attendanceOf,
   gameAttendance,
+  isSellout,
   dynastyRivalries,
   recordRivalryGame,
   rivalryForGame,
@@ -317,6 +319,8 @@ export function simulateOneWeek(
       : null;
     const opponentRank = opponentRankRaw !== null && opponentRankRaw <= 20 ? opponentRankRaw : null;
     const visitIdSet = new Set(state.recruitingActivity.visitIds);
+    const gate = hostedHome ? attendanceOf(userGame) : undefined;
+    const crowdShare = gate ? gate.count / gate.capacity : null;
 
     recruitsAfterVisits = dynasty.recruits.map((recruit) => {
       if (!visitIdSet.has(recruit.id) || recruit.status !== 'open') return recruit;
@@ -324,6 +328,7 @@ export function simulateOneWeek(
         won,
         opponentRank,
         facilities: updatedUserTeam.reputation.facilities,
+        crowdShare,
         interestMultiplier: recruitPrestigeMultiplier(
           recruit.starRating,
           updatedUserTeam.reputation.nationalPrestige,
@@ -335,8 +340,9 @@ export function simulateOneWeek(
           : outcome.impression === 'positive'
             ? 'enjoyed the visit'
             : 'left underwhelmed';
+      const crowdText = gate && isSellout(gate) ? ' in front of a sellout crowd' : '';
       const gameText = hostedHome && opponentId !== null
-        ? ` after the ${won ? 'win over' : 'loss to'} ${opponentRank !== null ? `#${opponentRank} ` : ''}${teamMap.get(opponentId) ?? opponentId}`
+        ? ` after the ${won ? 'win over' : 'loss to'} ${opponentRank !== null ? `#${opponentRank} ` : ''}${teamMap.get(opponentId) ?? opponentId}${crowdText}`
         : '';
       visitNews.push({
         id: `visit-${weekToSim}-${visitNews.length}`,

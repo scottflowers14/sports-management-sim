@@ -329,4 +329,32 @@ describe('game-day attendance', () => {
     expect(summary.gate!.homeGames).toBeGreaterThan(0);
     expect(summary.gate!.bonus).toBeGreaterThan(0);
   });
+
+  it('tells a visiting recruit about the sellout crowd', () => {
+    // A tiny stadium, rabid fans and a long winning run sell out every home game.
+    let state = freshStateWith(fixedDynasty());
+    const userId = state.dynasty.userTeamId;
+    state = {
+      ...state,
+      dynasty: {
+        ...state.dynasty,
+        season: {
+          ...state.dynasty.season,
+          teams: state.dynasty.season.teams.map((t) =>
+            t.id === userId
+              ? { ...t, record: { ...t.record, wins: 20 }, reputation: { ...t.reputation, facilities: 5, fanSupport: 99 } }
+              : t,
+          ),
+        },
+      },
+    };
+    const homeWeek = state.dynasty.season.schedule.find((g) => g.homeTeamId === userId && !g.neutralSite)!.week;
+    while (state.dynasty.season.currentWeek < homeWeek) state = simulateOneWeek(state, undefined, seededRandom(state.dynasty.season.currentWeek));
+    const target = state.dynasty.recruits.find((r) => r.status === 'open')!;
+    const next = simulateOneWeek({ ...state, recruitingActivity: { visitIds: [target.id], pitchedIds: [] } }, undefined, seededRandom(9));
+    const game = next.dynasty.season.schedule.find((g) => g.week === homeWeek && g.homeTeamId === userId)!;
+    expect(attendanceOf(game)!.count).toBe(attendanceOf(game)!.capacity);
+    expect(next.newsItems.find((n) => n.headline.startsWith('Campus visit:'))!.headline).toContain('in front of a sellout crowd');
+  });
 });
+
