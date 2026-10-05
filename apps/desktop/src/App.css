@@ -6223,3 +6223,21 @@ li span {
   grid-column: 2 / 4;
   margin: 0;
 }
+
+.bracketology-card {
+  grid-column: 1 / -1;
+}
+
+.bracket-status {
+  font-weight: 700;
+  color: #f2b872;
+}
+
+.bracket-status.bracket-in {
+  color: #72f2c6;
+}
+
+.bracket-note {
+  margin: 4px 0 12px;
+  font-size: 0.82rem;
+}

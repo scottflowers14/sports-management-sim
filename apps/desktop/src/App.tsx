@@ -38,7 +38,7 @@ import { HalftimeModal } from './components/HalftimeModal';
 import { recruitingPipelines } from './pipelines';
 import { playerGameLog } from './player-game-log';
 import { allSeries, userSeasonGames } from './series-history';
-import { TOURNAMENT_ROUND_LABELS } from './tournament';
+import { TOURNAMENT_ROUND_LABELS, projectNcaaField, projectionStatus } from './tournament';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
@@ -248,6 +248,12 @@ export function App() {
   const sortedStandings = [...fullStandings].sort(
     (a, b) => b.record.wins - a.record.wins || a.record.losses - b.record.losses,
   );
+
+  // Bracketology runs through the regular season, once anyone has played.
+  const ncaaProjection =
+    !tournament && dynasty.season.schedule.some((g) => g.status === 'final')
+      ? projectNcaaField(dynasty.season.teams, dynasty.season.conferences, fullStandings, dynasty.season.schedule)
+      : null;
 
   const committedCount = dynasty.recruits.filter(
     (r) => r.committedTeamId === dynasty.userTeamId || r.signedTeamId === dynasty.userTeamId,
@@ -531,6 +537,7 @@ export function App() {
         <WeekHubScreen
           onCoachGame={canCoachGame ? coachGame : undefined}
           onRushInjury={rushInjuredPlayer}
+          bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           userTeam={userTeam}
@@ -689,6 +696,7 @@ export function App() {
           userTeamId={dynasty.userTeamId}
           teamMap={teamMap}
           onOpenProgram={openProgram}
+          projection={ncaaProjection}
         />
       )}
 

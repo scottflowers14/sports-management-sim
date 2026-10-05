@@ -15,6 +15,9 @@ import {
   computeRpi,
   initTournament,
   ncaaFieldSize,
+  projectNcaaField,
+  projectionStatus,
+  compareConferenceStanding,
   selectNcaaField,
   advanceTournamentPhase,
   teamGameThisRound,
@@ -185,5 +188,30 @@ describe('coached tournament games', () => {
       state = played;
     }
     expect(rounds).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('bracketology', () => {
+  const season = finishedSeason();
+  const { teams, schedule, standings, conferences } = season;
+  const projection = projectNcaaField(teams, conferences, standings, schedule);
+
+  it('gives each conference leader the projected auto bid', () => {
+    for (const conf of conferences) {
+      const leader = [...standings].filter((s) => conf.teamIds.includes(s.teamId)).sort(compareConferenceStanding)[0]!;
+      expect(projection.leaders.get(conf.id)).toBe(leader.teamId);
+      expect(projection.field.find((e) => e.teamId === leader.teamId)?.bid).toBe('auto');
+    }
+    expect(projection.field).toHaveLength(NCAA_FIELD_SIZE);
+  });
+
+  it('describes in, bubble and out teams', () => {
+    const inTeam = projection.field[0]!;
+    expect(projectionStatus(projection, inTeam.teamId)).toMatch(/^Projected #1 seed \((auto bid|at-large)\)$/);
+    expect(projectionStatus(projection, projection.firstOut[0]!.teamId)).toBe('First four out (#1)');
+    const listed = new Set([...projection.field, ...projection.firstOut].map((e) => e.teamId));
+    const out = teams.find((t) => !listed.has(t.id))!;
+    expect(projectionStatus(projection, out.id)).toBe(`Out of the field (RPI #${projection.rpiRank.get(out.id)})`);
+    expect([...projection.rpiRank.values()].sort((a, b) => a - b)).toEqual(teams.map((_, i) => i + 1));
   });
 });

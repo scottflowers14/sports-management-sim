@@ -490,3 +490,48 @@ function playTournamentGame(
     log: result.log,
   };
 }
+
+export interface NcaaProjection {
+  field: NcaaEntry[];
+  firstOut: NcaaBubbleEntry[];
+  /** Projected auto bid per conference: its current league leader. */
+  leaders: Map<string, string>;
+  /** Every team's RPI rank, 1 = best. */
+  rpiRank: Map<string, number>;
+}
+
+/**
+ * Bracketology: who would make the NCAA field if the season ended today.
+ * Each conference's current leader takes the auto bid (the real one goes to
+ * the conference tournament winner) and selection runs exactly as it does on
+ * selection day.
+ */
+export function projectNcaaField(
+  teams: LacrosseTeam[],
+  conferences: Conference[],
+  standings: StandingsEntry[],
+  schedule: ScheduledGame[],
+): NcaaProjection {
+  const leaders = new Map<string, string>();
+  for (const conf of conferences) {
+    const leader = conf.teamIds
+      .map((id) => standings.find((e) => e.teamId === id) ?? { teamId: id, record: EMPTY_RECORD })
+      .sort(compareConferenceStanding)[0];
+    if (leader) leaders.set(conf.id, leader.teamId);
+  }
+  const { field, firstOut } = selectNcaaField([...leaders.values()], teams, schedule);
+  const rpi = computeRpi(teams, schedule);
+  const rpiRank = new Map(
+    [...rpi.entries()].sort((a, b) => b[1] - a[1]).map(([teamId], i) => [teamId, i + 1] as const),
+  );
+  return { field, firstOut, leaders, rpiRank };
+}
+
+/** One line on where a team stands, e.g. "Projected #4 seed (auto bid)". */
+export function projectionStatus(projection: NcaaProjection, teamId: string): string {
+  const entry = projection.field.find((e) => e.teamId === teamId);
+  if (entry) return `Projected #${entry.seed} seed (${entry.bid === 'auto' ? 'auto bid' : 'at-large'})`;
+  const bubble = projection.firstOut.findIndex((e) => e.teamId === teamId);
+  if (bubble >= 0) return `First four out (#${bubble + 1})`;
+  return `Out of the field (RPI #${projection.rpiRank.get(teamId) ?? '?'})`;
+}
