@@ -6326,3 +6326,13 @@ li span {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+.game-log-stars,
+.game-log-star {
+  color: #f2d472;
+}
+
+.game-log-star {
+  white-space: nowrap;
+  font-size: 0.7rem;
+}

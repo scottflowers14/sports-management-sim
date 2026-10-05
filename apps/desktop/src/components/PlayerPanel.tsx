@@ -6,7 +6,7 @@ import { careerTotals } from '../career-stats';
 import { cardFromPlayer } from '../player-card-model';
 import { PlayerCardPanel } from './PlayerCard';
 import { RushBackButton } from './RushBackButton';
-import { gameLogColumns, type PlayerGameRow } from '../player-game-log';
+import { gameLogColumns, starCounts, type PlayerGameRow } from '../player-game-log';
 
 export function PlayerPanel({
   player,
@@ -101,9 +101,18 @@ function RatingHistorySection({ player, seasonYear }: { player: LacrossePlayer; 
 
 function GameLogSection({ rows, position, teamShort }: { rows: PlayerGameRow[]; position: string; teamShort: (id: string) => string }) {
   const columns = gameLogColumns(position);
+  const [first, second, third] = starCounts(rows);
+  const anyStars = first + second + third > 0;
   return (
     <div className="player-stats-section" aria-label="Game log">
-      <p className="section-label">Game Log</p>
+      <p className="section-label">
+        Game Log
+        {anyStars && (
+          <span className="game-log-stars" title="Times named one of the game's three stars">
+            {' '}· ★ {first}-{second}-{third}
+          </span>
+        )}
+      </p>
       <div className="game-log-wrap">
       <table className="standings-table career-table game-log-table">
         <thead>
@@ -114,6 +123,7 @@ function GameLogSection({ rows, position, teamShort }: { rows: PlayerGameRow[]; 
             {columns.map((c) => (
               <th key={c.label}>{c.label}</th>
             ))}
+            {anyStars && <th title="Star of the game">★</th>}
           </tr>
         </thead>
         <tbody>
@@ -133,6 +143,11 @@ function GameLogSection({ rows, position, teamShort }: { rows: PlayerGameRow[]; 
                   {c.value(r.line)}
                 </td>
               ))}
+              {anyStars && (
+                <td className="game-log-star" title={r.star ? `${['1st', '2nd', '3rd'][r.star - 1]} star` : undefined}>
+                  {r.star ? '★'.repeat(4 - r.star) : ''}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
