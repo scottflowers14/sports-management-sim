@@ -6047,3 +6047,42 @@ li span {
   background: rgba(64, 196, 120, 0.14);
   color: #8fe3b1;
 }
+
+.press-question {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.press-answers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.press-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(143, 180, 255, 0.25);
+  background: rgba(61, 127, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+}
+
+.press-answer:hover {
+  border-color: rgba(143, 180, 255, 0.6);
+}
+
+.press-quote {
+  font-size: 0.85rem;
+  color: #aab8ca;
+  font-style: italic;
+}
+
+.press-effects {
+  font-size: 0.78rem;
+  color: #8fe3b1;
+}
