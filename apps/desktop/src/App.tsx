@@ -709,6 +709,7 @@ export function App() {
           userTeamId={dynasty.userTeamId}
           season={dynasty.season}
           weeklyHonors={weeklyHonors}
+          rivalries={rivalries}
         />
       )}
 

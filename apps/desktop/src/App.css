@@ -6113,3 +6113,21 @@ li span {
   padding-left: 6px;
   padding-right: 6px;
 }
+
+.card-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.splits-team-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.splits-table td:first-child {
+  white-space: nowrap;
+}
