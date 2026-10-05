@@ -20,7 +20,7 @@ import { PORTAL_REASON_LABELS } from '@sports-management-sim/engine-core';
 import { OfferControl } from '../components/OfferControl';
 import { portalStanding } from './PortalBoard';
 import type { OffseasonSummary } from '../dynasty-helpers';
-import { conferenceStrength, type RealignmentMove } from '@sports-management-sim/sport-lacrosse';
+import { GATE_FANS_PER_POINT, conferenceStrength, type GateReceipts, type RealignmentMove } from '@sports-management-sim/sport-lacrosse';
 import type { DynastySeasonRecord } from '../history';
 import type { SeasonAwards } from '../awards';
 import type { JobOffer } from '../coach-profile';
@@ -146,7 +146,7 @@ export function OffseasonScreen({
         )}
 
         {!(jobOffers && jobOffers.length > 0) && investments && (
-          <InvestmentsCard team={userTeam} {...investments} />
+          <InvestmentsCard team={userTeam} gate={offseasonSummary.gate} {...investments} />
         )}
 
         <article className="card">
@@ -553,8 +553,10 @@ function InvestmentsCard({
   plan,
   onFund,
   onUnfund,
+  gate,
 }: {
   team: LacrosseTeam;
+  gate?: GateReceipts | undefined;
   budget: number;
   plan: InvestmentPlan;
   onFund: (project: InvestmentProject) => void;
@@ -569,6 +571,17 @@ function InvestmentsCard({
         The athletic department has {budget} points for the program this year. Spend them before the season starts; unspent
         points don&apos;t carry over.
       </p>
+      {gate && gate.homeGames > 0 && (
+        <p className="investments-gate" aria-label="Gate receipts">
+          Gate receipts: {gate.totalFans.toLocaleString('en-US')} fans over {gate.homeGames} home game{gate.homeGames === 1 ? '' : 's'}
+          {gate.sellouts > 0 ? `, ${gate.sellouts} sellout${gate.sellouts === 1 ? '' : 's'}` : ''}.{' '}
+          {gate.bonus > 0 ? (
+            <strong>+{gate.bonus} point{gate.bonus === 1 ? '' : 's'} to the budget.</strong>
+          ) : (
+            <span>Not enough to add to the budget; every {GATE_FANS_PER_POINT.toLocaleString('en-US')} fans earns a point.</span>
+          )}
+        </p>
+      )}
       <p className="investments-budget">
         <strong>{budget - spent}</strong> of {budget} points left
       </p>

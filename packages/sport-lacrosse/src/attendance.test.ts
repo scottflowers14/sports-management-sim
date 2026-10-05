@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import type { LacrosseTeam } from './models';
 import {
+  GATE_BONUS_CAP,
+  GATE_FANS_PER_POINT,
   SELLOUT_FAN_GAIN_CAP,
   attendanceDemand,
   attendanceOf,
   formatAttendance,
+  gateReceipts,
   gameAttendance,
   isSellout,
   seasonAttendance,
@@ -90,7 +93,7 @@ describe('season crowds', () => {
     ];
     expect(attendanceOf(schedule[0]!)).toEqual({ count: 5000, capacity: 5000 });
     expect(attendanceOf(schedule[3]!)).toBeUndefined();
-    expect(seasonAttendance(schedule, 'h')).toEqual({ homeGames: 3, average: 4667, sellouts: 2, capacity: 5000 });
+    expect(seasonAttendance(schedule, 'h')).toEqual({ homeGames: 3, total: 14000, average: 4667, sellouts: 2, capacity: 5000 });
     expect(seasonAttendance(schedule, 'nobody')).toBeNull();
   });
 
@@ -104,5 +107,15 @@ describe('season crowds', () => {
   it('formats a gate', () => {
     expect(formatAttendance({ count: 7160, capacity: 7160 })).toBe('7,160 (sellout)');
     expect(formatAttendance({ count: 5240, capacity: 6600 })).toBe('5,240 of 6,600');
+  });
+});
+
+describe('gate receipts', () => {
+  it('earns a budget point per 12,000 fans, capped', () => {
+    expect(gateReceipts(null)).toEqual({ totalFans: 0, homeGames: 0, sellouts: 0, bonus: 0 });
+    expect(gateReceipts({ homeGames: 6, total: 11400, average: 1900, sellouts: 0, capacity: 4000 }).bonus).toBe(0);
+    const mid = gateReceipts({ homeGames: 6, total: 24000, average: 4000, sellouts: 1, capacity: 5000 });
+    expect(mid).toEqual({ totalFans: 24000, homeGames: 6, sellouts: 1, bonus: 24000 / GATE_FANS_PER_POINT });
+    expect(gateReceipts({ homeGames: 9, total: 63000, average: 7000, sellouts: 5, capacity: 7000 }).bonus).toBe(GATE_BONUS_CAP);
   });
 });

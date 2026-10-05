@@ -5787,6 +5787,16 @@ li span {
 }
 
 /* Program investments */
+.investments-gate {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: #aab8ca;
+}
+
+.investments-gate strong {
+  color: #72f2c6;
+}
+
 .investments-budget {
   margin: 8px 0 12px;
   font-size: 0.9rem;

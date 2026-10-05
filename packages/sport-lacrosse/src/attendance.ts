@@ -80,6 +80,8 @@ export function attendanceOf(game: ScheduledGame): GameAttendance | undefined {
 
 export interface SeasonAttendance {
   homeGames: number;
+  /** Fans through the gates over the season. */
+  total: number;
   average: number;
   sellouts: number;
   capacity: number;
@@ -92,9 +94,11 @@ export function seasonAttendance(schedule: readonly ScheduledGame[], teamId: str
     .map(attendanceOf)
     .filter((a): a is GameAttendance => a !== undefined);
   if (gates.length === 0) return null;
+  const total = gates.reduce((sum, a) => sum + a.count, 0);
   return {
     homeGames: gates.length,
-    average: Math.round(gates.reduce((sum, a) => sum + a.count, 0) / gates.length),
+    total,
+    average: Math.round(total / gates.length),
     sellouts: gates.filter(isSellout).length,
     capacity: gates[gates.length - 1]!.capacity,
   };
@@ -109,4 +113,28 @@ export function selloutFanGain(sellouts: number): number {
 
 export function formatAttendance(attendance: GameAttendance): string {
   return `${attendance.count.toLocaleString('en-US')}${isSellout(attendance) ? ' (sellout)' : ` of ${attendance.capacity.toLocaleString('en-US')}`}`;
+}
+
+/** Ticket money for the athletic department: a budget point per 12,000 fans through the gates, up to three. */
+export const GATE_FANS_PER_POINT = 12000;
+export const GATE_BONUS_CAP = 3;
+
+export interface GateReceipts {
+  /** Fans through the gates over the season. */
+  totalFans: number;
+  homeGames: number;
+  sellouts: number;
+  /** Extra investment budget points the gate earned. */
+  bonus: number;
+}
+
+export function gateReceipts(season: SeasonAttendance | null): GateReceipts {
+  if (!season) return { totalFans: 0, homeGames: 0, sellouts: 0, bonus: 0 };
+  const totalFans = season.total;
+  return {
+    totalFans,
+    homeGames: season.homeGames,
+    sellouts: season.sellouts,
+    bonus: Math.min(GATE_BONUS_CAP, Math.floor(totalFans / GATE_FANS_PER_POINT)),
+  };
 }
