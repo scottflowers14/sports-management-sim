@@ -6386,3 +6386,87 @@ li span {
   white-space: nowrap;
   font-size: 0.7rem;
 }
+
+/* ── Hot & cold streaks ───────────────────────────────────── */
+
+.form-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+.form-hot {
+  background: rgba(255, 122, 69, 0.18);
+  color: #ff9a6b;
+  border: 1px solid rgba(255, 122, 69, 0.45);
+}
+
+.form-cold {
+  background: rgba(96, 165, 250, 0.16);
+  color: #8cc4ff;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+}
+
+.form-watch-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+.form-watch-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: none;
+  color: #e6edf3;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.form-watch-row .form-badge {
+  margin-left: 0;
+  min-width: 42px;
+  text-align: center;
+}
+
+.form-watch-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.form-watch-line {
+  grid-column: 2;
+  color: #aab8ca;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.form-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: #e6edf3;
+}
+
+.form-status .form-badge {
+  margin-left: 0;
+}
+
+.form-watch-name .hub-injury-pos {
+  display: inline-block;
+  width: auto;
+  margin-left: 6px;
+}
