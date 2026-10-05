@@ -405,6 +405,7 @@ export function WeekHubScreen({
                 userTeamId={userTeamId}
                 gameLogs={gameLogs}
                 onBoxScore={onBoxScore}
+                rankOf={rankOf}
               />
             ))}
           </ul>

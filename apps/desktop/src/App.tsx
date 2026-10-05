@@ -232,6 +232,9 @@ export function App() {
   const hasScheduledGames = dynasty.season.schedule.some((g) => g.status === 'scheduled');
   const seasonComplete = !hasScheduledGames;
 
+  const rankById = new Map(rankings.map((r) => [r.teamId, r.rank]));
+  const rankOf = (teamId: string) => rankById.get(teamId) ?? null;
+
   const lastWeekGames =
     lastSimWeek !== null
       ? dynasty.season.schedule.filter((g) => g.week === lastSimWeek && g.status === 'final')
@@ -584,7 +587,7 @@ export function App() {
           userTeamId={dynasty.userTeamId}
           lastSimWeek={lastSimWeek}
           lastWeekGames={lastWeekGames}
-          rankOf={(id) => rankings.find((r) => r.teamId === id)?.rank ?? null}
+          rankOf={rankOf}
           gameLogs={gameLogs}
           onSimWeek={simWeek}
           onBoxScore={setSelectedBoxScore}
@@ -620,6 +623,7 @@ export function App() {
           tournament={tournament}
           lastSimWeek={lastSimWeek}
           lastWeekGames={lastWeekGames}
+          rankOf={rankOf}
           newsItems={newsItems}
           userTeam={userTeam}
           userInjuries={userInjuries}

@@ -6578,3 +6578,10 @@ li span {
 .results-toggle {
   margin-top: 8px;
 }
+
+.result-rank {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f2c472;
+  margin-right: 4px;
+}
