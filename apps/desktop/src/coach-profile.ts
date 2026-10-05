@@ -68,6 +68,64 @@ export function extendCoachContract(profile: CoachProfile, years = 3): CoachProf
   return { ...profile, contractYearsRemaining: profile.contractYearsRemaining + years };
 }
 
+/** AD confidence at which the AD offers a new deal ("On Extension Watch"). */
+export const EXTENSION_CONFIDENCE = 80;
+/** A full new deal runs this long. */
+export const FULL_CONTRACT_YEARS = 5;
+
+export type ContractDecision =
+  /** Rewarded with a fresh full-length deal. */
+  | 'extended'
+  /** Expiring, secure but not starring: a shorter renewal. */
+  | 'renewed'
+  /** Expiring under scrutiny: one more year to prove it. */
+  | 'prove-it'
+  /** Expiring on the hot seat: the AD lets the deal run out. */
+  | 'not-renewed';
+
+export interface ContractReview {
+  profile: CoachProfile;
+  decision: ContractDecision | null;
+  /** Years added to the contract by this review. */
+  yearsAdded: number;
+}
+
+/**
+ * The AD's offseason look at the coach's contract, after the tenure year has
+ * ticked off. A coach on extension watch gets a new full deal once two years or
+ * fewer remain. An expiring deal is renewed, cut to a one-year prove-it deal,
+ * or left to run out, depending on confidence.
+ */
+export function reviewCoachContract(profile: CoachProfile, confidence: number): ContractReview {
+  const left = profile.contractYearsRemaining;
+  if (confidence >= EXTENSION_CONFIDENCE && left <= 2) {
+    const yearsAdded = FULL_CONTRACT_YEARS - left;
+    return { profile: extendCoachContract(profile, yearsAdded), decision: 'extended', yearsAdded };
+  }
+  if (left > 0) return { profile, decision: null, yearsAdded: 0 };
+  if (confidence >= 60) return { profile: extendCoachContract(profile, 3), decision: 'renewed', yearsAdded: 3 };
+  if (confidence >= 40) return { profile: extendCoachContract(profile, 1), decision: 'prove-it', yearsAdded: 1 };
+  return { profile, decision: 'not-renewed', yearsAdded: 0 };
+}
+
+/** News headline for a contract decision, or null when nothing changed. */
+export function contractNewsHeadline(review: ContractReview, teamName: string, seasonYear: number): string | null {
+  const { name, contractYearsRemaining } = review.profile;
+  const through = seasonYear + contractYearsRemaining;
+  switch (review.decision) {
+    case 'extended':
+      return `${teamName} extends ${name} through ${through}, a ${FULL_CONTRACT_YEARS}-year deal`;
+    case 'renewed':
+      return `${teamName} renews ${name}'s contract through ${through}`;
+    case 'prove-it':
+      return `${teamName} gives ${name} a one-year deal: show progress in ${seasonYear + 1} or move on`;
+    case 'not-renewed':
+      return `${teamName} will not renew ${name}'s expiring contract`;
+    default:
+      return null;
+  }
+}
+
 export const DEFAULT_GOAL_SCHEDULE_LENGTH = 12;
 
 export function generateSeasonGoals(
