@@ -156,9 +156,19 @@ describe('the Hall of Fame', () => {
   });
 
   it('waits until a player leaves, and inducts him once', () => {
-    expect(hallOfFameInductees(records, new Set(), new Map(), 2030)).toEqual([]);
-    const first = hallOfFameInductees(records, new Set(['stay']), new Map(), 2030);
+    const honors = new Map([['stay', ['All-America 2030']]]);
+    expect(hallOfFameInductees(records, new Set(), honors, 2030)).toEqual([]);
+    const first = hallOfFameInductees(records, new Set(['stay']), honors, 2030);
     expect(first.map((e) => e.playerId)).toEqual(['stay']);
-    expect(hallOfFameInductees(records, new Set(['stay']), new Map(), 2031, first)).toEqual([]);
+    expect(hallOfFameInductees(records, new Set(['stay']), honors, 2031, first)).toEqual([]);
+  });
+
+  it('needs an honor or a program record on top of a top-three career', () => {
+    // Val is #2 everywhere with no honors; Sid holds the records but in one season.
+    expect(hallOfFameInductees(records, new Set(['vet', 'stay']), new Map(), 2030)).toEqual([]);
+    const solo = scopeRecords({}, 'durham', { vet: longCareers.vet! });
+    const inductees = hallOfFameInductees(solo, new Set(['vet']), new Map(), 2030);
+    expect(inductees.map((e) => e.playerId)).toEqual(['vet']);
+    expect(inductees[0]!.citation).toContain('#1 career goals');
   });
 });
