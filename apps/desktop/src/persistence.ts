@@ -89,6 +89,8 @@ export interface DynastySaveState {
   autoRecruitingAssistant?: boolean;
   /** When on, the assistant also makes its suggested scholarship offers. */
   autoRecruitingOffers?: boolean;
+  /** The staff sets the game plan from the roster; off once the user picks their own. */
+  autoGamePlan?: boolean;
   /** The user's assistant coaches. Older saves get a starting staff on load. */
   staff?: LacrosseStaff;
   /** Coaches available to hire this year. */

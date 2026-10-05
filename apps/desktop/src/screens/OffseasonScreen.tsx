@@ -4,6 +4,7 @@ import {
   draftSlotLabel,
   fundProject,
   INVESTMENT_PROJECT_INFO,
+  investmentStep,
   INVESTMENT_PROJECTS,
   planCost,
 } from '@sports-management-sim/sport-lacrosse';
@@ -753,7 +754,7 @@ function InvestmentsCard({
                 <span className="investments-rating">
                   {now}
                   {next !== now && <span className="mood-happy"> → {next}</span>}
-                  <span className="dim"> · {info.cost} pts for +{info.gain}</span>
+                  <span className="dim"> · {info.cost} pts for +{Math.min(99 - next, investmentStep(next, info.gain))}</span>
                 </span>
               </div>
               <div className="investments-controls">

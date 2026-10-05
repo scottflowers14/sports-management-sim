@@ -9,6 +9,7 @@ import {
   openLacrossePortal,
   resolveLacrossePortal,
 } from './transfer-portal';
+import { portalOfferCap } from '@sports-management-sim/engine-core';
 
 /** A league-sized roster set after the offseason: every class but freshmen is eligible to move. */
 function leagueTeams(): LacrosseTeam[] {
@@ -77,7 +78,7 @@ describe('generateLacrosseCpuPortalOffers', () => {
     const byTeam = new Map<string, number>();
     for (const id of offers) byTeam.set(id, (byTeam.get(id) ?? 0) + 1);
     for (const count of byTeam.values()) expect(count).toBeLessThanOrEqual(4);
-    for (const entry of offered) expect(Object.keys(entry.offersByTeamId).length).toBeLessThanOrEqual(2);
+    for (const entry of offered) expect(Object.keys(entry.offersByTeamId).length).toBeLessThanOrEqual(portalOfferCap(entry.ratings.overall));
     for (const team of opened.teams) {
       for (const [position, cap] of Object.entries(LACROSSE_PORTAL_POSITION_CAPS) as [LacrossePosition, number][]) {
         const held = team.roster.filter((p) => p.position === position).length;

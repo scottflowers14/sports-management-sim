@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ageProgram,
+  facilityWear,
+  investedRating,
+  investmentStep,
   applyInvestmentPlan,
   cpuInvestmentPlan,
   fanHomeEdgeFactor,
@@ -52,8 +55,24 @@ describe('funding projects', () => {
 
   it('raises each rating by its project, up to a cap', () => {
     const team = applyInvestmentPlan(program({ facilities: 70, fanSupport: 97, academicPrestige: 60 }), { facilities: 2, fans: 1, academics: 1 });
-    expect(team.reputation).toMatchObject({ facilities: 76, fanSupport: 99, academicPrestige: 62 });
+    expect(team.reputation).toMatchObject({ facilities: 76, fanSupport: 98, academicPrestige: 62 });
     expect(applyInvestmentPlan(program({ fanSupport: 60 }), { fans: 2 }).reputation.fanSupport).toBe(64);
+    expect(applyInvestmentPlan(program({ fanSupport: 98 }), { fans: 3 }).reputation.fanSupport).toBe(99);
+  });
+
+  it('makes the last points cost the most', () => {
+    // Facilities: +3 a round below 80, +2 from 80, +1 from 90.
+    expect(investedRating(74, 4, 3)).toBe(74 + 3 + 3 + 2 + 2);
+    expect(investedRating(90, 3, 3)).toBe(93);
+    expect([investmentStep(70, 3), investmentStep(85, 3), investmentStep(92, 3)]).toEqual([3, 2, 1]);
+  });
+
+  it('wears top-end facilities faster', () => {
+    expect([facilityWear(70), facilityWear(88), facilityWear(97)]).toEqual([1, 2, 3]);
+    // A facility at 98 funded every round of a big budget still can't hold 98.
+    let rep = program({ facilities: 98 });
+    for (let year = 0; year < 5; year += 1) rep = ageProgram(applyInvestmentPlan(rep, { facilities: 2 }));
+    expect(rep.reputation.facilities).toBeLessThan(98);
   });
 
   it('summarizes what changed', () => {

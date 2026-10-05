@@ -121,6 +121,8 @@ export function App() {
     seasonGoals,
     gamePlan,
     setGamePlan,
+    autoGamePlan,
+    restoreStaffGamePlan,
     trainingFocus,
     setTrainingFocus,
     staff,
@@ -650,6 +652,8 @@ export function App() {
           nextOpponentScout={nextOpponentScout}
           weeklyHub={weeklyHub}
           onGamePlanChange={setGamePlan}
+          autoGamePlan={autoGamePlan}
+          onUseStaffPlan={restoreStaffGamePlan}
           onTrainingFocusChange={setTrainingFocus}
           onSimWeek={simWeek}
           onSimToEnd={simToEnd}
