@@ -323,6 +323,14 @@ export function WeekHubScreen({
                 <span className="hub-stat-label">Recent Form</span>
               </div>
             )}
+            {weeklyHub && (
+              <div className="hub-stat" title={`Head-to-head vs ${weeklyHub.opponentName}`}>
+                <span className="hub-stat-value">
+                  {weeklyHub.series ? `${weeklyHub.series.wins}–${weeklyHub.series.losses}` : 'New'}
+                </span>
+                <span className="hub-stat-label">Series</span>
+              </div>
+            )}
             <div className="hub-stat">
               <span className="hub-stat-value">{scouting.pointsAvailable}</span>
               <span className="hub-stat-label">Recruit Hrs</span>

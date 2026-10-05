@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { buildCoachCareer } from '../coach-of-year';
 import type { CoachCareer } from '../coach-of-year';
 import type { DynastySeasonRecord, SeasonAwardRecord } from '../history';
@@ -5,15 +6,21 @@ import { buildRecordBook } from '../history';
 import { versusPrediction } from '../preseason';
 import type { HallOfFameEntry } from '../records';
 import { formatTeamName } from '../ui/format';
+import { formatStreak, type SeriesRecord } from '../series-history';
 
 export function HistoryScreen({
   history,
   hallOfFame = [],
   coachName = null,
+  series = [],
+  teamName = (id) => id,
 }: {
   history: DynastySeasonRecord[];
   hallOfFame?: HallOfFameEntry[];
   coachName?: string | null;
+  /** Head-to-head with every opponent, this season included. */
+  series?: SeriesRecord[];
+  teamName?: (teamId: string) => string;
 }) {
   if (history.length === 0) {
     return (
@@ -116,6 +123,8 @@ export function HistoryScreen({
           </tbody>
         </table>
       </article>
+
+      <HeadToHeadCard series={series} teamName={teamName} />
 
       <div className="history-detail-row">
         <RecordBookCard recordBook={recordBook} />
@@ -282,6 +291,55 @@ function AwardsHistoryCard({ history }: { history: DynastySeasonRecord[] }) {
           )}
         </tbody>
       </table>
+    </article>
+  );
+}
+
+function HeadToHeadCard({ series, teamName }: { series: SeriesRecord[]; teamName: (teamId: string) => string }) {
+  const [showAll, setShowAll] = useState(false);
+  if (series.length === 0) return null;
+  const rows = [...series].sort(
+    (a, b) => b.wins + b.losses - (a.wins + a.losses) || b.wins - a.wins || teamName(a.opponentId).localeCompare(teamName(b.opponentId)),
+  );
+  const shown = showAll ? rows : rows.slice(0, 10);
+  return (
+    <article className="card" aria-label="Head-to-head">
+      <h2>Head-to-Head</h2>
+      <table className="standings-table history-table">
+        <thead>
+          <tr>
+            <th>Opponent</th>
+            <th>Series</th>
+            <th>GF</th>
+            <th>GA</th>
+            <th>Streak</th>
+            <th>Last Meeting</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((s) => (
+            <tr key={s.opponentId}>
+              <td>{teamName(s.opponentId)}</td>
+              <td className={s.wins > s.losses ? 'mood-happy record-cell' : s.wins < s.losses ? 'mood-unhappy record-cell' : 'record-cell'}>
+                {s.wins}–{s.losses}
+              </td>
+              <td>{s.goalsFor}</td>
+              <td>{s.goalsAgainst}</td>
+              <td>{formatStreak(s)}</td>
+              <td className="dim">
+                {s.last
+                  ? `${s.last.won ? 'W' : 'L'} ${s.last.goalsFor}-${s.last.goalsAgainst}, ${s.last.year}${s.last.postseason ? ' (postseason)' : ''}`
+                  : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rows.length > 10 && (
+        <button className="hub-nav-link" onClick={() => setShowAll((v) => !v)}>
+          {showAll ? 'Show top 10' : `Show all ${rows.length} opponents`}
+        </button>
+      )}
     </article>
   );
 }

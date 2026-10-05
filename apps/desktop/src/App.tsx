@@ -37,6 +37,7 @@ import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
 import { recruitingPipelines } from './pipelines';
 import { playerGameLog } from './player-game-log';
+import { allSeries, userSeasonGames } from './series-history';
 import { TOURNAMENT_ROUND_LABELS } from './tournament';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
@@ -308,7 +309,11 @@ export function App() {
       }
     : null;
 
-  const weeklyHub = buildWeeklyHub({
+  const seriesByOpponent = allSeries(dynastyHistory, {
+    year: dynasty.season.year,
+    games: userSeasonGames(dynasty.season.schedule, tournament, dynasty.userTeamId),
+  });
+  const baseWeeklyHub = buildWeeklyHub({
     schedule: dynasty.season.schedule,
     teams: dynasty.season.teams,
     userTeamId: dynasty.userTeamId,
@@ -316,6 +321,8 @@ export function App() {
     rankings,
     seasonStats,
   });
+  const nextSeries = baseWeeklyHub ? seriesByOpponent.get(baseWeeklyHub.preview.opponent.id) : undefined;
+  const weeklyHub = baseWeeklyHub && nextSeries ? { ...baseWeeklyHub, series: nextSeries } : baseWeeklyHub;
 
   // Player cards are reusable across the whole league, not just the user roster.
   const selectedPlayer = selectedPlayerId
@@ -776,7 +783,13 @@ export function App() {
       )}
 
       {view === 'history' && (
-        <HistoryScreen history={dynastyHistory} hallOfFame={hallOfFame} coachName={coachProfile?.name ?? null} />
+        <HistoryScreen
+          history={dynastyHistory}
+          hallOfFame={hallOfFame}
+          coachName={coachProfile?.name ?? null}
+          series={[...seriesByOpponent.values()]}
+          teamName={(id) => formatTeamName(teamMap.get(id) ?? id)}
+        />
       )}
 
       {view === 'offseason' && offseasonSummary && (

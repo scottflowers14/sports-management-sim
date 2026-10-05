@@ -1,5 +1,6 @@
 import type { WeeklyHubData } from '../weekly-hub';
 import { formatTeamName, formatTeamShort } from '../ui/format';
+import { formatSeries, formatStreak } from '../series-history';
 
 export function WeeklyHub({
   hub,
@@ -25,6 +26,14 @@ export function WeeklyHub({
           <p className="dim weekly-hub-sub">
             {hub.opponentRank !== null && <span className="hub-rank">#{hub.opponentRank}</span>}
             {hub.opponentRecord.wins}–{hub.opponentRecord.losses} · {preview.userIsHome ? 'Home' : 'Away'} · {preview.matchupNote}
+          </p>
+          <p className="dim weekly-hub-sub" aria-label="Series history">
+            Series: {formatSeries(hub.series)}
+            {hub.series?.last &&
+              ` · Last: ${hub.series.last.won ? 'W' : 'L'} ${hub.series.last.goalsFor}-${hub.series.last.goalsAgainst} (${hub.series.last.year}${
+                hub.series.last.postseason ? ' postseason' : ''
+              })`}
+            {hub.series?.streak && hub.series.streak.count > 1 && ` · ${formatStreak(hub.series)} streak`}
           </p>
         </div>
         <div className="matchup-line">

@@ -1,6 +1,7 @@
 import type { LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { SeasonAwards } from './awards';
 import type { SeasonStatsMap } from './stats';
+import type { SeasonGameRecord } from './series-history';
 
 /** A national award winner captured for the permanent dynasty record. */
 export interface SeasonAwardRecord {
@@ -49,6 +50,8 @@ export interface DynastySeasonRecord {
   coachOfYear?: boolean;
   /** Players from the user program taken in that year's pro draft. */
   proPicks?: number;
+  /** Every game the user played that season, for head-to-head series. */
+  games?: SeasonGameRecord[];
 }
 
 /** Flatten the computed season awards into the slim records stored in history. */
