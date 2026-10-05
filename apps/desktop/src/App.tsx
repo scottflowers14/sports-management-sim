@@ -37,6 +37,7 @@ import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
 import { recruitingPipelines } from './pipelines';
 import { playerGameLog } from './player-game-log';
+import { TeamTalkCard } from './components/TeamTalkCard';
 import { allSeries, userSeasonGames } from './series-history';
 import { TOURNAMENT_ROUND_LABELS, projectNcaaField, projectionStatus } from './tournament';
 import { PressConferenceCard } from './components/PressConferenceCard';
@@ -172,6 +173,8 @@ export function App() {
     nil,
     retainWithNil,
     rushInjuredPlayer,
+    teamTalk,
+    giveTeamTalk,
     signNilDeal,
     enterTournament,
     simTournamentSemis,
@@ -538,6 +541,21 @@ export function App() {
           onCoachGame={canCoachGame ? coachGame : undefined}
           onRushInjury={rushInjuredPlayer}
           bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          teamTalkCard={
+            // Hidden at halftime: a talk given then would change a first half already shown.
+            weeklyHub && !seasonComplete && !tournament && !halftime ? (
+              <TeamTalkCard
+                opponentName={formatTeamName(weeklyHub.opponentName)}
+                talk={teamTalk}
+                onTalk={(tone) =>
+                  giveTeamTalk(tone, {
+                    winProbability: weeklyHub.winProbability,
+                    rivalry: rivalryForGame(rivalries, weeklyHub.preview.game) !== null,
+                  })
+                }
+              />
+            ) : undefined
+          }
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           userTeam={userTeam}

@@ -43,7 +43,8 @@ import {
   pitchNilRetention,
   signNilPortalDeal,
 } from '@sports-management-sim/sport-lacrosse';
-import type { InvestmentPlan, InvestmentProject, NilState, ProDraftPick, StaffRole } from '@sports-management-sim/sport-lacrosse';
+import type { InvestmentPlan, InvestmentProject, NilState, ProDraftPick, StaffRole, TeamTalkContext, TeamTalkTone } from '@sports-management-sim/sport-lacrosse';
+import { teamTalkResult } from '@sports-management-sim/sport-lacrosse';
 import {
   autoDevelopmentPlans,
   boostMorale,
@@ -68,12 +69,12 @@ import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition,
 import { userSeasonGames } from './series-history';
 import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
-import { previewUserGame, simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
+import { isCurrentTalk, previewUserGame, simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
 import type { HalftimeState } from './halftime';
 import { pressConferenceFor } from './press-conference';
 import { computeNationalRankings } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
-import type { PracticeLogEntry, WeekSimState } from './week-sim';
+import type { PracticeLogEntry, PregameTalk, WeekSimState } from './week-sim';
 import type { WeeklyHonor } from './weekly-honors';
 import { EMPTY_LOCKER_ROOM, type LockerRoomState } from './locker-room';
 import { archiveRecords, hallOfFameInductees, recordNewsForWeek, scopeRecords, type HallOfFameEntry, type RecordBookArchive } from './records';
@@ -255,6 +256,7 @@ export function useDynastyController() {
   const [nilSaved, setNil] = useState<NilState | null>(() => loadedSave?.nil ?? null);
   const [halftime, setHalftime] = useState<HalftimeState | null>(() => loadedSave?.halftime ?? null);
   const [pressAnswers, setPressAnswers] = useState<Record<string, string>>(() => loadedSave?.pressAnswers ?? {});
+  const [teamTalk, setTeamTalk] = useState<PregameTalk | null>(() => loadedSave?.teamTalk ?? null);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
@@ -291,6 +293,7 @@ export function useDynastyController() {
     nil: nilSaved,
     halftime,
     pressAnswers,
+    teamTalk,
     pendingJobOffers,
     shortlistIds,
     recruitingActivity,
@@ -299,7 +302,7 @@ export function useDynastyController() {
     autoRecruitingOffers,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -415,6 +418,7 @@ export function useDynastyController() {
       nil: null,
       halftime: null,
       pressAnswers: {},
+      teamTalk: null,
       seasonPreview: preview,
       pendingJobOffers: null,
       shortlistIds: [],
@@ -478,6 +482,7 @@ export function useDynastyController() {
     setNil(save.nil ?? null);
     setHalftime(save.halftime ?? null);
     setPressAnswers(save.pressAnswers ?? {});
+    setTeamTalk(save.teamTalk ?? null);
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
@@ -567,7 +572,8 @@ export function useDynastyController() {
     practiceGains,
     rivalrySeries,
     weeklyHonors,
-  }), [playingStaff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+    teamTalk,
+  }), [teamTalk, playingStaff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((simResult: WeekSimState) => {
     // Promises that came due are judged against the depth chart after the week.
@@ -852,6 +858,16 @@ export function useDynastyController() {
 
   // Rushing a player back halves his time out; the setback is rolled now, from
   // the dynasty seed, so reloading and rushing again gives the same result.
+  // The pregame talk is judged on the matchup when it's given and only counts
+  // for this week's game; one talk per week.
+  const giveTeamTalk = useCallback((tone: TeamTalkTone, context: TeamTalkContext) => {
+    const { year, currentWeek: week } = dynasty.season;
+    setTeamTalk((prev) =>
+      isCurrentTalk(prev, dynasty.season) ? prev : { year, week, tone, result: teamTalkResult(tone, context) },
+    );
+  }, [dynasty.season]);
+  const currentTeamTalk = isCurrentTalk(teamTalk, dynasty.season) ? teamTalk : null;
+
   const rushInjuredPlayer = useCallback((playerId: string) => {
     setInjuries((prev) => rushInjury(prev, playerId, dynasty.season.currentWeek, dynasty.seed));
   }, [dynasty.season.currentWeek, dynasty.seed]);
@@ -1659,6 +1675,8 @@ export function useDynastyController() {
     retainWithNil,
     signNilDeal,
     rushInjuredPlayer,
+    teamTalk: currentTeamTalk,
+    giveTeamTalk,
     activeSaveId,
     saves,
     customTeams,
