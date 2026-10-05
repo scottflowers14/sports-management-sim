@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { Conference, StandingsEntry } from '@sports-management-sim/engine-core';
 import type { RankingEntry } from '../rankings';
+import type { PowerRankingBlurb } from '../power-rankings';
 import { compareConferenceStanding, projectionStatus, type NcaaProjection } from '../tournament';
 import { formatTeamName } from '../ui/format';
 
@@ -14,6 +15,7 @@ export function StandingsScreen({
   teamMap,
   onOpenProgram,
   projection = null,
+  powerRankings = [],
 }: {
   rankings: RankingEntry[];
   sortedStandings: StandingsEntry[];
@@ -24,6 +26,8 @@ export function StandingsScreen({
   onOpenProgram: (teamId: string) => void;
   /** In-season projected NCAA field; null once the postseason starts. */
   projection?: NcaaProjection | null;
+  /** This week's top-ten write-ups; empty before any games. */
+  powerRankings?: PowerRankingBlurb[];
 }) {
   const teamLink = (teamId: string) => (
     <button type="button" className="link-btn" onClick={() => onOpenProgram(teamId)}>
@@ -40,6 +44,35 @@ export function StandingsScreen({
           userTeamId={userTeamId}
           teamLink={teamLink}
         />
+      )}
+      {powerRankings.length > 0 && (
+        <article className="card power-rankings-card" aria-label="Power rankings">
+          <h2>Power Rankings</h2>
+          <ol className="power-rankings-list">
+            {powerRankings.map((p) => (
+              <li key={p.teamId} className={p.teamId === userTeamId ? 'power-row user-row' : 'power-row'}>
+                <span className="power-rank">{p.rank}</span>
+                <div>
+                  <div className="power-team">
+                    {teamLink(p.teamId)}
+                    <span className="power-record">
+                      {(() => {
+                        const r = sortedStandings.find((s) => s.teamId === p.teamId)?.record;
+                        return r ? `${r.wins}–${r.losses}` : '';
+                      })()}
+                    </span>
+                    {p.change > 0 ? (
+                      <span className="rank-change rank-up">▲{p.change}</span>
+                    ) : p.change < 0 ? (
+                      <span className="rank-change rank-down">▼{-p.change}</span>
+                    ) : null}
+                  </div>
+                  <p className="power-blurb">{p.blurb}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </article>
       )}
       <article className="card">
         <h2>National Rankings</h2>

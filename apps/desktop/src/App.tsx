@@ -51,6 +51,7 @@ import { PlayersScreen } from './screens/PlayersScreen';
 import { useState } from 'react';
 import { FormWatchCard } from './components/FormWatchCard';
 import { rosterForm } from './player-form';
+import { powerRankingBlurbs } from './power-rankings';
 import { formatTeamName, formatTeamShort } from './ui/format';
 import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
@@ -727,6 +728,11 @@ export function App() {
           teamMap={teamMap}
           onOpenProgram={openProgram}
           projection={ncaaProjection}
+          powerRankings={
+            dynasty.season.schedule.some((g) => g.status === 'final')
+              ? powerRankingBlurbs(rankings, dynasty.season.schedule, (id) => formatTeamName(teamMap.get(id) ?? id), dynasty.season.currentWeek)
+              : []
+          }
         />
       )}
 
