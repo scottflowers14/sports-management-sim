@@ -73,7 +73,7 @@ import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-h
 import { isCurrentTalk, previewUserGame, simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
 import type { HalftimeState } from './halftime';
 import { pressConferenceFor } from './press-conference';
-import { computeNationalRankings } from './rankings';
+import { computeNationalRankings, finalPollRank } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, PregameTalk, WeekSimState } from './week-sim';
 import type { WeeklyHonor } from './weekly-honors';
@@ -1025,7 +1025,7 @@ export function useDynastyController() {
     const userBracket = tournament?.conferenceBrackets.find(b => b.conferenceId === userConfId);
     const isConfChamp = userBracket?.champion === dynasty.userTeamId;
     const isNatChamp = tournamentChampion === dynasty.userTeamId;
-    const currentNatRank = rankings.find((r) => r.teamId === dynasty.userTeamId)?.rank ?? null;
+    const currentNatRank = finalPollRank(rankings, dynasty.userTeamId, tournamentChampion);
 
     const { newDynasty, summary } = runOffseason(dynasty, tournamentChampion, trainingFocus, seasonStats, playingStaff);
     const confId = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId)?.conferenceId;
@@ -1211,11 +1211,14 @@ export function useDynastyController() {
     if (coachProfile && seasonGoals) {
       const userTeamData = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
       const userRecord = userTeamData?.record ?? { wins: 0, losses: 0 };
+      // The final poll counts too: a title run lifts a team to #1.
+      const ranks = [bestNatRank, currentNatRank].filter((r): r is number => r !== null);
+      const bestRankWithFinalPoll = ranks.length > 0 ? Math.min(...ranks) : null;
       // Grade the class that actually signed, after signing-day commits and flips.
       const evaluated = evaluateSeasonGoals(
         seasonGoals,
         userRecord,
-        bestNatRank,
+        bestRankWithFinalPoll,
         isConfChamp ?? false,
         summary.signingClass.length,
       );

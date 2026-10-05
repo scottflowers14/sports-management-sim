@@ -6567,3 +6567,7 @@ li span {
   border-color: rgba(242, 196, 114, 0.6);
   color: #f2c472;
 }
+
+.results-toggle {
+  margin-top: 8px;
+}

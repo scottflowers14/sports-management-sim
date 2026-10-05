@@ -116,3 +116,29 @@ function topPerformer(team: LacrosseTeam, seasonStats: SeasonStatsMap, isUser: b
     isUser,
   };
 }
+
+/** Results the hub shows before "show all". */
+export const FEATURED_RESULTS = 6;
+/** Ranked teams worth a headline. */
+const FEATURED_RANK = 20;
+
+/**
+ * The week's results worth reading first: your game, then games with a
+ * ranked team (best rank first), then the closest finishes.
+ */
+export function featuredResults(
+  games: readonly ScheduledGame[],
+  userTeamId: string,
+  rankOf: (teamId: string) => number | null,
+  limit = FEATURED_RESULTS,
+): ScheduledGame[] {
+  const bestRank = (g: ScheduledGame) => {
+    const ranks = [rankOf(g.homeTeamId), rankOf(g.awayTeamId)].filter((r): r is number => r !== null && r <= FEATURED_RANK);
+    return ranks.length > 0 ? Math.min(...ranks) : Infinity;
+  };
+  const margin = (g: ScheduledGame) => (g.result ? Math.abs(g.result.homeScore - g.result.awayScore) : Infinity);
+  const isUsers = (g: ScheduledGame) => g.homeTeamId === userTeamId || g.awayTeamId === userTeamId;
+  return [...games]
+    .sort((a, b) => Number(isUsers(b)) - Number(isUsers(a)) || bestRank(a) - bestRank(b) || margin(a) - margin(b))
+    .slice(0, limit);
+}

@@ -584,6 +584,7 @@ export function App() {
           userTeamId={dynasty.userTeamId}
           lastSimWeek={lastSimWeek}
           lastWeekGames={lastWeekGames}
+          rankOf={(id) => rankings.find((r) => r.teamId === id)?.rank ?? null}
           gameLogs={gameLogs}
           onSimWeek={simWeek}
           onBoxScore={setSelectedBoxScore}
