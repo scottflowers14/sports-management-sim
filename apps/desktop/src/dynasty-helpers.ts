@@ -94,9 +94,19 @@ export interface SigningDayFlip {
   toTeamName: string;
 }
 
+/** A row of the season recap: final poll rank and the full record, postseason included. */
+export interface FinalPollRow {
+  teamId: string;
+  rank: number;
+  wins: number;
+  losses: number;
+}
+
 export interface OffseasonSummary {
   seasonYear: number;
   finalStandings: StandingsEntry[];
+  /** The final poll with full records; older saves fall back to finalStandings. */
+  finalPoll?: FinalPollRow[];
   userStanding: number;
   userRecord: { wins: number; losses: number };
   graduates: { name: string; position: string; overall: number }[];
@@ -893,4 +903,20 @@ export function withSelloutFans(team: LacrosseTeam, schedule: readonly Scheduled
   const gain = selloutFanGain(seasonAttendance(schedule, team.id)?.sellouts ?? 0);
   if (gain === 0) return team;
   return { ...team, reputation: { ...team.reputation, fanSupport: Math.min(99, team.reputation.fanSupport + gain) } };
+}
+
+/** The season recap table: every team in final poll order with its full record. */
+export function buildFinalPollRows(
+  poll: readonly { teamId: string; rank: number }[],
+  standings: readonly StandingsEntry[],
+  postseason: ReadonlyMap<string, { wins: number; losses: number }>,
+): FinalPollRow[] {
+  const regular = new Map(standings.map((entry) => [entry.teamId, entry.record]));
+  return [...poll]
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ teamId, rank }) => {
+      const record = regular.get(teamId) ?? { wins: 0, losses: 0 };
+      const extra = postseason.get(teamId) ?? { wins: 0, losses: 0 };
+      return { teamId, rank, wins: record.wins + extra.wins, losses: record.losses + extra.losses };
+    });
 }

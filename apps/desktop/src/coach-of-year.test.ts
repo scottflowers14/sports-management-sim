@@ -88,6 +88,26 @@ describe('buildCoachCareer', () => {
     expect(career.bestSeason?.year).toBe(2031);
   });
 
+  it('picks a 10-0 #2 season over a 7-3 conference title year', () => {
+    const history = [
+      season(2038, { wins: 10, losses: 0, natRankAtEnd: 2 }),
+      season(2033, { wins: 7, losses: 3, confChampion: true, natRankAtEnd: 9 }),
+      season(2031, { wins: 9, losses: 1, natRankAtEnd: null }),
+    ];
+    expect(buildCoachCareer(history, 'Pat Riley').bestSeason?.year).toBe(2038);
+  });
+
+  it('breaks a poll-rank tie with the conference title, then win percentage', () => {
+    const history = [
+      season(2034, { wins: 9, losses: 1, natRankAtEnd: 4 }),
+      season(2035, { wins: 8, losses: 2, natRankAtEnd: 4, confChampion: true }),
+      season(2036, { wins: 6, losses: 4 }),
+      season(2037, { wins: 7, losses: 3 }),
+    ];
+    expect(buildCoachCareer(history, 'Pat Riley').bestSeason?.year).toBe(2035);
+    expect(buildCoachCareer(history.slice(2), 'Pat Riley').bestSeason?.year).toBe(2037);
+  });
+
   it('is empty before the first season', () => {
     expect(buildCoachCareer([], 'Pat Riley')).toMatchObject({ seasons: 0, wins: 0, stints: [], bestSeason: null });
   });

@@ -46,3 +46,17 @@ export function finalPollRank(
   const championRank = rankings.find((r) => r.teamId === championId)?.rank ?? Infinity;
   return championRank > rank ? rank + 1 : rank;
 }
+
+/**
+ * The whole final poll, with the champion at #1 and the teams it passed each
+ * sliding down a spot. previousRank keeps the last regular-season rank.
+ */
+export function finalPoll(rankings: readonly RankingEntry[], championId: string | null | undefined): RankingEntry[] {
+  return rankings
+    .map((entry) => ({
+      ...entry,
+      rank: finalPollRank(rankings, entry.teamId, championId) ?? entry.rank,
+      previousRank: entry.rank,
+    }))
+    .sort((a, b) => a.rank - b.rank);
+}

@@ -98,29 +98,42 @@ export function OffseasonScreen({
       <div className="offseason-left">
         <article className="card season-recap-card">
           <p className="eyebrow">{offseasonSummary.seasonYear} Season Recap</p>
-          <h2>
-            Finished #{offseasonSummary.userStanding} ·{' '}
-            {offseasonSummary.userRecord.wins}–{offseasonSummary.userRecord.losses}
-          </h2>
+          {(() => {
+            const poll = offseasonSummary.finalPoll;
+            const userRow = poll?.find((row) => row.teamId === userTeamId);
+            const { wins, losses } = userRow ?? offseasonSummary.userRecord;
+            const regular = offseasonSummary.userRecord;
+            const hasPostseason = userRow !== undefined && (userRow.wins !== regular.wins || userRow.losses !== regular.losses);
+            return (
+              <h2>
+                {userRow ? `Final poll #${userRow.rank}` : `Finished #${offseasonSummary.userStanding}`} · {wins}–{losses}
+                {hasPostseason && (
+                  <span className="recap-regular dim"> ({regular.wins}–{regular.losses} regular season)</span>
+                )}
+              </h2>
+            );
+          })()}
           <table className="standings-table recap-table">
             <thead>
               <tr>
-                <th></th>
+                <th>{offseasonSummary.finalPoll ? 'Poll' : ''}</th>
                 <th>Team</th>
                 <th>W</th>
                 <th>L</th>
               </tr>
             </thead>
             <tbody>
-              {offseasonSummary.finalStandings.map((entry, i) => (
+              {(offseasonSummary.finalPoll
+                ?? offseasonSummary.finalStandings.map((entry, i) => ({ teamId: entry.teamId, rank: i + 1, ...entry.record }))
+              ).map((row) => (
                 <tr
-                  key={entry.teamId}
-                  className={entry.teamId === userTeamId ? 'user-row' : ''}
+                  key={row.teamId}
+                  className={row.teamId === userTeamId ? 'user-row' : ''}
                 >
-                  <td className="rank">#{i + 1}</td>
-                  <td>{formatTeamName(teamMap.get(entry.teamId) ?? entry.teamId)}</td>
-                  <td>{entry.record.wins}</td>
-                  <td>{entry.record.losses}</td>
+                  <td className="rank">#{row.rank}</td>
+                  <td>{formatTeamName(teamMap.get(row.teamId) ?? row.teamId)}</td>
+                  <td>{row.wins}</td>
+                  <td>{row.losses}</td>
                 </tr>
               ))}
             </tbody>

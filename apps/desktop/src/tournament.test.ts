@@ -27,6 +27,7 @@ import {
   advanceTournamentPhase,
   teamGameThisRound,
   tournamentGames,
+  postseasonRecords,
   withTournamentCoaching,
 } from './tournament';
 import { deriveCpuGamePlan } from '@sports-management-sim/sport-lacrosse';
@@ -107,6 +108,18 @@ describe('NCAA tournament', () => {
     const done = advanceNationalChampionship(advanceTournamentNationalSemis(qf, teams), teams);
     expect(done.phase).toBe('complete');
     expect(qfWinners.has(done.nationalChampion!)).toBe(true);
+
+    // The champion can lose its conference tournament and still win it all,
+    // but never loses an NCAA game.
+    const records = postseasonRecords(done);
+    const ncaaOnly = postseasonRecords({ ...done, conferenceBrackets: [] }).get(done.nationalChampion!)!;
+    expect(ncaaOnly.losses).toBe(0);
+    expect(ncaaOnly.wins).toBeGreaterThanOrEqual(3);
+    expect(records.get(done.nationalChampion!)!.wins).toBeGreaterThanOrEqual(ncaaOnly.wins);
+    const played = tournamentGames(done).filter((g) => g.result).length;
+    const totals = [...records.values()].reduce((t, r) => ({ wins: t.wins + r.wins, losses: t.losses + r.losses }), { wins: 0, losses: 0 });
+    expect(totals).toEqual({ wins: played, losses: played });
+    expect(postseasonRecords(null).size).toBe(0);
   });
 
   it('separates teams with identical records by schedule strength', () => {
