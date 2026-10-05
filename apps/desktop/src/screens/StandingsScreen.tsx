@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react';
 import type { LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { Conference, StandingsEntry } from '@sports-management-sim/engine-core';
 import type { RankingEntry } from '../rankings';
-import { compareConferenceStanding } from '../tournament';
+import { compareConferenceStanding, projectionStatus, type NcaaProjection } from '../tournament';
 import { formatTeamName } from '../ui/format';
 
 export function StandingsScreen({
@@ -12,6 +13,7 @@ export function StandingsScreen({
   userTeamId,
   teamMap,
   onOpenProgram,
+  projection = null,
 }: {
   rankings: RankingEntry[];
   sortedStandings: StandingsEntry[];
@@ -20,6 +22,8 @@ export function StandingsScreen({
   userTeamId: string;
   teamMap: Map<string, string>;
   onOpenProgram: (teamId: string) => void;
+  /** In-season projected NCAA field; null once the postseason starts. */
+  projection?: NcaaProjection | null;
 }) {
   const teamLink = (teamId: string) => (
     <button type="button" className="link-btn" onClick={() => onOpenProgram(teamId)}>
@@ -29,6 +33,14 @@ export function StandingsScreen({
 
   return (
     <div className="standings-layout">
+      {projection && (
+        <BracketologyCard
+          projection={projection}
+          standings={sortedStandings}
+          userTeamId={userTeamId}
+          teamLink={teamLink}
+        />
+      )}
       <article className="card">
         <h2>National Rankings</h2>
         {rankings.length > 0 ? (
@@ -127,5 +139,71 @@ export function StandingsScreen({
         })}
       </div>
     </div>
+  );
+}
+
+function BracketologyCard({
+  projection,
+  standings,
+  userTeamId,
+  teamLink,
+}: {
+  projection: NcaaProjection;
+  standings: StandingsEntry[];
+  userTeamId: string;
+  teamLink: (teamId: string) => ReactNode;
+}) {
+  const record = (teamId: string) => {
+    const r = standings.find((s) => s.teamId === teamId)?.record;
+    return r ? `${r.wins}–${r.losses}` : '0–0';
+  };
+  return (
+    <article className="card bracketology-card" aria-label="Bracketology">
+      <div className="card-head-row">
+        <h2>Bracketology</h2>
+        <span className={`bracket-status${projection.field.some((e) => e.teamId === userTeamId) ? ' bracket-in' : ''}`}>
+          You: {projectionStatus(projection, userTeamId)}
+        </span>
+      </div>
+      <p className="dim bracket-note">
+        If the season ended today. Conference leaders take the auto bids; the rest go by RPI.
+      </p>
+      <table className="standings-table">
+        <thead>
+          <tr>
+            <th>Seed</th>
+            <th>Team</th>
+            <th>Bid</th>
+            <th>W-L</th>
+            <th>RPI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {projection.field.map((e) => (
+            <tr key={e.teamId} className={e.teamId === userTeamId ? 'user-row' : ''}>
+              <td className="rank">{e.seed}</td>
+              <td>{teamLink(e.teamId)}</td>
+              <td>{e.bid === 'auto' ? <span className="honor-pill">AQ</span> : <span className="dim">At-large</span>}</td>
+              <td>{record(e.teamId)}</td>
+              <td>{e.rpi.toFixed(3).replace(/^0/, '')}</td>
+            </tr>
+          ))}
+          {projection.firstOut.length > 0 && (
+            <tr className="bracket-divider">
+              <td colSpan={5} className="section-label">First Four Out</td>
+            </tr>
+          )}
+          {projection.firstOut.map((e) => (
+            <tr key={e.teamId} className={e.teamId === userTeamId ? 'user-row dim' : 'dim'}>
+              <td className="rank">—</td>
+              <td>{teamLink(e.teamId)}</td>
+              <td />
+              <td>{record(e.teamId)}</td>
+              <td>{e.rpi.toFixed(3).replace(/^0/, '')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </article>
   );
 }

@@ -228,6 +228,7 @@ export function WeekHubScreen({
   rivalryWeek,
   previewCard,
   onRushInjury,
+  bracketStatus,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -259,6 +260,8 @@ export function WeekHubScreen({
   /** Shown before the opener. */
   previewCard?: ReactNode;
   onRushInjury?: (playerId: string) => void;
+  /** Bracketology line for the user, e.g. "Projected #4 seed (at-large)". */
+  bracketStatus?: string | undefined;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -329,6 +332,12 @@ export function WeekHubScreen({
                   {weeklyHub.series ? `${weeklyHub.series.wins}–${weeklyHub.series.losses}` : 'New'}
                 </span>
                 <span className="hub-stat-label">Series</span>
+              </div>
+            )}
+            {bracketStatus && (
+              <div className="hub-stat" title={bracketStatus}>
+                <span className="hub-stat-value">{shortBracketStatus(bracketStatus)}</span>
+                <span className="hub-stat-label">Bracket</span>
               </div>
             )}
             <div className="hub-stat">
@@ -593,4 +602,11 @@ export function WeekHubScreen({
       </article>
     </div>
   );
+}
+
+/** "Projected #4 seed (at-large)" → "#4 seed"; bubble and out read as such. */
+function shortBracketStatus(status: string): string {
+  const seed = /#(\d+) seed/.exec(status);
+  if (seed) return `#${seed[1]} seed`;
+  return status.startsWith('First four out') ? 'Bubble' : 'Out';
 }
