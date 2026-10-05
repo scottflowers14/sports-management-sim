@@ -6,6 +6,8 @@ import { careerTotals } from '../career-stats';
 import { cardFromPlayer } from '../player-card-model';
 import { PlayerCardPanel } from './PlayerCard';
 import { RushBackButton } from './RushBackButton';
+import { FormBadge } from './FormWatchCard';
+import { playerFormFromLog } from '../player-form';
 import { gameLogColumns, starCounts, type PlayerGameRow } from '../player-game-log';
 
 export function PlayerPanel({
@@ -35,8 +37,16 @@ export function PlayerPanel({
   const hasLiveStats = Boolean(playerStats && playerStats.gamesPlayed > 0);
   const liveStats = hasLiveStats ? playerStats : undefined;
 
+  const form = playerFormFromLog(gameLog, player.position);
+
   const footer = (
     <>
+      {form && (
+        <p className={`form-status form-status-${form.trend}`}>
+          <FormBadge form={form} />
+          {form.trend === 'hot' ? 'On a heater' : 'In a slump'}: {form.line}
+        </p>
+      )}
       {isInjured && injuryData && (
         <p className="injury-status">
           Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}

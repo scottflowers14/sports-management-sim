@@ -49,6 +49,8 @@ import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
 import { PlayersScreen } from './screens/PlayersScreen';
 import { useState } from 'react';
+import { FormWatchCard } from './components/FormWatchCard';
+import { rosterForm } from './player-form';
 import { formatTeamName, formatTeamShort } from './ui/format';
 import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
@@ -311,6 +313,7 @@ export function App() {
         (t) => t.id === (nextUserGame.homeTeamId === dynasty.userTeamId ? nextUserGame.awayTeamId : nextUserGame.homeTeamId),
       )
     : undefined;
+  const userForm = rosterForm(userTeam.roster, dynasty.season.schedule, gameLogs);
   const league = leagueTendencies(dynasty.season.schedule);
   const opponentTendencies = nextOpponentTeam ? teamTendencies(dynasty.season.schedule, nextOpponentTeam.id) : null;
   const nextOpponentScout = nextUserGame && nextOpponentTeam
@@ -548,6 +551,7 @@ export function App() {
           onCoachGame={canCoachGame ? coachGame : undefined}
           onRushInjury={rushInjuredPlayer}
           bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          formCard={<FormWatchCard roster={userTeam.roster} form={userForm} onSelectPlayer={setSelectedPlayerId} />}
           teamTalkCard={
             // Hidden at halftime: a talk given then would change a first half already shown.
             weeklyHub && !seasonComplete && !tournament && !halftime ? (
@@ -648,6 +652,7 @@ export function App() {
           onDepthChartChange={updateDepthChartSlot}
           onResetDepthChart={resetDepthChart}
           redshirts={{ open: redshirtsOpen, gamesPlayedFor, onSetRedshirt: setRedshirt }}
+          form={userForm}
         />
       )}
 

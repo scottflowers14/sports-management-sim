@@ -230,6 +230,7 @@ export function WeekHubScreen({
   onRushInjury,
   bracketStatus,
   teamTalkCard,
+  formCard,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -265,6 +266,8 @@ export function WeekHubScreen({
   bracketStatus?: string | undefined;
   /** Pregame talk for this week's game. */
   teamTalkCard?: ReactNode;
+  /** Hot and cold streaks on the roster. */
+  formCard?: ReactNode;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -488,6 +491,8 @@ export function WeekHubScreen({
             Open Roster →
           </button>
         </article>
+
+        {formCard}
 
         {/* Recruiting Pulse */}
         <article className="card hub-card">
