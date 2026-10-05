@@ -6470,3 +6470,52 @@ li span {
   width: auto;
   margin-left: 6px;
 }
+
+/* ── Power rankings ───────────────────────────────────────── */
+
+.power-rankings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.power-row {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.power-row:last-child {
+  border-bottom: none;
+}
+
+.power-rank {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #7ba8ff;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.power-team {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.power-record {
+  color: #aab8ca;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.power-blurb {
+  margin: 3px 0 0;
+  color: #c9d4e3;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
