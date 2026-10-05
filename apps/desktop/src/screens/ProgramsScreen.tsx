@@ -13,6 +13,7 @@ import {
 } from '../league-browser';
 import { RatingCell } from '../components/RatingCell';
 import { SortHeader, nextSort, type SortState } from '../components/SortHeader';
+import { formatStreak, type SeriesRecord } from '../series-history';
 import { formatTeamName } from '../ui/format';
 
 const POSITION_ORDER: LacrossePosition[] = ['ATT', 'MID', 'DEF', 'LSM', 'GK', 'FOGO'];
@@ -31,6 +32,7 @@ export function ProgramsScreen({
   onOpenProgram,
   onSelectPlayer,
   proDraftHistory = [],
+  seriesFor,
 }: {
   teams: LacrosseTeam[];
   conferences: Conference[];
@@ -43,6 +45,8 @@ export function ProgramsScreen({
   onSelectPlayer: (playerId: string) => void;
   /** Every pro draft so far, newest first. */
   proDraftHistory?: ProDraftPick[];
+  /** Your head-to-head series with a program. */
+  seriesFor?: (teamId: string) => SeriesRecord | undefined;
 }) {
   const [confFilter, setConfFilter] = useState<string>('ALL');
   const [sort, setSort] = useState<SortState<ProgramSortKey>>({ key: 'overall', direction: 'desc' });
@@ -67,6 +71,7 @@ export function ProgramsScreen({
         onOpenProgram={onOpenProgram}
         onSelectPlayer={onSelectPlayer}
         draftees={proDraftHistory.filter((p) => p.collegeTeamId === program.id)}
+        series={program.id === userTeamId ? null : (seriesFor?.(program.id) ?? undefined)}
       />
     );
   }
@@ -170,6 +175,7 @@ function ProgramDetail({
   onOpenProgram,
   onSelectPlayer,
   draftees,
+  series,
 }: {
   team: LacrosseTeam;
   row: ProgramRow | undefined;
@@ -181,6 +187,8 @@ function ProgramDetail({
   onSelectPlayer: (playerId: string) => void;
   /** This program's pro draft picks, newest first. */
   draftees: ProDraftPick[];
+  /** Your series with them; null on your own program page. */
+  series: SeriesRecord | null | undefined;
 }) {
   const rating = calculateLacrosseTeamRating(team);
   const nameById = new Map(teams.map((t) => [t.id, formatTeamName(t.name)]));
@@ -225,6 +233,9 @@ function ProgramDetail({
           <KV label="Facilities" value={rep.facilities} />
           <KV label="Fans" value={rep.fanSupport} />
           <KV label="Pro picks" value={draftees.length} />
+          {series !== null && (
+            <KV label="Your Series" value={series ? `${series.wins}–${series.losses}${series.streak ? ` (${formatStreak(series)})` : ''}` : 'Never met'} />
+          )}
           <KV label="Scholarships" value={`${team.resources.scholarshipUsed.toFixed(1)} / ${team.resources.scholarshipLimit}`} />
         </div>
       </article>

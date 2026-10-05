@@ -852,6 +852,7 @@ export function App() {
           onOpenProgram={openProgram}
           onSelectPlayer={setSelectedPlayerId}
           proDraftHistory={proDraftHistory}
+          seriesFor={(id) => seriesByOpponent.get(id)}
         />
       )}
 
