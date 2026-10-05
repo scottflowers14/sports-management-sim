@@ -1,5 +1,5 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
-import type { GameLog, LacrossePlayerGameStats } from '@sports-management-sim/sport-lacrosse';
+import { threeStars, type GameLog, type LacrossePlayerGameStats } from '@sports-management-sim/sport-lacrosse';
 
 /** One row of a player's game-by-game log, OOTP style. */
 export interface PlayerGameRow {
@@ -12,6 +12,8 @@ export interface PlayerGameRow {
   score: string;
   overtime: boolean;
   line: LacrossePlayerGameStats;
+  /** 1, 2 or 3 when he was one of the game's three stars. */
+  star?: 1 | 2 | 3;
 }
 
 /**
@@ -23,8 +25,10 @@ export function playerGameLog(playerId: string, schedule: readonly ScheduledGame
   const rows: PlayerGameRow[] = [];
   for (const game of schedule) {
     if (game.status !== 'final' || !game.result) continue;
-    const line = gameLogs.get(game.id)?.playerLines?.find((l) => l.playerId === playerId);
-    if (!line) continue;
+    const lines = gameLogs.get(game.id)?.playerLines;
+    const line = lines?.find((l) => l.playerId === playerId);
+    if (!lines || !line) continue;
+    const starIndex = threeStars(lines, game.result.winnerTeamId).findIndex((s) => s.playerId === playerId);
     const home = line.teamId === game.homeTeamId;
     const ours = home ? game.result.homeScore : game.result.awayScore;
     const theirs = home ? game.result.awayScore : game.result.homeScore;
@@ -37,6 +41,7 @@ export function playerGameLog(playerId: string, schedule: readonly ScheduledGame
       score: `${ours}-${theirs}`,
       overtime: game.result.overtime,
       line,
+      ...(starIndex >= 0 ? { star: (starIndex + 1) as 1 | 2 | 3 } : {}),
     });
   }
   return rows.sort((a, b) => a.week - b.week);
@@ -88,4 +93,11 @@ export function gameLogColumns(position: string): GameLogColumn[] {
     { label: 'GB', value: (l) => l.groundBalls },
     { label: 'TO', value: (l) => l.turnovers },
   ];
+}
+
+/** How many times he was each star this season: [1st, 2nd, 3rd]. */
+export function starCounts(rows: readonly PlayerGameRow[]): [number, number, number] {
+  const counts: [number, number, number] = [0, 0, 0];
+  for (const r of rows) if (r.star) counts[r.star - 1] = (counts[r.star - 1] ?? 0) + 1;
+  return counts;
 }

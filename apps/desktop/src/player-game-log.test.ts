@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import type { GameLog, LacrossePlayerGameStats } from '@sports-management-sim/sport-lacrosse';
-import { gameLogColumns, playerGameLog } from './player-game-log';
+import { gameLogColumns, playerGameLog, starCounts } from './player-game-log';
 
 function line(extra: Partial<LacrossePlayerGameStats> = {}): LacrossePlayerGameStats {
   return { playerId: 'p1', teamId: 'us', goals: 2, assists: 1, shots: 6, shotsOnGoal: 4, groundBalls: 3, turnovers: 1, causedTurnovers: 0, penalties: 0, penaltyMinutes: 0, ...extra };
@@ -54,5 +54,21 @@ describe('playerGameLog', () => {
     expect(fo[0]!.value(line({ faceoffWins: 14, faceoffAttempts: 20 }))).toBe('14-6');
     expect(fo[1]!.value(line({ faceoffWins: 14, faceoffAttempts: 20 }))).toBe('70%');
     expect(gameLogColumns('ATT')[2]!.value(line())).toBe('4/6');
+  });
+});
+
+describe('stars in the game log', () => {
+  it('marks the games where he was a star and counts them', () => {
+    const schedule = [game('g1', 1, 'us', 'a', 12, 9), game('g2', 2, 'us', 'b', 10, 8)];
+    const other = (id: string, goals: number) => line({ playerId: id, goals, assists: 0, groundBalls: 0, turnovers: 0 });
+    const logs = new Map([
+      // Only line in the game: first star.
+      ['g1', log([line()])],
+      // Three teammates outscore him: no star.
+      ['g2', log([line({ goals: 0, assists: 0, groundBalls: 0 }), other('x', 5), other('y', 4), other('z', 3)])],
+    ]);
+    const rows = playerGameLog('p1', schedule, logs);
+    expect(rows.map((r) => r.star)).toEqual([1, undefined]);
+    expect(starCounts(rows)).toEqual([1, 0, 0]);
   });
 });
