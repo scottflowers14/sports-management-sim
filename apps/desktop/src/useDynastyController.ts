@@ -65,6 +65,7 @@ import { createProgramStaff, withStaffRecruitingHours } from './program-staff';
 import { addCoachXp, availablePoints, seasonCoachXp, upgradeAbility, withCoachAbilities, type CoachAbility } from './coach-abilities';
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import { userSeasonGames } from './series-history';
 import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { previewUserGame, simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
@@ -1032,6 +1033,7 @@ export function useDynastyController() {
         : {}),
       ...(summary.coachOfYear?.teamId === dynasty.userTeamId ? { coachOfYear: true } : {}),
       ...(userDraftPicks.length > 0 ? { proPicks: userDraftPicks.length } : {}),
+      games: userSeasonGames(dynasty.season.schedule, tournament, dynasty.userTeamId),
     };
 
     // Staff contracts run down; expiring coaches re-enter the pool asking for a raise.
