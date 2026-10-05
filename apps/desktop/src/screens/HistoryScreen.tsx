@@ -134,6 +134,7 @@ export function HistoryScreen({
       <HallOfFameCard entries={hallOfFame} />
 
       <AwardsHistoryCard history={history} />
+      <AllAmericansCard history={history} />
     </div>
   );
 }
@@ -286,6 +287,45 @@ function AwardsHistoryCard({ history }: { history: DynastySeasonRecord[] }) {
                 <td>{award.playerName}</td>
                 <td className="dim">{formatTeamName(award.teamName)}</td>
                 <td className="record-cell">{award.statLine ?? '—'}</td>
+              </tr>
+            )),
+          )}
+        </tbody>
+      </table>
+    </article>
+  );
+}
+
+function AllAmericansCard({ history }: { history: DynastySeasonRecord[] }) {
+  const seasons = history.filter((r) => r.allAmericans && r.allAmericans.length > 0);
+  if (seasons.length === 0) return null;
+  const total = seasons.reduce((sum, r) => sum + r.allAmericans!.length, 0);
+  const firstTeam = seasons.reduce((sum, r) => sum + r.allAmericans!.filter((a) => a.award.startsWith('1st')).length, 0);
+  return (
+    <article className="card" aria-label="Program All-Americans">
+      <h2>All-Americans</h2>
+      <p className="dim">
+        {total} All-America selection{total === 1 ? '' : 's'}, {firstTeam} on the first team.
+      </p>
+      <table className="standings-table history-awards-table">
+        <thead>
+          <tr>
+            <th>Year</th>
+            <th>Team</th>
+            <th>Player</th>
+            <th>Pos</th>
+            <th>Stat Line</th>
+          </tr>
+        </thead>
+        <tbody>
+          {seasons.flatMap((record) =>
+            record.allAmericans!.map((a, i) => (
+              <tr key={`${record.year}-${a.playerName}`}>
+                {i === 0 ? <td className="rank" rowSpan={record.allAmericans!.length}>{record.year}</td> : null}
+                <td>{a.award.replace(' All-America', '')}</td>
+                <td>{a.playerName}</td>
+                <td>{a.position}</td>
+                <td className="record-cell">{a.statLine ?? '—'}</td>
               </tr>
             )),
           )}

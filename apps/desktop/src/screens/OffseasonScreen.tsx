@@ -22,7 +22,14 @@ import { portalStanding } from './PortalBoard';
 import type { OffseasonSummary } from '../dynasty-helpers';
 import { GATE_FANS_PER_POINT, conferenceStrength, type GateReceipts, type RealignmentMove } from '@sports-management-sim/sport-lacrosse';
 import type { DynastySeasonRecord } from '../history';
-import type { SeasonAwards } from '../awards';
+import {
+  ALL_AMERICA_TIERS,
+  ALL_AMERICA_TIER_LABELS,
+  programAllAmericans,
+  type AllAmericaTeams,
+  type AllAmericaTier,
+  type SeasonAwards,
+} from '../awards';
 import type { JobOffer } from '../coach-profile';
 import type { PlayerDevelopmentEntry } from '../development-report';
 import { formatTeamName, formatTeamShort } from '../ui/format';
@@ -120,6 +127,7 @@ export function OffseasonScreen({
         {offseasonSummary.awards && (
           <AwardsSection
             awards={offseasonSummary.awards}
+            userTeamId={userTeamId}
             coachOfYear={
               offseasonSummary.coachOfYear
                 ? {
@@ -317,9 +325,11 @@ export function OffseasonScreen({
 
 function AwardsSection({
   awards,
+  userTeamId,
   coachOfYear,
 }: {
   awards: SeasonAwards;
+  userTeamId: string;
   coachOfYear: { name: string; teamName: string; detail: string } | null;
 }) {
   return (
@@ -350,7 +360,8 @@ function AwardsSection({
           </div>
         ))}
       </div>
-      {awards.allConference.length > 0 && (
+      {awards.allAmerica && <AllAmericaTable teams={awards.allAmerica} userTeamId={userTeamId} />}
+      {!awards.allAmerica && awards.allConference.length > 0 && (
         <>
           <p className="section-label">All-Conference</p>
           <table className="standings-table">
@@ -373,6 +384,54 @@ function AwardsSection({
         </>
       )}
     </article>
+  );
+}
+
+function AllAmericaTable({ teams, userTeamId }: { teams: AllAmericaTeams; userTeamId: string }) {
+  const ours = programAllAmericans(teams, userTeamId);
+  const [tier, setTier] = useState<AllAmericaTier>(ours[0]?.tier ?? 'first');
+  return (
+    <section className="all-america" aria-label="All-America teams">
+      <div className="news-header">
+        <p className="section-label">
+          All-America · {ours.length === 0 ? 'none of yours' : `${ours.length} of yours`}
+        </p>
+        <div className="news-filters" role="group" aria-label="All-America team">
+          {ALL_AMERICA_TIERS.map((t) => {
+            const count = teams[t].filter((w) => w.teamId === userTeamId).length;
+            return (
+              <button
+                key={t}
+                type="button"
+                className={`pos-filter-btn${tier === t ? ' active' : ''}`}
+                aria-pressed={tier === t}
+                onClick={() => setTier(t)}
+              >
+                {ALL_AMERICA_TIER_LABELS[t].replace(' All-America', '')}
+                {count > 0 ? ` (${count})` : ''}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <table className="standings-table">
+        <thead>
+          <tr>
+            <th>Player</th><th>Pos</th><th>Team</th><th>Season</th>
+          </tr>
+        </thead>
+        <tbody>
+          {teams[tier].map((winner) => (
+            <tr key={winner.playerId ?? winner.playerName} className={winner.teamId === userTeamId ? 'user-row' : ''}>
+              <td>{winner.playerName}</td>
+              <td>{winner.position}</td>
+              <td>{formatTeamName(winner.teamName)}</td>
+              <td>{winner.statLine ?? `${winner.overall} OVR`}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 
