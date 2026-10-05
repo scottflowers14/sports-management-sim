@@ -3,7 +3,7 @@ import {
   deriveCpuGamePlan,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
-  buildRivalries,
+  dynastyRivalries,
   rivalryFor,
   rivalryForGame,
   seriesSummary,
@@ -34,12 +34,19 @@ import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
+import { HalftimeModal } from './components/HalftimeModal';
+import { recruitingPipelines } from './pipelines';
+import { playerGameLog } from './player-game-log';
+import { TeamTalkCard } from './components/TeamTalkCard';
+import { allSeries, userSeasonGames } from './series-history';
+import { TOURNAMENT_ROUND_LABELS, projectNcaaField, projectionStatus } from './tournament';
+import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
 import { PlayersScreen } from './screens/PlayersScreen';
 import { useState } from 'react';
-import { formatTeamName } from './ui/format';
+import { formatTeamName, formatTeamShort } from './ui/format';
 import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
 
@@ -87,6 +94,9 @@ export function App() {
     seasonPreview,
     hallOfFame,
     proDraftHistory,
+    upgradeCoachAbility,
+    scheduleEditable,
+    swapNonConferenceGame,
     saveStatus,
     recruitPosFilter,
     setRecruitPosFilter,
@@ -153,6 +163,19 @@ export function App() {
     offerPortalPlayer,
     withdrawPortalOffer,
     portalScholarshipRoom,
+    answerRealignmentInvite,
+    pressConference,
+    answerPressConference,
+    canCoachGame,
+    coachGame,
+    halftime,
+    playSecondHalf,
+    nil,
+    retainWithNil,
+    rushInjuredPlayer,
+    teamTalk,
+    giveTeamTalk,
+    signNilDeal,
     enterTournament,
     simTournamentSemis,
     simTournamentFinals,
@@ -229,6 +252,12 @@ export function App() {
     (a, b) => b.record.wins - a.record.wins || a.record.losses - b.record.losses,
   );
 
+  // Bracketology runs through the regular season, once anyone has played.
+  const ncaaProjection =
+    !tournament && dynasty.season.schedule.some((g) => g.status === 'final')
+      ? projectNcaaField(dynasty.season.teams, dynasty.season.conferences, fullStandings, dynasty.season.schedule)
+      : null;
+
   const committedCount = dynasty.recruits.filter(
     (r) => r.committedTeamId === dynasty.userTeamId || r.signedTeamId === dynasty.userTeamId,
   ).length;
@@ -246,7 +275,7 @@ export function App() {
   const playerLookup = buildPlayerLookup(dynasty.season.teams);
 
   const unhappyCount = userTeam.roster.filter((p) => p.morale < 50).length;
-  const rivalries = buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+  const rivalries = dynastyRivalries(dynasty);
   const userRivalry = rivalryFor(rivalries, userTeam.id);
   const rivalGameThisWeek = userRivalry
     ? dynasty.season.schedule.find(
@@ -289,7 +318,11 @@ export function App() {
       }
     : null;
 
-  const weeklyHub = buildWeeklyHub({
+  const seriesByOpponent = allSeries(dynastyHistory, {
+    year: dynasty.season.year,
+    games: userSeasonGames(dynasty.season.schedule, tournament, dynasty.userTeamId),
+  });
+  const baseWeeklyHub = buildWeeklyHub({
     schedule: dynasty.season.schedule,
     teams: dynasty.season.teams,
     userTeamId: dynasty.userTeamId,
@@ -297,6 +330,8 @@ export function App() {
     rankings,
     seasonStats,
   });
+  const nextSeries = baseWeeklyHub ? seriesByOpponent.get(baseWeeklyHub.preview.opponent.id) : undefined;
+  const weeklyHub = baseWeeklyHub && nextSeries ? { ...baseWeeklyHub, series: nextSeries } : baseWeeklyHub;
 
   // Player cards are reusable across the whole league, not just the user roster.
   const selectedPlayer = selectedPlayerId
@@ -503,6 +538,24 @@ export function App() {
         <section className="screen-area">
       {view === 'week-hub' && (
         <WeekHubScreen
+          onCoachGame={canCoachGame ? coachGame : undefined}
+          onRushInjury={rushInjuredPlayer}
+          bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          teamTalkCard={
+            // Hidden at halftime: a talk given then would change a first half already shown.
+            weeklyHub && !seasonComplete && !tournament && !halftime ? (
+              <TeamTalkCard
+                opponentName={formatTeamName(weeklyHub.opponentName)}
+                talk={teamTalk}
+                onTalk={(tone) =>
+                  giveTeamTalk(tone, {
+                    winProbability: weeklyHub.winProbability,
+                    rivalry: rivalryForGame(rivalries, weeklyHub.preview.game) !== null,
+                  })
+                }
+              />
+            ) : undefined
+          }
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           userTeam={userTeam}
@@ -537,6 +590,8 @@ export function App() {
                 userTeamId={dynasty.userTeamId}
                 onSelectPlayer={setSelectedPlayerId}
               />
+            ) : pressConference ? (
+              <PressConferenceCard press={pressConference} onAnswer={answerPressConference} />
             ) : null
           }
         />
@@ -544,6 +599,7 @@ export function App() {
 
       {view === 'season' && (
         <SeasonScreen
+          onCoachGame={canCoachGame ? coachGame : undefined}
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           tournament={tournament}
@@ -599,12 +655,16 @@ export function App() {
           onBoxScore={setSelectedBoxScore}
           rivalries={rivalries}
           rivalrySeries={rivalrySeries}
+          conferences={dynasty.season.conferences}
+          editable={scheduleEditable}
+          onSwapNonConference={swapNonConferenceGame}
         />
       )}
 
       {view === 'recruiting' && (
         <RecruitingScreen
           classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
+          pipelines={recruitingPipelines(userTeam, dynasty.season.regions)}
           recruitBoard={dynasty.recruitBoard}
           portalEntries={dynasty.portalEntries}
           scouting={scouting}
@@ -626,6 +686,7 @@ export function App() {
           onToggleVisitInvite={toggleVisitInvite}
           onOfferPortalPlayer={offerPortalPlayer}
           onWithdrawPortalOffer={withdrawPortalOffer}
+          nil={{ state: nil, onRetain: retainWithNil, onDeal: signNilDeal }}
           portalTeams={dynasty.season.teams}
           portalScholarshipRoom={portalScholarshipRoom}
           seasonYear={dynasty.season.year}
@@ -653,11 +714,13 @@ export function App() {
           userTeamId={dynasty.userTeamId}
           teamMap={teamMap}
           onOpenProgram={openProgram}
+          projection={ncaaProjection}
         />
       )}
 
       {view === 'tournament' && (
         <TournamentScreen
+          onCoachGame={canCoachGame ? coachGame : undefined}
           tournament={tournament}
           teamMap={teamMap}
           userTeamId={dynasty.userTeamId}
@@ -681,6 +744,7 @@ export function App() {
           userTeamId={dynasty.userTeamId}
           season={dynasty.season}
           weeklyHonors={weeklyHonors}
+          rivalries={rivalries}
         />
       )}
 
@@ -691,6 +755,8 @@ export function App() {
       {view === 'staff' && (
         <StaffScreen
           staff={staff}
+          coach={coachProfile}
+          onUpgradeAbility={upgradeCoachAbility}
           candidates={staffCandidates}
           budget={staffBudget}
           onHire={hireStaff}
@@ -743,7 +809,13 @@ export function App() {
       )}
 
       {view === 'history' && (
-        <HistoryScreen history={dynastyHistory} hallOfFame={hallOfFame} coachName={coachProfile?.name ?? null} />
+        <HistoryScreen
+          history={dynastyHistory}
+          hallOfFame={hallOfFame}
+          coachName={coachProfile?.name ?? null}
+          series={[...seriesByOpponent.values()]}
+          teamName={(id) => formatTeamName(teamMap.get(id) ?? id)}
+        />
       )}
 
       {view === 'offseason' && offseasonSummary && (
@@ -764,6 +836,7 @@ export function App() {
           portalScholarshipRoom={portalScholarshipRoom}
           onOpenPortal={() => { setRecruitTab('portal'); setView('recruiting'); }}
           investments={{ budget: investmentBudget, plan: investmentPlan, onFund: fundInvestment, onUnfund: unfundInvestment }}
+          realignment={{ conferences: dynasty.season.conferences, teams: dynasty.season.teams, onAnswer: answerRealignmentInvite }}
         />
       )}
 
@@ -779,6 +852,7 @@ export function App() {
           onOpenProgram={openProgram}
           onSelectPlayer={setSelectedPlayerId}
           proDraftHistory={proDraftHistory}
+          seriesFor={(id) => seriesByOpponent.get(id)}
         />
       )}
 
@@ -802,9 +876,12 @@ export function App() {
           injuryData={injuries.find(
             (inj) => inj.playerId === selectedPlayer.id && inj.teamId === dynasty.userTeamId,
           )}
+          onRushInjury={rushInjuredPlayer}
           playerStats={seasonStats[selectedPlayer.id]}
           career={careerStats[selectedPlayer.id]}
           seasonYear={dynasty.season.year}
+          gameLog={playerGameLog(selectedPlayer.id, dynasty.season.schedule, gameLogs)}
+          teamShort={(id) => formatTeamShort(teamMap.get(id) ?? id)}
           onClose={() => setSelectedPlayerId(null)}
         />
       )}
@@ -817,6 +894,17 @@ export function App() {
           teamMap={teamMap}
           onScout={doScoutRecruit}
           onClose={() => setSelectedRecruitId(null)}
+        />
+      )}
+
+      {halftime && (
+        <HalftimeModal
+          log={halftime.log}
+          label={halftime.tournamentPhase ? TOURNAMENT_ROUND_LABELS[halftime.tournamentPhase] : `Week ${halftime.week}`}
+          userTeamId={dynasty.userTeamId}
+          teamMap={teamMap}
+          gamePlan={gamePlan}
+          onPlaySecondHalf={playSecondHalf}
         />
       )}
 

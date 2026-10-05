@@ -5,6 +5,8 @@ import type { PlayerCareer } from '../career-stats';
 import { careerTotals } from '../career-stats';
 import { cardFromPlayer } from '../player-card-model';
 import { PlayerCardPanel } from './PlayerCard';
+import { RushBackButton } from './RushBackButton';
+import { gameLogColumns, starCounts, type PlayerGameRow } from '../player-game-log';
 
 export function PlayerPanel({
   player,
@@ -13,6 +15,9 @@ export function PlayerPanel({
   playerStats,
   career,
   seasonYear,
+  gameLog = [],
+  teamShort = (id) => id,
+  onRushInjury,
   onClose,
 }: {
   player: LacrossePlayer;
@@ -21,6 +26,9 @@ export function PlayerPanel({
   playerStats: PlayerSeasonStats | undefined;
   career: PlayerCareer | undefined;
   seasonYear: number;
+  gameLog?: PlayerGameRow[];
+  teamShort?: (teamId: string) => string;
+  onRushInjury?: (playerId: string) => void;
   onClose: () => void;
 }) {
   const data = cardFromPlayer(player, { injured: isInjured });
@@ -33,12 +41,15 @@ export function PlayerPanel({
         <p className="injury-status">
           Out {injuryData.weeksRemaining} more week{injuryData.weeksRemaining > 1 ? 's' : ''}
           {injuryData.description ? ` (${injuryData.description})` : ''}
+          {injuryData.rushed ? ' · rushed back' : ''}
+          {onRushInjury && <RushBackButton injury={injuryData} onRush={onRushInjury} />}
         </p>
       )}
       {player.ratingHistory && player.ratingHistory.length > 0 && (
         <RatingHistorySection player={player} seasonYear={seasonYear} />
       )}
       {liveStats && <PlayerStatsSection stats={liveStats} position={player.position} seasonYear={seasonYear} />}
+      {gameLog.length > 0 && <GameLogSection rows={gameLog} position={player.position} teamShort={teamShort} />}
       {((career && career.seasons.length > 0) || liveStats) && (
         <CareerSection
           career={career}
@@ -83,6 +94,64 @@ function RatingHistorySection({ player, seasonYear }: { player: LacrossePlayer; 
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function GameLogSection({ rows, position, teamShort }: { rows: PlayerGameRow[]; position: string; teamShort: (id: string) => string }) {
+  const columns = gameLogColumns(position);
+  const [first, second, third] = starCounts(rows);
+  const anyStars = first + second + third > 0;
+  return (
+    <div className="player-stats-section" aria-label="Game log">
+      <p className="section-label">
+        Game Log
+        {anyStars && (
+          <span className="game-log-stars" title="Times named one of the game's three stars">
+            {' '}· ★ {first}-{second}-{third}
+          </span>
+        )}
+      </p>
+      <div className="game-log-wrap">
+      <table className="standings-table career-table game-log-table">
+        <thead>
+          <tr>
+            <th>Wk</th>
+            <th>Opp</th>
+            <th>Result</th>
+            {columns.map((c) => (
+              <th key={c.label}>{c.label}</th>
+            ))}
+            {anyStars && <th title="Star of the game">★</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.gameId}>
+              <td className="rank">{r.week}</td>
+              <td>
+                {r.home ? '' : '@'}
+                {teamShort(r.opponentId)}
+              </td>
+              <td className={r.won ? 'game-log-win' : 'game-log-loss'}>
+                {r.won ? 'W' : 'L'} {r.score}
+                {r.overtime ? ' OT' : ''}
+              </td>
+              {columns.map((c) => (
+                <td key={c.label} className="stat-val">
+                  {c.value(r.line)}
+                </td>
+              ))}
+              {anyStars && (
+                <td className="game-log-star" title={r.star ? `${['1st', '2nd', '3rd'][r.star - 1]} star` : undefined}>
+                  {r.star ? '★'.repeat(4 - r.star) : ''}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
       </div>
     </div>
   );

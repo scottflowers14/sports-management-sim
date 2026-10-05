@@ -1,3 +1,7 @@
+import type { ScheduledGame } from '@sports-management-sim/engine-core';
+import { seededGameRandom } from './halftime';
+import { bracketMovementHeadline, projectNcaaField } from './tournament';
+export { seededGameRandom } from './halftime';
 import {
   advanceSeasonWeek,
   applyCampusVisit,
@@ -9,7 +13,7 @@ import {
 } from '@sports-management-sim/engine-core';
 import {
   applyCpuCaptains,
-  buildRivalries,
+  dynastyRivalries,
   recordRivalryGame,
   rivalryForGame,
   seriesSummary,
@@ -18,6 +22,7 @@ import {
   moodLabel,
   moraleReason,
   runMoraleWeek,
+  isSeniorDay,
   DEFAULT_GAME_PLAN,
   DEFAULT_PRACTICE_PLAN,
   deriveCpuGamePlan,
@@ -38,6 +43,12 @@ import {
   type LacrossePlayerGameStats,
   type LacrosseTeam,
 } from '@sports-management-sim/sport-lacrosse';
+import {
+  addCoachingEdge,
+  type CoachingEdge,
+  type TeamTalkResult,
+  type TeamTalkTone,
+} from '@sports-management-sim/sport-lacrosse';
 import { autoCommitWeekly, processInjuries } from './dynasty-helpers';
 import { formatTeamName } from './ui/format';
 import type { InjuredPlayer } from './dynasty-helpers';
@@ -53,6 +64,8 @@ import { updateSeasonStats } from './stats';
 import { pickWeeklyHonors, weeklyHonorNews } from './weekly-honors';
 import type { WeeklyHonor } from './weekly-honors';
 import type { SeasonStatsMap } from './stats';
+
+const BRACKET_NEWS_FIRST_WEEK = 3;
 
 // About ten items a week, so this keeps the whole regular season.
 const MAX_NEWS_ITEMS = 120;
@@ -80,6 +93,23 @@ export interface WeekSimState {
   rivalrySeries?: RivalrySeriesMap;
   /** This season's Player of the Week honors, oldest first. */
   weeklyHonors?: WeeklyHonor[];
+  /** The pregame talk for the user's game; only counts in the week it was given. */
+  teamTalk?: PregameTalk | null;
+}
+
+/** A talk only counts in the season and week it was given. */
+export function isCurrentTalk(
+  talk: PregameTalk | null | undefined,
+  season: { year: number; currentWeek: number },
+): boolean {
+  return !!talk && talk.year === season.year && talk.week === season.currentWeek;
+}
+
+export interface PregameTalk {
+  year: number;
+  week: number;
+  tone: TeamTalkTone;
+  result: TeamTalkResult;
 }
 
 export interface PracticeLogEntry extends PracticeGain {
@@ -89,10 +119,72 @@ export interface PracticeLogEntry extends PracticeGain {
 /** Keeps a season of practice gains for the Practice screen. */
 const MAX_PRACTICE_LOG = 80;
 
+/** The user's game this week, played with a halftime adjustment. */
+export interface CoachedGame {
+  /** Seeds the game's dice, so the first half replays exactly as previewed. */
+  seed: number;
+  secondHalfPlan: LacrosseGamePlan;
+}
+
+/** CPU staffs name captains and make their redshirt calls before the opener. */
+function seasonReadyForWeek(dynasty: WeekSimState['dynasty']): WeekSimState['dynasty']['season'] {
+  const firstWeek = dynasty.season.schedule.reduce((min, game) => Math.min(min, game.week), Infinity);
+  if (dynasty.season.currentWeek !== firstWeek) return dynasty.season;
+  return {
+    ...dynasty.season,
+    teams: dynasty.season.teams.map((t) => (t.id === dynasty.userTeamId ? t : applyCpuCaptains(applyCpuRedshirts(t)))),
+  };
+}
+
+/** Everything a game this week is played with, except the dice. */
+function weekGameInput(state: WeekSimState, homeTeam: LacrosseTeam, awayTeam: LacrosseTeam, userGamePlan: LacrosseGamePlan) {
+  const { dynasty } = state;
+  const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
+  const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
+  const planFor = (team: LacrosseTeam): LacrosseGamePlan => (team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team));
+  const talk = isCurrentTalk(state.teamTalk, dynasty.season) ? state.teamTalk!.result.edge : null;
+  const withTalk = (team: LacrosseTeam, edge: CoachingEdge): CoachingEdge =>
+    talk && team.id === dynasty.userTeamId ? addCoachingEdge(edge, talk) : edge;
+  // Injured and redshirting players sit: the depth chart promotes the next man up for the
+  // rating, the game plan, and the box score.
+  const home = withoutUnavailable(homeTeam, injuredIds);
+  const away = withoutUnavailable(awayTeam, injuredIds);
+  return {
+    homeTeam: home,
+    awayTeam: away,
+    homeGamePlan: planFor(home),
+    awayGamePlan: planFor(away),
+    homeCoaching: withTalk(home, programCoachingEdge(home, staffOwner)),
+    awayCoaching: withTalk(away, programCoachingEdge(away, staffOwner)),
+  };
+}
+
+/**
+ * Plays the user's game this week with a fixed seed and returns its log, so
+ * the first half can be shown at halftime before the week is simmed. Null when
+ * the user has no game this week.
+ */
+export function previewUserGame(state: WeekSimState, userGamePlan: LacrosseGamePlan, seed: number): { game: ScheduledGame; log: GameLog } | null {
+  const { dynasty } = state;
+  const season = seasonReadyForWeek(dynasty);
+  const game = season.schedule.find(
+    (g) =>
+      g.week === season.currentWeek &&
+      g.status === 'scheduled' &&
+      (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
+  );
+  if (!game) return null;
+  const homeTeam = season.teams.find((t) => t.id === game.homeTeamId)!;
+  const awayTeam = season.teams.find((t) => t.id === game.awayTeamId)!;
+  const { log } = simulateLacrosseGameWithLog({ ...weekGameInput(state, homeTeam, awayTeam, userGamePlan), random: seededGameRandom(seed) });
+  return { game, log };
+}
+
 export function simulateOneWeek(
   state: WeekSimState,
   userGamePlan: LacrosseGamePlan = DEFAULT_GAME_PLAN,
   random: () => number = Math.random,
+  coached?: CoachedGame,
 ): WeekSimState {
   const { dynasty } = state;
   const weekToSim = dynasty.season.currentWeek;
@@ -111,31 +203,19 @@ export function simulateOneWeek(
   const weekLogs = new Map<string, GameLog>();
   const weekPlayerLines = new Map<string, LacrossePlayerGameStats[]>();
   const injuredIds = new Set(state.injuries.map((inj) => inj.playerId));
-  const planFor = (team: LacrosseTeam): LacrosseGamePlan =>
-    team.id === dynasty.userTeamId ? userGamePlan : deriveCpuGamePlan(team);
   const staffOwner = { teamId: dynasty.userTeamId, ...(state.userStaff ? { staff: state.userStaff } : {}) };
-  // CPU staffs name captains and make their redshirt calls before the opener.
-  const firstWeek = dynasty.season.schedule.reduce((min, game) => Math.min(min, game.week), Infinity);
-  const seasonBeforeGames =
-    weekToSim === firstWeek
-      ? {
-          ...dynasty.season,
-          teams: dynasty.season.teams.map((t) => (t.id === dynasty.userTeamId ? t : applyCpuCaptains(applyCpuRedshirts(t)))),
-        }
-      : dynasty.season;
+  const seasonBeforeGames = seasonReadyForWeek(dynasty);
   const seasonAfterGames = advanceSeasonWeek(seasonBeforeGames, (game, homeTeam, awayTeam) => {
-    // Injured and redshirting players sit: the depth chart promotes the next man up for the
-    // rating, the game plan, and the box score.
-    const home = withoutUnavailable(homeTeam, injuredIds);
-    const away = withoutUnavailable(awayTeam, injuredIds);
+    const input = weekGameInput(state, homeTeam, awayTeam, userGamePlan);
+    const coachedHere = coached && (homeTeam.id === dynasty.userTeamId || awayTeam.id === dynasty.userTeamId);
     const { log, players, ...result } = simulateLacrosseGameWithLog({
-      homeTeam: home,
-      awayTeam: away,
-      random,
-      homeGamePlan: planFor(home),
-      awayGamePlan: planFor(away),
-      homeCoaching: programCoachingEdge(home, staffOwner),
-      awayCoaching: programCoachingEdge(away, staffOwner),
+      ...input,
+      random: coachedHere ? seededGameRandom(coached.seed) : random,
+      ...(coachedHere
+        ? homeTeam.id === dynasty.userTeamId
+          ? { homeSecondHalfPlan: coached.secondHalfPlan }
+          : { awaySecondHalfPlan: coached.secondHalfPlan }
+        : {}),
     });
     weekLogs.set(game.id, log);
     weekPlayerLines.set(game.id, [...players.home, ...players.away]);
@@ -144,7 +224,7 @@ export function simulateOneWeek(
 
   // Every program practices after the week's games. CPU staffs run a normal
   // week with plans on their highest-upside young players.
-  const rivalries = buildRivalries(dynasty.season.conferences, dynasty.season.teams);
+  const rivalries = dynastyRivalries(dynasty);
   let rivalrySeries = state.rivalrySeries ?? {};
   const rivalryNews: NewsItem[] = [];
   for (const game of seasonAfterGames.schedule) {
@@ -173,6 +253,7 @@ export function simulateOneWeek(
   const userPractice = state.practicePlan ?? DEFAULT_PRACTICE_PLAN;
   const practiceGains: PracticeGain[] = [];
   const moraleChanges: MoraleChange[] = [];
+  const seniorDayNews: NewsItem[] = [];
   const newSeason = {
     ...seasonAfterGames,
     teams: seasonAfterGames.teams.map((team) => {
@@ -190,7 +271,19 @@ export function simulateOneWeek(
       );
       const won = game?.result ? game.result.winnerTeamId === team.id : null;
       const rivalry = game ? rivalryForGame(rivalries, game) !== null : false;
-      const mood = runMoraleWeek(practiced.team, { won, intensity: plan.intensity, rivalry });
+      // Senior Day only means something if the team actually played at home.
+      const seniorDay = game?.homeTeamId === team.id && isSeniorDay(seasonAfterGames.schedule, team.id, weekToSim);
+      if (isUser && seniorDay) {
+        const seniors = practiced.team.roster.filter((p) => p.classYear === 'SR' || p.classYear === 'GR').length;
+        if (seniors > 0) seniorDayNews.push({
+          id: `senior-day-${weekToSim}`,
+          week: weekToSim,
+          category: 'game',
+          featured: true,
+          headline: `Senior Day: ${formatTeamName(team.name)} honors ${seniors} senior${seniors > 1 ? 's' : ''} before the home finale`,
+        });
+      }
+      const mood = runMoraleWeek(practiced.team, { won, intensity: plan.intensity, rivalry, seniorDay });
       if (isUser) moraleChanges.push(...mood.changes);
       return mood.team;
     }),
@@ -261,8 +354,23 @@ export function simulateOneWeek(
   const newDynasty = { ...dynasty, season: newSeason, recruits: newRecruits, recruitBoard: newBoard };
 
   const newRankings = computeNationalRankings(newSeason.teams, state.rankings);
+  const bracketNews: NewsItem[] = [];
+  // Bubble watch starts once a few weeks of results make the projection mean something.
+  if (weekToSim >= BRACKET_NEWS_FIRST_WEEK) {
+    const project = (season: typeof newSeason) =>
+      projectNcaaField(season.teams, season.conferences, season.standings, season.schedule);
+    const headline = bracketMovementHeadline(
+      project(dynasty.season),
+      project(newSeason),
+      dynasty.userTeamId,
+      formatTeamName(teamMap.get(dynasty.userTeamId) ?? dynasty.userTeamId),
+    );
+    if (headline) {
+      bracketNews.push({ id: `bracket-${weekToSim}`, week: weekToSim, category: 'rankings', featured: true, headline });
+    }
+  }
   const userInjuryRisk = PRACTICE_INTENSITIES[userPractice.intensity].injuryRisk;
-  const { injuries: newInjuries, newlyInjured, recovered } = processInjuries(
+  const { injuries: newInjuries, newlyInjured, recovered, setbacks } = processInjuries(
     state.injuries,
     newSeason.teams,
     random,
@@ -347,6 +455,19 @@ export function simulateOneWeek(
         featured: true,
         headline: `${r.playerName} has returned from injury`,
       })),
+    ...setbacks
+      .filter((sb) => sb.teamId === dynasty.userTeamId)
+      .map((sb, i) => {
+        const player = newSeason.teams.find((t) => t.id === sb.teamId)?.roster.find((p) => p.id === sb.playerId);
+        const name = player ? `${player.name.first} ${player.name.last}` : 'A rushed player';
+        return {
+          id: `setback-${weekToSim}-${i}`,
+          week: weekToSim,
+          category: 'injury' as const,
+          featured: true,
+          headline: `${name} suffers a setback after rushing back and is out ${sb.weeksRemaining} more week${sb.weeksRemaining > 1 ? 's' : ''}`,
+        };
+      }),
   ];
 
   const practiceNews: NewsItem[] = [];
@@ -396,7 +517,7 @@ export function simulateOneWeek(
     rankings: newRankings,
     injuries: newInjuries,
     rivalrySeries,
-    newsItems: [...rivalryNews, ...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
+    newsItems: [...rivalryNews, ...seniorDayNews, ...bracketNews, ...playerOfWeekNews, ...weekNews, ...visitNews, ...recruitNews, ...dramaNews, ...injuryNews, ...practiceNews, ...state.newsItems].slice(0, MAX_NEWS_ITEMS),
     scouting: advanceScoutingWeek(state.scouting),
     recruitingActivity: emptyRecruitingActivity(),
     recruitTrends,

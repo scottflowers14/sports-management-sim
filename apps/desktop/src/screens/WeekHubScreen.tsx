@@ -8,6 +8,7 @@ import type { ScoutingState } from '../scouting';
 import type { WeeklyHubData } from '../weekly-hub';
 import type { BoxScoreData } from '../ui/types';
 import { ResultRow } from '../components/ResultRow';
+import { RushBackButton } from '../components/RushBackButton';
 import { formatTeamName } from '../ui/format';
 
 interface ActionItem {
@@ -215,6 +216,7 @@ export function WeekHubScreen({
   lastWeekGames,
   gameLogs,
   onSimWeek,
+  onCoachGame,
   onBoxScore,
   onNavigate,
   classNeeds,
@@ -225,6 +227,9 @@ export function WeekHubScreen({
   captainCount,
   rivalryWeek,
   previewCard,
+  onRushInjury,
+  bracketStatus,
+  teamTalkCard,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -242,6 +247,8 @@ export function WeekHubScreen({
   lastWeekGames: ScheduledGame[];
   gameLogs: Map<string, GameLog>;
   onSimWeek: () => void;
+  /** Play the user's game to halftime and adjust; absent when there's no game to coach. */
+  onCoachGame?: (() => void) | undefined;
   onBoxScore: (data: BoxScoreData) => void;
   onNavigate: (view: string) => void;
   classNeeds?: PositionNeed[];
@@ -253,6 +260,11 @@ export function WeekHubScreen({
   rivalryWeek?: string;
   /** Shown before the opener. */
   previewCard?: ReactNode;
+  onRushInjury?: (playerId: string) => void;
+  /** Bracketology line for the user, e.g. "Projected #4 seed (at-large)". */
+  bracketStatus?: string | undefined;
+  /** Pregame talk for this week's game. */
+  teamTalkCard?: ReactNode;
 }) {
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
@@ -317,6 +329,20 @@ export function WeekHubScreen({
                 <span className="hub-stat-label">Recent Form</span>
               </div>
             )}
+            {weeklyHub && (
+              <div className="hub-stat" title={`Head-to-head vs ${weeklyHub.opponentName}`}>
+                <span className="hub-stat-value">
+                  {weeklyHub.series ? `${weeklyHub.series.wins}–${weeklyHub.series.losses}` : 'New'}
+                </span>
+                <span className="hub-stat-label">Series</span>
+              </div>
+            )}
+            {bracketStatus && (
+              <div className="hub-stat" title={bracketStatus}>
+                <span className="hub-stat-value">{shortBracketStatus(bracketStatus)}</span>
+                <span className="hub-stat-label">Bracket</span>
+              </div>
+            )}
             <div className="hub-stat">
               <span className="hub-stat-value">{scouting.pointsAvailable}</span>
               <span className="hub-stat-label">Recruit Hrs</span>
@@ -324,9 +350,16 @@ export function WeekHubScreen({
           </div>
         </div>
         {!seasonComplete && (
-          <button className="hub-sim-btn" onClick={onSimWeek}>
-            Sim Week {currentWeek} →
-          </button>
+          <div className="hub-sim-actions">
+            {onCoachGame && (
+              <button className="hub-sim-btn hub-coach-btn" onClick={onCoachGame}>
+                Coach the Game
+              </button>
+            )}
+            <button className="hub-sim-btn" onClick={onSimWeek}>
+              Sim Week {currentWeek} →
+            </button>
+          </div>
         )}
       </div>
 
@@ -346,6 +379,8 @@ export function WeekHubScreen({
           ))}
         </div>
       )}
+
+      {teamTalkCard}
 
       {previewCard}
 
@@ -439,6 +474,8 @@ export function WeekHubScreen({
                     </div>
                     <div className="hub-injury-weeks">
                       Out {inj.weeksRemaining} wk{inj.weeksRemaining > 1 ? 's' : ''}
+                      {inj.rushed && <span className="hub-injury-type">rushed</span>}
+                      {onRushInjury && <RushBackButton injury={inj} onRush={onRushInjury} />}
                     </div>
                   </li>
                 );
@@ -570,4 +607,11 @@ export function WeekHubScreen({
       </article>
     </div>
   );
+}
+
+/** "Projected #4 seed (at-large)" → "#4 seed"; bubble and out read as such. */
+function shortBracketStatus(status: string): string {
+  const seed = /#(\d+) seed/.exec(status);
+  if (seed) return `#${seed[1]} seed`;
+  return status.startsWith('First four out') ? 'Bubble' : 'Out';
 }

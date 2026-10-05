@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import type { LacrossePortalEntry, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
+import {
+  NIL_PORTAL_INTEREST_BOOST,
+  NIL_RETENTION_ODDS,
+  formatNil,
+  nilDealFor,
+  nilPortalDealCost,
+  nilRemaining,
+  nilRetentionAsk,
+  type LacrossePortalEntry,
+  type LacrossePosition,
+  type LacrosseTeam,
+  type NilState,
+} from '@sports-management-sim/sport-lacrosse';
 import { PORTAL_REASON_LABELS, rankPortalCandidates } from '@sports-management-sim/engine-core';
 import { OfferControl } from '../components/OfferControl';
 import { RatingCell } from '../components/RatingCell';
@@ -16,6 +28,12 @@ const REASON_SHORT: Record<LacrossePortalEntry['reason'], string> = {
 type PortalSortKey = 'name' | 'position' | 'classYear' | 'overall' | 'potential' | 'offers' | 'from';
 const ASCENDING_FIRST: ReadonlySet<PortalSortKey> = new Set(['name', 'position', 'classYear', 'from']);
 
+export interface PortalNilProps {
+  state: NilState;
+  onRetain: (entryId: string) => void;
+  onDeal: (entryId: string) => void;
+}
+
 export interface PortalBoardProps {
   entries: LacrossePortalEntry[];
   teams: LacrosseTeam[];
@@ -26,6 +44,7 @@ export interface PortalBoardProps {
   scholarshipRoom: number;
   onOffer: (entryId: string, scholarshipPercent: number) => void;
   onWithdraw: (entryId: string) => void;
+  nil?: PortalNilProps;
 }
 
 /** Who a transfer is leaning toward right now, and where our offer stands. */
@@ -42,7 +61,7 @@ export function portalStanding(entry: LacrossePortalEntry, teams: LacrosseTeam[]
   };
 }
 
-export function PortalBoard({ entries, teams, userTeamId, teamMap, seasonYear, scholarshipRoom, onOffer, onWithdraw }: PortalBoardProps) {
+export function PortalBoard({ entries, teams, userTeamId, teamMap, seasonYear, scholarshipRoom, onOffer, onWithdraw, nil }: PortalBoardProps) {
   const [position, setPosition] = useState<LacrossePosition | 'ALL'>('ALL');
   const [onlyOurs, setOnlyOurs] = useState(false);
   const [sort, setSort] = useState<SortState<PortalSortKey>>({ key: 'overall', direction: 'desc' });
@@ -51,6 +70,9 @@ export function PortalBoard({ entries, teams, userTeamId, teamMap, seasonYear, s
   const ourDepartures = available.filter((e) => e.sourceTeamId === userTeamId);
   const ourOffers = available.filter((e) => e.offersByTeamId[userTeamId] !== undefined);
   const userTeam = teams.find((t) => t.id === userTeamId);
+  const nilLeft = nil ? nilRemaining(nil.state) : 0;
+  const declinedNil = nil ? nil.state.deals.filter((d) => d.kind === 'retain' && d.outcome === 'declined').map((d) => d.entryId) : [];
+  const keptNil = nil ? nil.state.deals.filter((d) => d.outcome === 'retained').length : 0;
 
   const rows = (() => {
     const filtered = available.filter(
@@ -108,6 +130,7 @@ export function PortalBoard({ entries, teams, userTeamId, teamMap, seasonYear, s
             <span><strong>{available.length}</strong> in the portal</span>
             <span><strong>{ourOffers.length}</strong> our offers</span>
             <span><strong>{scholarshipRoom.toFixed(2)}</strong> scholarships free</span>
+            {nil && <span title="NIL collective money left this offseason"><strong>{formatNil(nilLeft)}</strong> NIL left</span>}
           </div>
           <label className="toolbar-field">
             Position
@@ -123,6 +146,14 @@ export function PortalBoard({ entries, teams, userTeamId, teamMap, seasonYear, s
         <p className="portal-hint">
           Transfers weigh playing time, prestige, home region and the scholarship on the table. Everyone picks a school when the season starts.
         </p>
+
+        {nil && (
+          <p className="portal-hint nil-hint">
+            NIL collective: {formatNil(nilLeft)} of {formatNil(nil.state.budget)} left. Pay one of our departures to stay
+            (it lands or fails on the spot, and a no costs nothing), or add NIL to a portal offer for +{NIL_PORTAL_INTEREST_BOOST} interest.
+            {keptNil > 0 ? ` Kept ${keptNil} so far.` : ''}
+          </p>
+        )}
 
         {ourDepartures.length > 0 && (
           <div className="portal-departures" aria-label="Our players in the portal">
@@ -140,11 +171,26 @@ export function PortalBoard({ entries, teams, userTeamId, teamMap, seasonYear, s
                     <span className="portal-departure-rivals">
                       {rivals.length > 0 ? `Offers from ${rivals.map(teamShort).join(', ')}` : 'No other offers yet'}
                     </span>
+                    <span className="portal-departure-actions">
                     {ourOffer !== undefined ? (
                       <span className="badge badge-offered">Re-recruiting {ourOffer}%</span>
                     ) : (
                       <OfferControl recruitId={e.id} recruitName={`${e.name.first} ${e.name.last}`} budgetRemaining={scholarshipRoom} onOffer={onOffer} label="Re-recruit" />
                     )}
+                    {nil && (declinedNil.includes(e.id) ? (
+                      <span className="badge nil-declined">Turned down NIL</span>
+                    ) : (
+                      <button
+                        className="ghost-btn nil-btn"
+                        disabled={nilRetentionAsk(e) > nilLeft}
+                        onClick={() => nil.onRetain(e.id)}
+                        aria-label={`NIL deal to keep ${e.name.first} ${e.name.last}`}
+                        title={`${Math.round(NIL_RETENTION_ODDS[e.reason] * 100)}% chance he takes it`}
+                      >
+                        NIL {formatNil(nilRetentionAsk(e))} · {Math.round(NIL_RETENTION_ODDS[e.reason] * 100)}%
+                      </button>
+                    ))}
+                    </span>
                   </li>
                 );
               })}
@@ -217,6 +263,19 @@ export function PortalBoard({ entries, teams, userTeamId, teamMap, seasonYear, s
                         ) : (
                           <span className="portal-trailing">Behind {standing.leaderTeamId ? teamShort(standing.leaderTeamId) : '–'}</span>
                         )}
+                        {nil && (nilDealFor(nil.state, e.id) ? (
+                          <span className="badge nil-signed" title="NIL deal attached">+NIL</span>
+                        ) : (
+                          <button
+                            className="link-btn"
+                            disabled={nilPortalDealCost(e) > nilLeft}
+                            onClick={() => nil.onDeal(e.id)}
+                            aria-label={`Add NIL to offer for ${e.name.first} ${e.name.last}`}
+                            title={`+${NIL_PORTAL_INTEREST_BOOST} interest`}
+                          >
+                            +NIL {formatNil(nilPortalDealCost(e))}
+                          </button>
+                        ))}
                         <button className="link-btn" onClick={() => onWithdraw(e.id)} aria-label={`Withdraw offer to ${e.name.first} ${e.name.last}`}>Withdraw</button>
                       </div>
                     ) : (

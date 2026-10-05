@@ -1,11 +1,115 @@
 import { deriveCpuGamePlan, simulateLacrosseGameWithLog } from '@sports-management-sim/sport-lacrosse';
 import type { CoachingEdge, GameLog, LacrosseGamePlan, LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import type { Conference, ScheduledGame, StandingsEntry } from '@sports-management-sim/engine-core';
+import { seededGameRandom } from './halftime';
 
 /** Resolves the game plan a team uses in tournament play (defaults to CPU-derived plans). */
 export type GamePlanResolver = (team: LacrosseTeam) => LacrosseGamePlan;
 export type CoachingResolver = (team: LacrosseTeam) => CoachingEdge;
 const NO_COACHING: CoachingResolver = () => ({ offense: 0, defense: 0 });
+
+/** The user's postseason game, coached through halftime (see halftime.ts). */
+export interface TournamentCoaching {
+  teamId: string;
+  seed: number;
+  secondHalfPlan?: LacrosseGamePlan;
+}
+
+let activeCoaching: TournamentCoaching | null = null;
+
+/**
+ * Runs a tournament step with the coached team's game on seeded dice. Must
+ * wrap a synchronous call, never a React state updater that runs later.
+ */
+export function withTournamentCoaching<T>(coaching: TournamentCoaching, run: () => T): T {
+  activeCoaching = coaching;
+  try {
+    return run();
+  } finally {
+    activeCoaching = null;
+  }
+}
+
+/** Plays whatever round the tournament is on. */
+export function advanceTournamentPhase(
+  state: TournamentState,
+  teams: LacrosseTeam[],
+  planFor: GamePlanResolver,
+  schedule: ScheduledGame[],
+  coachingFor: CoachingResolver,
+): TournamentState {
+  switch (state.phase) {
+    case 'conf_semis':
+      return advanceTournamentSemis(state, teams, planFor, coachingFor);
+    case 'conf_finals':
+      return advanceTournamentFinals(state, teams, planFor, schedule, coachingFor);
+    case 'ncaa_first_round':
+      return advanceNcaaFirstRound(state, teams, planFor, coachingFor);
+    case 'ncaa_quarterfinals':
+      return advanceNcaaQuarterfinals(state, teams, planFor, coachingFor);
+    case 'national_semis':
+      return advanceTournamentNationalSemis(state, teams, planFor, coachingFor);
+    case 'national_final':
+      return advanceNationalChampionship(state, teams, planFor, coachingFor);
+    case 'complete':
+      return state;
+  }
+}
+
+export const TOURNAMENT_ROUND_LABELS: Record<TournamentPhase, string> = {
+  conf_semis: 'Conference Semifinal',
+  conf_finals: 'Conference Final',
+  ncaa_first_round: 'NCAA First Round',
+  ncaa_quarterfinals: 'NCAA Quarterfinal',
+  national_semis: 'National Semifinal',
+  national_final: 'National Championship',
+  complete: 'Tournament',
+};
+
+/** Whether a team has a game in the round the tournament is on. */
+export function teamPlaysThisRound(state: TournamentState, teamId: string): boolean {
+  const has = (g: TournamentGame | undefined) => g !== undefined && !g.result && (g.homeTeamId === teamId || g.awayTeamId === teamId);
+  switch (state.phase) {
+    case 'conf_semis':
+      return state.conferenceBrackets.some((b) => has(b.semifinal1) || has(b.semifinal2));
+    case 'conf_finals':
+      return state.conferenceBrackets.some(
+        (b) => !b.final && (b.semifinal1.result?.winnerId === teamId || b.semifinal2.result?.winnerId === teamId),
+      );
+    case 'ncaa_first_round':
+      return (state.ncaaFirstRound ?? []).some(has);
+    case 'ncaa_quarterfinals':
+      return (state.ncaaQuarterfinals ?? []).some(has);
+    case 'national_semis':
+      return has(state.nationalSemiFinal1) || has(state.nationalSemiFinal2);
+    case 'national_final':
+      return has(state.nationalGame);
+    case 'complete':
+      return false;
+  }
+}
+
+/** Every game in the tournament so far, played or not. */
+export function tournamentGames(state: TournamentState): TournamentGame[] {
+  return [
+    ...state.conferenceBrackets.flatMap((b) => [b.semifinal1, b.semifinal2, ...(b.final ? [b.final] : [])]),
+    ...(state.ncaaFirstRound ?? []),
+    ...(state.ncaaQuarterfinals ?? []),
+    ...(state.nationalSemiFinal1 ? [state.nationalSemiFinal1] : []),
+    ...(state.nationalSemiFinal2 ? [state.nationalSemiFinal2] : []),
+    ...(state.nationalGame ? [state.nationalGame] : []),
+  ];
+}
+
+/** The game a team plays in the current round, read from the round once played. */
+export function teamGameThisRound(before: TournamentState, after: TournamentState, teamId: string): TournamentGame | null {
+  const playedBefore = new Set(tournamentGames(before).filter((g) => g.result).map((g) => g.id));
+  return (
+    tournamentGames(after).find(
+      (g) => g.result && !playedBefore.has(g.id) && (g.homeTeamId === teamId || g.awayTeamId === teamId),
+    ) ?? null
+  );
+}
 
 export interface TournamentGameResult {
   winnerId: string;
@@ -357,6 +461,12 @@ function playTournamentGame(
 ): TournamentGameResult {
   const homeTeam = teams.find((t) => t.id === game.homeTeamId)!;
   const awayTeam = teams.find((t) => t.id === game.awayTeamId)!;
+  const coached = activeCoaching && (homeTeam.id === activeCoaching.teamId || awayTeam.id === activeCoaching.teamId) ? activeCoaching : null;
+  const secondHalf = coached?.secondHalfPlan
+    ? homeTeam.id === coached.teamId
+      ? { homeSecondHalfPlan: coached.secondHalfPlan }
+      : { awaySecondHalfPlan: coached.secondHalfPlan }
+    : {};
   const result = simulateLacrosseGameWithLog({
     homeTeam,
     awayTeam,
@@ -365,6 +475,8 @@ function playTournamentGame(
     neutralSite,
     homeCoaching: coachingFor(homeTeam),
     awayCoaching: coachingFor(awayTeam),
+    ...(coached ? { random: seededGameRandom(coached.seed) } : {}),
+    ...secondHalf,
   });
   const homeWon = result.winnerTeamId === homeTeam.id;
 
@@ -377,4 +489,77 @@ function playTournamentGame(
     ...(result.teamStats ? { teamStats: result.teamStats } : {}),
     log: result.log,
   };
+}
+
+export interface NcaaProjection {
+  field: NcaaEntry[];
+  firstOut: NcaaBubbleEntry[];
+  /** Projected auto bid per conference: its current league leader. */
+  leaders: Map<string, string>;
+  /** Every team's RPI rank, 1 = best. */
+  rpiRank: Map<string, number>;
+}
+
+/**
+ * Bracketology: who would make the NCAA field if the season ended today.
+ * Each conference's current leader takes the auto bid (the real one goes to
+ * the conference tournament winner) and selection runs exactly as it does on
+ * selection day.
+ */
+export function projectNcaaField(
+  teams: LacrosseTeam[],
+  conferences: Conference[],
+  standings: StandingsEntry[],
+  schedule: ScheduledGame[],
+): NcaaProjection {
+  const leaders = new Map<string, string>();
+  for (const conf of conferences) {
+    const leader = conf.teamIds
+      .map((id) => standings.find((e) => e.teamId === id) ?? { teamId: id, record: EMPTY_RECORD })
+      .sort(compareConferenceStanding)[0];
+    if (leader) leaders.set(conf.id, leader.teamId);
+  }
+  const { field, firstOut } = selectNcaaField([...leaders.values()], teams, schedule);
+  const rpi = computeRpi(teams, schedule);
+  const rpiRank = new Map(
+    [...rpi.entries()].sort((a, b) => b[1] - a[1]).map(([teamId], i) => [teamId, i + 1] as const),
+  );
+  return { field, firstOut, leaders, rpiRank };
+}
+
+/** One line on where a team stands, e.g. "Projected #4 seed (auto bid)". */
+export function projectionStatus(projection: NcaaProjection, teamId: string): string {
+  const entry = projection.field.find((e) => e.teamId === teamId);
+  if (entry) return `Projected #${entry.seed} seed (${entry.bid === 'auto' ? 'auto bid' : 'at-large'})`;
+  const bubble = projection.firstOut.findIndex((e) => e.teamId === teamId);
+  if (bubble >= 0) return `First four out (#${bubble + 1})`;
+  return `Out of the field (RPI #${projection.rpiRank.get(teamId) ?? '?'})`;
+}
+
+/** Seed swings smaller than this aren't news. */
+const BRACKET_NEWS_SEED_SWING = 3;
+
+/**
+ * Bubble watch: a headline when a week moves a team into or out of the
+ * projected field, or swings its projected seed by three or more.
+ */
+export function bracketMovementHeadline(
+  before: NcaaProjection,
+  after: NcaaProjection,
+  teamId: string,
+  teamName: string,
+): string | null {
+  const was = before.field.find((e) => e.teamId === teamId);
+  const now = after.field.find((e) => e.teamId === teamId);
+  if (!was && now) return `Bubble watch: ${teamName} plays its way into the projected NCAA field as the #${now.seed} seed`;
+  if (was && !now) {
+    const bubble = after.firstOut.some((e) => e.teamId === teamId);
+    return `Bubble watch: ${teamName} falls out of the projected NCAA field${bubble ? ' and into the first four out' : ''}`;
+  }
+  if (was && now && Math.abs(was.seed - now.seed) >= BRACKET_NEWS_SEED_SWING) {
+    return now.seed < was.seed
+      ? `Bracketology: ${teamName} climbs from a projected #${was.seed} to a #${now.seed} seed`
+      : `Bracketology: ${teamName} slides from a projected #${was.seed} to a #${now.seed} seed`;
+  }
+  return null;
 }

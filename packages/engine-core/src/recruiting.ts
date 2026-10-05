@@ -33,6 +33,39 @@ export interface Recruit<Position extends string = string, SportTraits = unknown
   status: RecruitStatus;
 }
 
+/**
+ * Recruiting pipelines, in the spirit of College Football dynasty: every
+ * scholarship player a program signed out of a region makes the next recruit
+ * from there feel closer to home. Counts are recruited scholarship players on
+ * the current roster, outside the program's own region.
+ */
+export const PIPELINE_TIER_THRESHOLDS = [2, 5, 8] as const;
+/** Proximity points each pipeline tier adds for an out-of-region recruit (home is 100, away 25). */
+export const PIPELINE_PROXIMITY_BONUS = 15;
+
+const pipelineCache = new WeakMap<readonly unknown[], Map<RegionId, number>>();
+
+export function pipelineCounts<Position extends string, SportTraits>(team: Team<Position, SportTraits>): Map<RegionId, number> {
+  const cached = pipelineCache.get(team.roster);
+  if (cached) return cached;
+  const counts = new Map<RegionId, number>();
+  for (const player of team.roster) {
+    if (player.isWalkOn || !player.recruitingProfile || player.regionId === team.regionId) continue;
+    counts.set(player.regionId, (counts.get(player.regionId) ?? 0) + 1);
+  }
+  pipelineCache.set(team.roster, counts);
+  return counts;
+}
+
+export function pipelineTierFor(count: number): number {
+  return PIPELINE_TIER_THRESHOLDS.filter((threshold) => count >= threshold).length;
+}
+
+export function pipelineTier<Position extends string, SportTraits>(team: Team<Position, SportTraits>, regionId: RegionId): number {
+  if (regionId === team.regionId) return 0;
+  return pipelineTierFor(pipelineCounts(team).get(regionId) ?? 0);
+}
+
 export function calculateRecruitFitScore<Position extends string, SportTraits>(
   recruit: Recruit<Position, SportTraits>,
   team: Team<Position, SportTraits>,
@@ -44,7 +77,7 @@ export function calculateRecruitFitScore<Position extends string, SportTraits>(
     team.reputation.recentSuccess,
   ]);
   const academicScore = team.reputation.academicPrestige;
-  const proximityScore = recruit.regionId === team.regionId ? 100 : 25;
+  const proximityScore = recruit.regionId === team.regionId ? 100 : 25 + PIPELINE_PROXIMITY_BONUS * pipelineTier(team, recruit.regionId);
   const scholarshipRoom = Math.max(0, team.resources.scholarshipLimit - team.resources.scholarshipUsed);
   const scholarshipScore = clamp(scholarshipRoom * 100, 0, 100);
   const playingTimeScore = clamp(100 - team.roster.length * 2, 10, 100);

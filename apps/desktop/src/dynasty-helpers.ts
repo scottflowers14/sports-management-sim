@@ -15,6 +15,9 @@ import {
 } from '@sports-management-sim/engine-core';
 import type { PortalMove, PortalReason, StandingsEntry } from '@sports-management-sim/engine-core';
 import {
+  canRushInjury,
+  rushSetbackWeeks,
+  rushedWeeksOut,
   createLacrosseSeasonSchedule,
   generateLacrosseRecruitingClass,
   generateLacrosseWalkOns,
@@ -33,8 +36,13 @@ import {
   cpuInvestmentPlan,
   runProDraft,
   applyProDraftPrestige,
+  applyRealignment,
+  dynastyRivalries,
+  planRealignment,
+  realignmentInvolves,
 } from '@sports-management-sim/sport-lacrosse';
 import type {
+  RealignmentMove,
   CarouselChange,
   LacrossePlayer,
   LacrossePortalEntry,
@@ -100,6 +108,10 @@ export interface OffseasonSummary {
   coachOfYear?: CoachOfYear | null;
   /** The whole pro draft, every program's picks. */
   proDraft?: ProDraftPick[];
+  /** Two programs that changed leagues this offseason. */
+  realignment?: RealignmentMove | null;
+  /** A stronger league inviting the user's program; null once answered. */
+  realignmentInvite?: RealignmentMove | null;
 }
 
 /** Production needs a few games behind it before scouts trust it. */
@@ -154,6 +166,44 @@ export interface InjuredPlayer {
   weeksRemaining: number;
   /** e.g. "ankle sprain"; missing on saves from before injury types. */
   description?: string;
+  /** Rushed back once already; can't be rushed again. */
+  rushed?: boolean;
+  /** Weeks a rushed return will cost when it fails. Hidden from the UI. */
+  setbackWeeks?: number;
+}
+
+/** Players whose rushed return failed this week and are back on the list. */
+export interface InjurySetback {
+  playerId: string;
+  teamId: string;
+  weeksRemaining: number;
+}
+
+/** Halve a player's time out. The setback is rolled now so a reload can't change it. */
+export function rushInjury(
+  injuries: InjuredPlayer[],
+  playerId: string,
+  week: number,
+  seed: number,
+): InjuredPlayer[] {
+  return injuries.map((inj) => {
+    if (inj.playerId !== playerId || !canRushInjury(inj.weeksRemaining, inj.rushed === true)) return inj;
+    const setbackWeeks = rushSetbackWeeks(inj.weeksRemaining, playerId, week, seed);
+    return {
+      ...inj,
+      weeksRemaining: rushedWeeksOut(inj.weeksRemaining),
+      rushed: true,
+      ...(setbackWeeks > 0 ? { setbackWeeks } : {}),
+    };
+  });
+}
+
+/** Someone whose time is up either returns or, after a failed rush, goes back out. */
+function returnFromInjury(inj: InjuredPlayer): InjuredPlayer | null {
+  if (inj.weeksRemaining > 0) return inj;
+  if (!inj.setbackWeeks) return null;
+  const { setbackWeeks, ...rest } = inj;
+  return { ...rest, weeksRemaining: setbackWeeks, description: `setback, ${inj.description ?? 'injury'}` };
 }
 
 export interface NewInjury {
@@ -181,6 +231,7 @@ export function processInjuries(
   injuries: InjuredPlayer[];
   newlyInjured: NewInjury[];
   recovered: { playerId: string; teamId: string; playerName: string }[];
+  setbacks: InjurySetback[];
 } {
   const decremented = currentInjuries.map((inj) => ({
     ...inj,
@@ -189,9 +240,14 @@ export function processInjuries(
 
   const recovered: { playerId: string; teamId: string; playerName: string }[] = [];
   const stillActive: InjuredPlayer[] = [];
+  const setbacks: InjurySetback[] = [];
 
   for (const inj of decremented) {
-    if (inj.weeksRemaining <= 0) {
+    const next = returnFromInjury(inj);
+    if (next && inj.weeksRemaining <= 0) {
+      setbacks.push({ playerId: next.playerId, teamId: next.teamId, weeksRemaining: next.weeksRemaining });
+      stillActive.push(next);
+    } else if (!next) {
       const player = teams.find((t) => t.id === inj.teamId)?.roster.find((p) => p.id === inj.playerId);
       recovered.push({
         playerId: inj.playerId,
@@ -230,6 +286,7 @@ export function processInjuries(
     ],
     newlyInjured,
     recovered,
+    setbacks,
   };
 }
 
@@ -240,8 +297,8 @@ export function processInjuries(
  */
 export function healInjuriesOneWeek(currentInjuries: InjuredPlayer[]): InjuredPlayer[] {
   return currentInjuries
-    .map((inj) => ({ ...inj, weeksRemaining: inj.weeksRemaining - 1 }))
-    .filter((inj) => inj.weeksRemaining > 0);
+    .map((inj) => returnFromInjury({ ...inj, weeksRemaining: inj.weeksRemaining - 1 }))
+    .filter((inj): inj is InjuredPlayer => inj !== null);
 }
 
 /** A recruit shuts down their recruitment early only when one school is a runaway leader. */
@@ -595,11 +652,29 @@ export function runOffseason(
   const newUserTeam = teamsForNewSeason.find((t) => t.id === userTeamId)!;
   const newRecruitBoard = sortRecruitBoardForTeam(newUserTeam, newRecruits, rosterTargets);
 
+  // Realignment: a rising pair of rivals may trade leagues with a fading pair.
+  // A move that takes the user's program up waits for the user to accept.
+  const rivalries = dynastyRivalries(dynasty);
+  const realignment = planRealignment({
+    conferences: season.conferences,
+    teams: teamsForNewSeason,
+    rivalries,
+    year: newYear,
+    seed,
+    userTeamId,
+  });
+  const realignmentInvite = realignment && realignmentInvolves(realignment, userTeamId) ? realignment : null;
+  const realigned =
+    realignment && !realignmentInvite
+      ? applyRealignment(season.conferences, teamsForNewSeason, realignment)
+      : { conferences: season.conferences, teams: teamsForNewSeason };
+
   const newSeason: LacrosseSeason = {
     ...season,
     year: newYear,
-    teams: teamsForNewSeason,
-    schedule: createLacrosseSeasonSchedule(newYear, season.conferences),
+    teams: realigned.teams,
+    conferences: realigned.conferences,
+    schedule: createLacrosseSeasonSchedule(newYear, realigned.conferences),
     standings: [],
     currentWeek: 1,
     phase: 'regular_season',
@@ -619,6 +694,8 @@ export function runOffseason(
     coachingCarousel: carousel.changes,
     coachOfYear,
     proDraft,
+    realignment: realignment && !realignmentInvite ? realignment : null,
+    realignmentInvite,
   };
 
   return {
@@ -629,6 +706,7 @@ export function runOffseason(
       recruitBoard: newRecruitBoard,
       seed: newSeed,
       portalEntries,
+      ...(realignment && !realignmentInvite ? { rivalries } : {}),
     },
     summary,
   };

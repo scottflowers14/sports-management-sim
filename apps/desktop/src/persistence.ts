@@ -2,7 +2,7 @@ import { compactGameLog, normalizeGamePlan } from '@sports-management-sim/sport-
 import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, LacrossePortalEntry, LacrossePracticePlan, LacrosseStaff, RivalrySeriesMap, StaffMember } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
-import type { PracticeLogEntry } from './week-sim';
+import type { PracticeLogEntry, PregameTalk } from './week-sim';
 import type { LockerRoomState } from './locker-room';
 import type { HallOfFameEntry, RecordBookArchive } from './records';
 import type { SeasonPreview } from './preseason';
@@ -18,7 +18,8 @@ import type { SeasonStatsMap } from './stats';
 import type { CareerStatsMap } from './career-stats';
 import type { CoachProfile, JobOffer, SeasonGoals } from './coach-profile';
 import type { WeeklyHonor } from './weekly-honors';
-import type { InvestmentPlan, ProDraftPick } from '@sports-management-sim/sport-lacrosse';
+import type { InvestmentPlan, NilState, ProDraftPick } from '@sports-management-sim/sport-lacrosse';
+import type { HalftimeState } from './halftime';
 import { formatTeamName } from './ui/format';
 
 export const DYNASTY_SAVE_VERSION = 1;
@@ -67,6 +68,14 @@ export interface DynastySaveState {
   hallOfFame?: HallOfFameEntry[];
   /** Every pro draft so far, all programs, newest first. */
   proDraftHistory?: ProDraftPick[];
+  /** The NIL collective's money and deals for the current portal. */
+  nil?: NilState | null;
+  /** A coached game paused at halftime; reloading returns to the locker room. */
+  halftime?: HalftimeState | null;
+  /** Press conference answers by game id, recent games only. */
+  pressAnswers?: Record<string, string>;
+  /** This week's pregame team talk, if given. */
+  teamTalk?: PregameTalk | null;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */

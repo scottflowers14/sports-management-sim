@@ -243,3 +243,37 @@ describe('tactics inside the possession engine', () => {
     expect(manUp.goals / manUp.chances).toBeLessThan(0.6);
   });
 });
+
+describe('halftime adjustments', () => {
+  const firstHalf = (events: { period: unknown }[]) => events.filter((e) => e.period === 1 || e.period === 2);
+
+  it('replays the first half exactly and changes the second', () => {
+    let changed = 0;
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const base = simulatePossessionGame({ homeTeam: home, awayTeam: away, random: seededRandom(seed) });
+      const adjusted = simulatePossessionGame({
+        homeTeam: home,
+        awayTeam: away,
+        random: seededRandom(seed),
+        homeSecondHalfPlan: { tempo: 'uptempo', defense: 'pressure', ride: 'aggressive', rotation: 'deep' },
+      });
+      expect(firstHalf(adjusted.log.events)).toEqual(firstHalf(base.log.events));
+      if (adjusted.result.homeScore !== base.result.homeScore || adjusted.result.awayScore !== base.result.awayScore) changed += 1;
+    }
+    expect(changed).toBeGreaterThan(15);
+  });
+
+  it('plays the adjusted tempo in the second half', () => {
+    // Uptempo after the break means more second-half possessions than a patient second half.
+    let fast = 0;
+    let slow = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const count = (tempo: 'uptempo' | 'patient') =>
+        simulatePossessionGame({ homeTeam: home, awayTeam: away, random: seededRandom(seed), homeSecondHalfPlan: { tempo }, awaySecondHalfPlan: { tempo } })
+          .log.events.filter((e) => (e.period === 3 || e.period === 4) && (e.type === 'shot' || e.type === 'save' || e.type === 'goal' || e.type === 'turnover')).length;
+      fast += count('uptempo');
+      slow += count('patient');
+    }
+    expect(fast).toBeGreaterThan(slow * 1.1);
+  });
+});

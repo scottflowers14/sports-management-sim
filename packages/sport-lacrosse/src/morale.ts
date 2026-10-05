@@ -1,6 +1,7 @@
 import { getLacrosseDepthChart, LACROSSE_STARTER_COUNTS } from './depth-chart';
 import type { LacrossePlayer, LacrosseTeam } from './models';
 import type { PracticeIntensity } from './practice';
+import type { ScheduledGame } from '@sports-management-sim/engine-core';
 
 /** Where morale settles when nothing is happening. */
 export const MORALE_BASELINE = 62;
@@ -61,6 +62,21 @@ export interface MoraleWeekInput {
   intensity: PracticeIntensity;
   /** A rivalry game counts triple, win or lose. */
   rivalry?: boolean;
+  /** The last home game of the regular season: seniors are honored before it. */
+  seniorDay?: boolean;
+}
+
+/** What being honored on Senior Day is worth to a senior. */
+export const SENIOR_DAY_BOOST = 4;
+
+/** Whether this week's game is the team's last regular-season home game. */
+export function isSeniorDay(
+  schedule: readonly Pick<ScheduledGame, 'week' | 'homeTeamId' | 'awayTeamId' | 'neutralSite'>[],
+  teamId: string,
+  week: number,
+): boolean {
+  const homeWeeks = schedule.filter((g) => g.homeTeamId === teamId && !g.neutralSite).map((g) => g.week);
+  return homeWeeks.length > 0 && Math.max(...homeWeeks) === week;
 }
 
 /** One player's weekly change, before drift. */
@@ -85,6 +101,7 @@ export function weeklyMoraleChange(player: LacrossePlayer, status: PlayerRoleSta
   if (input.won === false) change -= 0.8 * stakes;
   if (input.intensity === 'intense') change -= 1;
   if (input.intensity === 'light') change += 0.5;
+  if (input.seniorDay && (player.classYear === 'SR' || player.classYear === 'GR')) change += SENIOR_DAY_BOOST;
   if (player.traits.includes('leader')) change += 0.3;
   if (player.traits.includes('low_motivation')) change -= 0.3;
   return change;

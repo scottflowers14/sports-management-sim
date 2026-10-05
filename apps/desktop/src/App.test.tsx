@@ -416,6 +416,9 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Long Island Tech$/i }));
     expect(screen.getByText(/Program Page/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Roster \(\d+\)/i })).toBeInTheDocument();
+    // No games yet, so no series with them.
+    expect(screen.getByText('Your Series')).toBeInTheDocument();
+    expect(screen.getByText('Never met')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /All Programs/i }));
     expect(screen.getByText(/36 programs/i)).toBeInTheDocument();
@@ -510,6 +513,84 @@ describe('Desktop App', () => {
     await userEvent.click(hireButtons[0]!);
     expect(within(pool).getAllByRole('button', { name: 'Hire' }).length).toBe(before - 1);
     await waitFor(() => expect(loadActiveDynastySave()?.staffCandidates?.length).toBe(before - 1));
+  });
+
+  it('spends a head coach ability point on the Staff screen', async () => {
+    await renderStartedApp();
+    const hoursBefore = loadActiveDynastySave()!.scouting.pointsPerWeek;
+    await userEvent.click(screen.getByRole('button', { name: /^Staff$/ }));
+    const card = screen.getByLabelText('Head coach abilities');
+    expect(within(card).getByText(/ability point to spend/)).toBeInTheDocument();
+    // Recruiter tier 1 costs the new coach's one point; tier 2 then costs two.
+    await userEvent.click(within(card).getByRole('button', { name: 'Upgrade Recruiter' }));
+    expect(within(card).getByText(/ability points to spend/)).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Upgrade Recruiter' })).toBeDisabled();
+    expect(within(screen.getByLabelText('Coaching staff')).getByText('+5')).toBeInTheDocument();
+    await waitFor(() => expect(loadActiveDynastySave()?.coachProfile?.abilities).toEqual({ recruiter: 1 }));
+    expect(loadActiveDynastySave()!.scouting.pointsPerWeek).toBeGreaterThanOrEqual(hoursBefore);
+  });
+
+  it('swaps a non-conference opponent on the Schedule screen until the season starts', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Schedule$/ }));
+    const card = screen.getByLabelText('Non-conference schedule');
+    const select = within(card).getAllByRole('combobox')[0]!;
+    const week = Number(select.getAttribute('aria-label')!.match(/Week (\d+)/)![1]);
+    const pick = within(select).getAllByRole('option')[1]!.getAttribute('value')!;
+    await userEvent.selectOptions(select, pick);
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      const game = save.dynasty.season.schedule.find(
+        (g) => g.week === week && (g.homeTeamId === save.dynasty.userTeamId || g.awayTeamId === save.dynasty.userTeamId),
+      )!;
+      expect([game.homeTeamId, game.awayTeamId]).toContain(pick);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /^Week Hub/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Schedule$/ }));
+    expect(within(screen.getByLabelText('Non-conference schedule')).queryAllByRole('combobox')).toHaveLength(0);
+    expect(screen.getByText(/slate is locked/)).toBeInTheDocument();
+  });
+
+  it('coaches a game through halftime, and a reload returns to the locker room', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: 'Coach the Game' }));
+    const dialog = screen.getByRole('dialog', { name: /Halftime|at/ });
+    expect(within(dialog).getByText('Staff read')).toBeInTheDocument();
+    await waitFor(() => expect(loadActiveDynastySave()?.halftime?.week).toBe(1));
+    const score = within(dialog).getByRole('heading').textContent;
+    cleanup();
+
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    const again = screen.getByRole('dialog');
+    expect(within(again).getByRole('heading').textContent).toBe(score);
+    await userEvent.selectOptions(within(again).getByLabelText('Second half Offensive Tempo'), 'uptempo');
+    await userEvent.click(within(again).getByRole('button', { name: /Play Second Half \(1 adjustment\)/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      expect(save.halftime ?? null).toBeNull();
+      expect(save.dynasty.season.currentWeek).toBe(2);
+    });
+  });
+
+  it('answers the postgame press conference once', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Week Hub/ }));
+    const card = screen.getByLabelText('Press conference');
+    const first = within(card).getAllByRole('button')[0]!;
+    const label = first.querySelector('strong')!.textContent!;
+    await userEvent.click(first);
+    expect(screen.queryByLabelText('Press conference')).not.toBeInTheDocument();
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      expect(Object.values(save.pressAnswers ?? {})).toHaveLength(1);
+      expect(save.newsItems.some((n) => n.headline.includes('after the game'))).toBe(true);
+    });
+    expect(label.length).toBeGreaterThan(0);
   });
 
   it('sets practice intensity and development plans on the Practice screen', async () => {

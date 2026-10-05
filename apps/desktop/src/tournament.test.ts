@@ -15,8 +15,18 @@ import {
   computeRpi,
   initTournament,
   ncaaFieldSize,
+  projectNcaaField,
+  bracketMovementHeadline,
+  type NcaaProjection,
+  projectionStatus,
+  compareConferenceStanding,
   selectNcaaField,
+  advanceTournamentPhase,
+  teamGameThisRound,
+  tournamentGames,
+  withTournamentCoaching,
 } from './tournament';
+import { deriveCpuGamePlan } from '@sports-management-sim/sport-lacrosse';
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -149,5 +159,91 @@ describe('ncaaFieldSize', () => {
     expect(field).toHaveLength(4);
     expect(field.filter((e) => e.bid === 'auto')).toHaveLength(2);
     expect(firstOut).toHaveLength(4);
+  });
+});
+
+describe('coached tournament games', () => {
+  const season = finishedSeason();
+  const { teams, schedule, standings, conferences } = season;
+  const coaching = () => ({ offense: 0, defense: 0 });
+
+  it('replays the coached first half in every round and changes only the second', () => {
+    let state = initTournament(standings, conferences);
+    let rounds = 0;
+    while (state.phase !== 'complete') {
+      // Coach the home side of one of this round's games.
+      const probe = advanceTournamentPhase(state, teams, deriveCpuGamePlan, schedule, coaching);
+      const playedBefore = new Set(tournamentGames(state).filter((g) => g.result).map((g) => g.id));
+      const teamId = tournamentGames(probe).find((g) => g.result && !playedBefore.has(g.id))!.homeTeamId;
+      const half = (log: { events: { period: unknown }[] } | undefined) => log!.events.filter((e) => e.period === 1 || e.period === 2);
+      const preview = withTournamentCoaching({ teamId, seed: 77 }, () => advanceTournamentPhase(state, teams, deriveCpuGamePlan, schedule, coaching));
+      const played = withTournamentCoaching({ teamId, seed: 77, secondHalfPlan: { tempo: 'uptempo', defense: 'pressure', ride: 'aggressive', rotation: 'deep' } }, () =>
+        advanceTournamentPhase(state, teams, deriveCpuGamePlan, schedule, coaching),
+      );
+      const previewGame = teamGameThisRound(state, preview, teamId);
+      const playedGame = teamGameThisRound(state, played, teamId);
+      if (previewGame && playedGame) {
+        expect(playedGame.id).toBe(previewGame.id);
+        expect(half(playedGame.result!.log)).toEqual(half(previewGame.result!.log));
+        rounds += 1;
+      }
+      state = played;
+    }
+    expect(rounds).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('bracketology', () => {
+  const season = finishedSeason();
+  const { teams, schedule, standings, conferences } = season;
+  const projection = projectNcaaField(teams, conferences, standings, schedule);
+
+  it('gives each conference leader the projected auto bid', () => {
+    for (const conf of conferences) {
+      const leader = [...standings].filter((s) => conf.teamIds.includes(s.teamId)).sort(compareConferenceStanding)[0]!;
+      expect(projection.leaders.get(conf.id)).toBe(leader.teamId);
+      expect(projection.field.find((e) => e.teamId === leader.teamId)?.bid).toBe('auto');
+    }
+    expect(projection.field).toHaveLength(NCAA_FIELD_SIZE);
+  });
+
+  it('describes in, bubble and out teams', () => {
+    const inTeam = projection.field[0]!;
+    expect(projectionStatus(projection, inTeam.teamId)).toMatch(/^Projected #1 seed \((auto bid|at-large)\)$/);
+    expect(projectionStatus(projection, projection.firstOut[0]!.teamId)).toBe('First four out (#1)');
+    const listed = new Set([...projection.field, ...projection.firstOut].map((e) => e.teamId));
+    const out = teams.find((t) => !listed.has(t.id))!;
+    expect(projectionStatus(projection, out.id)).toBe(`Out of the field (RPI #${projection.rpiRank.get(out.id)})`);
+    expect([...projection.rpiRank.values()].sort((a, b) => a - b)).toEqual(teams.map((_, i) => i + 1));
+  });
+});
+
+describe('bubble watch headlines', () => {
+  const projection = (field: Array<[string, number]>, firstOut: string[] = []): NcaaProjection => ({
+    field: field.map(([teamId, seed]) => ({ teamId, seed, bid: 'at-large' as const, rpi: 0.5 })),
+    firstOut: firstOut.map((teamId) => ({ teamId, rpi: 0.4 })),
+    leaders: new Map(),
+    rpiRank: new Map(),
+  });
+
+  it('reports moving into and out of the field', () => {
+    expect(bracketMovementHeadline(projection([]), projection([['us', 9]]), 'us', 'Us')).toBe(
+      'Bubble watch: Us plays its way into the projected NCAA field as the #9 seed',
+    );
+    expect(bracketMovementHeadline(projection([['us', 12]]), projection([], ['us']), 'us', 'Us')).toBe(
+      'Bubble watch: Us falls out of the projected NCAA field and into the first four out',
+    );
+    expect(bracketMovementHeadline(projection([['us', 12]]), projection([]), 'us', 'Us')).toBe(
+      'Bubble watch: Us falls out of the projected NCAA field',
+    );
+  });
+
+  it('reports seed swings of three or more and stays quiet otherwise', () => {
+    expect(bracketMovementHeadline(projection([['us', 8]]), projection([['us', 4]]), 'us', 'Us')).toBe(
+      'Bracketology: Us climbs from a projected #8 to a #4 seed',
+    );
+    expect(bracketMovementHeadline(projection([['us', 2]]), projection([['us', 6]]), 'us', 'Us')).toMatch(/slides from a projected #2 to a #6/);
+    expect(bracketMovementHeadline(projection([['us', 5]]), projection([['us', 3]]), 'us', 'Us')).toBeNull();
+    expect(bracketMovementHeadline(projection([]), projection([]), 'us', 'Us')).toBeNull();
   });
 });

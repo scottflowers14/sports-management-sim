@@ -3,6 +3,7 @@ import { lacrosseWinProbability, type LacrosseTeam } from '@sports-management-si
 import { getNextUserGamePreview, type ScheduleMatchupPreview } from './schedule-preview';
 import type { RankingEntry } from './rankings';
 import type { SeasonStatsMap } from './stats';
+import type { SeriesRecord } from './series-history';
 
 export interface HubKeyPlayer {
   playerId: string;
@@ -24,6 +25,8 @@ export interface WeeklyHubData {
   /** Most-recent-last sequence of user results. */
   recentForm: Array<'W' | 'L'>;
   keyPlayers: HubKeyPlayer[];
+  /** Head-to-head with this opponent, filled in by the app from dynasty history. */
+  series?: SeriesRecord;
 }
 
 export function buildWeeklyHub({
