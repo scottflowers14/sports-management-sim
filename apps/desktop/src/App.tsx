@@ -36,6 +36,7 @@ import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
 import { recruitingPipelines } from './pipelines';
+import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
@@ -159,6 +160,8 @@ export function App() {
     withdrawPortalOffer,
     portalScholarshipRoom,
     answerRealignmentInvite,
+    pressConference,
+    answerPressConference,
     canCoachGame,
     coachGame,
     halftime,
@@ -551,6 +554,8 @@ export function App() {
                 userTeamId={dynasty.userTeamId}
                 onSelectPlayer={setSelectedPlayerId}
               />
+            ) : pressConference ? (
+              <PressConferenceCard press={pressConference} onAnswer={answerPressConference} />
             ) : null
           }
         />

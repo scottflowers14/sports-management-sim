@@ -72,6 +72,8 @@ export interface DynastySaveState {
   nil?: NilState | null;
   /** A coached game paused at halftime; reloading returns to the locker room. */
   halftime?: HalftimeState | null;
+  /** Press conference answers by game id, recent games only. */
+  pressAnswers?: Record<string, string>;
   /** Job offers awaiting a decision after the coach was fired, null otherwise. */
   pendingJobOffers: JobOffer[] | null;
   /** Recruit IDs the user has pinned to their recruiting board. */

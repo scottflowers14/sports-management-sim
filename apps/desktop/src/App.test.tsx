@@ -573,6 +573,23 @@ describe('Desktop App', () => {
     });
   });
 
+  it('answers the postgame press conference once', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Week Hub/ }));
+    const card = screen.getByLabelText('Press conference');
+    const first = within(card).getAllByRole('button')[0]!;
+    const label = first.querySelector('strong')!.textContent!;
+    await userEvent.click(first);
+    expect(screen.queryByLabelText('Press conference')).not.toBeInTheDocument();
+    await waitFor(() => {
+      const save = loadActiveDynastySave()!;
+      expect(Object.values(save.pressAnswers ?? {})).toHaveLength(1);
+      expect(save.newsItems.some((n) => n.headline.includes('after the game'))).toBe(true);
+    });
+    expect(label.length).toBeGreaterThan(0);
+  });
+
   it('sets practice intensity and development plans on the Practice screen', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Practice$/ }));
