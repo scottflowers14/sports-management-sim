@@ -1,4 +1,5 @@
 import type { GameEvent, GameLog, LacrosseGamePlan } from '@sports-management-sim/sport-lacrosse';
+import type { TournamentPhase } from './tournament';
 
 /**
  * Halftime in the locker room, in the spirit of Football Manager's team talk:
@@ -10,6 +11,8 @@ export interface HalftimeState {
   week: number;
   gameId: string;
   log: GameLog;
+  /** Set for a postseason game: the round it was paused in. */
+  tournamentPhase?: TournamentPhase;
 }
 
 export interface HalfSideStats {
@@ -96,4 +99,16 @@ export function halftimeAdvice(report: HalftimeReport, userTeamId: string, curre
   }
   if (tips.length === 0) tips.push({ text: 'Close game and the plan is working. Stay the course.', plan: {} });
   return tips;
+}
+
+/** The dice for a coached game: the same seed always rolls the same game. */
+export function seededGameRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }

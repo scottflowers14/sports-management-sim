@@ -16,7 +16,12 @@ import {
   initTournament,
   ncaaFieldSize,
   selectNcaaField,
+  advanceTournamentPhase,
+  teamGameThisRound,
+  tournamentGames,
+  withTournamentCoaching,
 } from './tournament';
+import { deriveCpuGamePlan } from '@sports-management-sim/sport-lacrosse';
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -149,5 +154,36 @@ describe('ncaaFieldSize', () => {
     expect(field).toHaveLength(4);
     expect(field.filter((e) => e.bid === 'auto')).toHaveLength(2);
     expect(firstOut).toHaveLength(4);
+  });
+});
+
+describe('coached tournament games', () => {
+  const season = finishedSeason();
+  const { teams, schedule, standings, conferences } = season;
+  const coaching = () => ({ offense: 0, defense: 0 });
+
+  it('replays the coached first half in every round and changes only the second', () => {
+    let state = initTournament(standings, conferences);
+    let rounds = 0;
+    while (state.phase !== 'complete') {
+      // Coach the home side of one of this round's games.
+      const probe = advanceTournamentPhase(state, teams, deriveCpuGamePlan, schedule, coaching);
+      const playedBefore = new Set(tournamentGames(state).filter((g) => g.result).map((g) => g.id));
+      const teamId = tournamentGames(probe).find((g) => g.result && !playedBefore.has(g.id))!.homeTeamId;
+      const half = (log: { events: { period: unknown }[] } | undefined) => log!.events.filter((e) => e.period === 1 || e.period === 2);
+      const preview = withTournamentCoaching({ teamId, seed: 77 }, () => advanceTournamentPhase(state, teams, deriveCpuGamePlan, schedule, coaching));
+      const played = withTournamentCoaching({ teamId, seed: 77, secondHalfPlan: { tempo: 'uptempo', defense: 'pressure', ride: 'aggressive', rotation: 'deep' } }, () =>
+        advanceTournamentPhase(state, teams, deriveCpuGamePlan, schedule, coaching),
+      );
+      const previewGame = teamGameThisRound(state, preview, teamId);
+      const playedGame = teamGameThisRound(state, played, teamId);
+      if (previewGame && playedGame) {
+        expect(playedGame.id).toBe(previewGame.id);
+        expect(half(playedGame.result!.log)).toEqual(half(previewGame.result!.log));
+        rounds += 1;
+      }
+      state = played;
+    }
+    expect(rounds).toBeGreaterThanOrEqual(4);
   });
 });

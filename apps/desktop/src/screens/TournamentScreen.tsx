@@ -13,6 +13,7 @@ export function TournamentScreen({
   onSimNcaaQuarterfinals,
   onSimNationalSemis,
   onSimNational,
+  onCoachGame,
   onEnterOffseason,
   onInitTournament,
   onBoxScore,
@@ -27,6 +28,8 @@ export function TournamentScreen({
   onSimNcaaQuarterfinals: () => void;
   onSimNationalSemis: () => void;
   onSimNational: () => void;
+  /** Coach the user's game in this round through halftime; absent when they don't play. */
+  onCoachGame?: (() => void) | undefined;
   onEnterOffseason: () => void;
   onInitTournament: () => void;
   onBoxScore: (data: BoxScoreData) => void;
@@ -69,6 +72,9 @@ export function TournamentScreen({
       )}
       {phase === 'national_final' && (
         <button className="sim-btn" onClick={onSimNational}>Sim National Championship</button>
+      )}
+      {phase !== 'complete' && onCoachGame && (
+        <button className="sim-btn sim-btn-secondary" onClick={onCoachGame}>Coach the Game</button>
       )}
       {phase === 'complete' && (
         <button className="offseason-btn" onClick={onEnterOffseason}>Enter Offseason →</button>

@@ -99,6 +99,10 @@ import {
   advanceTournamentFinals,
   advanceTournamentNationalSemis,
   advanceNationalChampionship,
+  advanceTournamentPhase,
+  teamGameThisRound,
+  teamPlaysThisRound,
+  withTournamentCoaching,
   compareConferenceStanding,
 } from './tournament';
 import type { TournamentState } from './tournament';
@@ -663,34 +667,6 @@ export function useDynastyController() {
     applyWeekSimResult(simulateOneWeek(start, gamePlan));
   }, [applyWeekSimResult, buildWeekSimState, gamePlan, offseasonSummary, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
 
-  // Coach the game: play the user's game to the half with a fixed seed, then
-  // sim the week once the second-half plan is set.
-  const canCoachGame =
-    offseasonSummary === null &&
-    tournament === null &&
-    dynasty.season.schedule.some(
-      (g) =>
-        g.week === dynasty.season.currentWeek &&
-        g.status === 'scheduled' &&
-        (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
-    );
-  const coachGame = useCallback(() => {
-    if (!canCoachGame || halftime) return;
-    const seed = Math.floor(Math.random() * 2 ** 31);
-    const preview = previewUserGame(buildWeekSimState(), gamePlan, seed);
-    if (!preview) return;
-    setHalftime({ seed, week: dynasty.season.currentWeek, gameId: preview.game.id, log: preview.log });
-  }, [canCoachGame, halftime, buildWeekSimState, gamePlan, dynasty.season.currentWeek]);
-
-  const playSecondHalf = useCallback((secondHalfPlan: LacrosseGamePlan) => {
-    if (!halftime) return;
-    const start = autoRecruitingAssistant
-      ? applyAssistantToWeekState(buildWeekSimState(), shortlistIds, Math.random, { autoOffer: autoRecruitingOffers }).state
-      : buildWeekSimState();
-    setHalftime(null);
-    applyWeekSimResult(simulateOneWeek(start, gamePlan, Math.random, { seed: halftime.seed, secondHalfPlan }));
-  }, [halftime, applyWeekSimResult, buildWeekSimState, gamePlan, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
-
   const simToEnd = useCallback(() => {
     if (offseasonSummary) {
       setView('offseason');
@@ -955,6 +931,56 @@ export function useDynastyController() {
   const simTournamentNational = useCallback(() => {
     setTournament((prev) => prev ? advanceNationalChampionship(prev, tournamentTeams, tournamentPlanFor, tournamentCoachingFor) : prev);
   }, [tournamentTeams, tournamentPlanFor, tournamentCoachingFor]);
+
+  // Coach the game: play the user's game to the half with a fixed seed, then
+  // play the rest of the week (or tournament round) once the second-half plan
+  // is set. The same seed replays the first half exactly.
+  const userGameThisWeek = dynasty.season.schedule.some(
+    (g) =>
+      g.week === dynasty.season.currentWeek &&
+      g.status === 'scheduled' &&
+      (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
+  );
+  const canCoachGame =
+    offseasonSummary === null &&
+    (tournament === null ? userGameThisWeek : teamPlaysThisRound(tournament, dynasty.userTeamId));
+  const playTournamentRound = useCallback((state: TournamentState) =>
+    advanceTournamentPhase(state, tournamentTeams, tournamentPlanFor, dynasty.season.schedule, tournamentCoachingFor),
+  [tournamentTeams, tournamentPlanFor, dynasty.season.schedule, tournamentCoachingFor]);
+
+  const coachGame = useCallback(() => {
+    if (!canCoachGame || halftime) return;
+    const seed = Math.floor(Math.random() * 2 ** 31);
+    if (tournament) {
+      const preview = withTournamentCoaching({ teamId: dynasty.userTeamId, seed }, () => playTournamentRound(tournament));
+      const game = teamGameThisRound(tournament, preview, dynasty.userTeamId);
+      if (!game?.result?.log) return;
+      setHalftime({ seed, week: dynasty.season.currentWeek, gameId: game.id, log: game.result.log, tournamentPhase: tournament.phase });
+      return;
+    }
+    const preview = previewUserGame(buildWeekSimState(), gamePlan, seed);
+    if (!preview) return;
+    setHalftime({ seed, week: dynasty.season.currentWeek, gameId: preview.game.id, log: preview.log });
+  }, [canCoachGame, halftime, tournament, playTournamentRound, buildWeekSimState, gamePlan, dynasty.season.currentWeek, dynasty.userTeamId]);
+
+  const playSecondHalf = useCallback((secondHalfPlan: LacrosseGamePlan) => {
+    if (!halftime) return;
+    setHalftime(null);
+    if (halftime.tournamentPhase) {
+      if (!tournament || tournament.phase !== halftime.tournamentPhase) return;
+      const phase = tournament.phase;
+      setTournament(withTournamentCoaching({ teamId: dynasty.userTeamId, seed: halftime.seed, secondHalfPlan }, () => playTournamentRound(tournament)));
+      // A week passes after the conference final and each NCAA round before the final weekend.
+      if (phase === 'conf_finals' || phase === 'ncaa_first_round' || phase === 'ncaa_quarterfinals') {
+        setInjuries((prev) => healInjuriesOneWeek(prev));
+      }
+      return;
+    }
+    const start = autoRecruitingAssistant
+      ? applyAssistantToWeekState(buildWeekSimState(), shortlistIds, Math.random, { autoOffer: autoRecruitingOffers }).state
+      : buildWeekSimState();
+    applyWeekSimResult(simulateOneWeek(start, gamePlan, Math.random, { seed: halftime.seed, secondHalfPlan }));
+  }, [halftime, tournament, playTournamentRound, dynasty.userTeamId, applyWeekSimResult, buildWeekSimState, gamePlan, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
 
   const enterOffseason = useCallback(() => {
     const tournamentChampion = tournament?.nationalChampion;
