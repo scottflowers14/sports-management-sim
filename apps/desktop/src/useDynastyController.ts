@@ -68,12 +68,12 @@ import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
 import { careerMilestonesForWeek } from './career-milestones';
-import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom } from './dynasty-helpers';
+import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom, buildFinalPollRows } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
 import { isCurrentTalk, previewUserGame, simulateOneWeek, simulateRemainingWeeks, withoutUnavailable } from './week-sim';
 import type { HalftimeState } from './halftime';
 import { pressConferenceFor } from './press-conference';
-import { computeNationalRankings, finalPollRank } from './rankings';
+import { computeNationalRankings, finalPoll, finalPollRank } from './rankings';
 import { applyAssistantToWeekState, summarizeAssistantActions, type AssistantReport } from './recruiting-assistant';
 import type { PracticeLogEntry, PregameTalk, WeekSimState } from './week-sim';
 import type { WeeklyHonor } from './weekly-honors';
@@ -109,6 +109,7 @@ import {
   teamPlaysThisRound,
   withTournamentCoaching,
   compareConferenceStanding,
+  postseasonRecords,
 } from './tournament';
 import type { TournamentState } from './tournament';
 import type { DynastySeasonRecord } from './history';
@@ -1047,7 +1048,14 @@ export function useDynastyController() {
     const isNatChamp = tournamentChampion === dynasty.userTeamId;
     const currentNatRank = finalPollRank(rankings, dynasty.userTeamId, tournamentChampion);
 
-    const { newDynasty, summary } = runOffseason(dynasty, tournamentChampion, trainingFocus, seasonStats, playingStaff);
+    const { newDynasty, summary: baseSummary } = runOffseason(dynasty, tournamentChampion, trainingFocus, seasonStats, playingStaff);
+    // The recap and the top bar both read the final poll, champion at #1.
+    const finalRankings = finalPoll(rankings, tournamentChampion);
+    const summary = {
+      ...baseSummary,
+      finalPoll: buildFinalPollRows(finalRankings, dynasty.season.standings, postseasonRecords(tournament)),
+    };
+    setRankings(finalRankings);
     const confId = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId)?.conferenceId;
     const confTeamIds = dynasty.season.conferences.find((c) => c.id === confId)?.teamIds ?? [];
     const confRank =

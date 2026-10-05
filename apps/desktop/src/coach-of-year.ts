@@ -80,11 +80,19 @@ export function buildCoachCareer(history: DynastySeasonRecord[], name: string): 
     }
   }
   const pct = (record: DynastySeasonRecord) => record.wins / Math.max(1, record.wins + record.losses);
-  const bestSeason = seasons.reduce<DynastySeasonRecord | null>((best, record) => {
-    if (!best) return record;
-    const rank = (r: DynastySeasonRecord) => (r.nationalChampion ? 2 : 0) + (r.confChampion ? 1 : 0);
-    return rank(record) > rank(best) || (rank(record) === rank(best) && pct(record) > pct(best)) ? record : best;
-  }, null);
+  // A national title beats everything; then the best final poll rank, so a
+  // 10-0 #2 season beats a 7-3 conference title; then a conference title,
+  // then win percentage.
+  const pollRank = (r: DynastySeasonRecord) => r.natRankAtEnd ?? Infinity;
+  const betterSeason = (a: DynastySeasonRecord, b: DynastySeasonRecord) =>
+    Number(a.nationalChampion) - Number(b.nationalChampion) ||
+    pollRank(b) - pollRank(a) ||
+    Number(a.confChampion) - Number(b.confChampion) ||
+    pct(a) - pct(b);
+  const bestSeason = seasons.reduce<DynastySeasonRecord | null>(
+    (best, record) => (!best || betterSeason(record, best) > 0 ? record : best),
+    null,
+  );
   return {
     seasons: seasons.length,
     wins: seasons.reduce((sum, r) => sum + r.wins, 0),
