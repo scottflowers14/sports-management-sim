@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { LacrossePlayerGameStats, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
-import { formatEventTime, isScoringEvent, threeStars } from '@sports-management-sim/sport-lacrosse';
+import { formatAttendance, formatEventTime, isScoringEvent, threeStars } from '@sports-management-sim/sport-lacrosse';
 import type { GameStar } from '@sports-management-sim/sport-lacrosse';
 import type { GameEvent, GamePeriod } from '@sports-management-sim/sport-lacrosse';
 import { formatTeamName, formatTeamShort } from '../ui/format';
@@ -55,7 +55,10 @@ export function BoxScorePanel({
     <div className="player-panel-backdrop" onClick={onClose}>
       <aside className="player-panel box-score-panel card" onClick={(e) => e.stopPropagation()}>
         <button className="panel-close" onClick={onClose} aria-label="Close box score">×</button>
-        <p className="panel-eyebrow">{data.title}</p>
+        <p className="panel-eyebrow">
+          {data.title}
+          {data.attendance && <span className="box-score-gate"> · Attendance {formatAttendance(data.attendance)}</span>}
+        </p>
 
         <div className="box-score-header">
           <div className={`box-score-side${data.awayScore > data.homeScore ? ' winner-side' : ''}`}>

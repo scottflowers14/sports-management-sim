@@ -1,5 +1,6 @@
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import {
+  attendanceOf,
   calculateLacrosseTeamRating,
   eligibleNonConferenceOpponents,
   userNonConferenceSlots,
@@ -170,6 +171,7 @@ export function ScheduleScreen({
                       homeStats: result.teamStats.home as LacrosseTeamStats,
                       awayStats: result.teamStats.away as LacrosseTeamStats,
                       ...(log ? { log } : {}),
+                      ...(attendanceOf(game) ? { attendance: attendanceOf(game)! } : {}),
                     });
                   };
 

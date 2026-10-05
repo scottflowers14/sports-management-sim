@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createNewLacrosseDynasty, ensureHeadCoaches, teamCaptains } from '@sports-management-sim/sport-lacrosse';
+import { attendanceOf, createNewLacrosseDynasty, ensureHeadCoaches, seasonAttendance, stadiumCapacity, teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import { previewUserGame, simulateOneWeek, simulateRemainingWeeks, type WeekSimState } from './week-sim';
-import { healInjuriesOneWeek } from './dynasty-helpers';
+import { healInjuriesOneWeek, withSelloutFans } from './dynasty-helpers';
 import { createProgramStaff } from './program-staff';
 
 function seededRandom(seed: number): () => number {
@@ -288,5 +288,36 @@ describe('pregame team talk', () => {
     const stale = userGoals({ ...state, teamTalk: { year: year - 1, week: currentWeek, tone: 'fire_up', result } });
     expect(talked).toBeGreaterThan(base);
     expect(stale).toBe(base);
+  });
+});
+
+describe('game-day attendance', () => {
+  it('stamps a gate on every home game, within the home stadium', () => {
+    const state = freshStateWith(fixedDynasty());
+    const next = simulateOneWeek(state, undefined, seededRandom(3));
+    const played = next.dynasty.season.schedule.filter((g) => g.week === 1 && g.status === 'final');
+    expect(played.length).toBeGreaterThan(0);
+    for (const g of played) {
+      const gate = attendanceOf(g);
+      if (g.neutralSite) {
+        expect(gate).toBeUndefined();
+        continue;
+      }
+      const home = next.dynasty.season.teams.find((t) => t.id === g.homeTeamId)!;
+      expect(gate!.capacity).toBe(stadiumCapacity(home));
+      expect(gate!.count).toBeGreaterThan(0);
+      expect(gate!.count).toBeLessThanOrEqual(gate!.capacity);
+    }
+  });
+
+  it('grows fan support from a season of sellouts', () => {
+    const state = simulateRemainingWeeks(freshStateWith(fixedDynasty()), undefined, seededRandom(4));
+    const { schedule, teams } = state.dynasty.season;
+    const seller = teams.find((t) => (seasonAttendance(schedule, t.id)?.sellouts ?? 0) >= 2);
+    expect(seller).toBeDefined();
+    const after = withSelloutFans(seller!, schedule);
+    expect(after.reputation.fanSupport).toBeGreaterThan(seller!.reputation.fanSupport);
+    const quiet = teams.find((t) => (seasonAttendance(schedule, t.id)?.sellouts ?? 0) < 2)!;
+    expect(withSelloutFans(quiet, schedule)).toBe(quiet);
   });
 });

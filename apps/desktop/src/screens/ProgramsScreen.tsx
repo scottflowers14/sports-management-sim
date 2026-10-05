@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { calculateLacrosseTeamRating, coachName } from '@sports-management-sim/sport-lacrosse';
-import type { LacrossePosition, LacrosseTeam, ProDraftPick } from '@sports-management-sim/sport-lacrosse';
+import type { LacrossePosition, LacrosseTeam, ProDraftPick, SeasonAttendance } from '@sports-management-sim/sport-lacrosse';
 import type { Conference, ScheduledGame } from '@sports-management-sim/engine-core';
 import type { RankingEntry } from '../rankings';
 import type { SeasonStatsMap } from '../stats';
@@ -33,6 +33,7 @@ export function ProgramsScreen({
   onSelectPlayer,
   proDraftHistory = [],
   seriesFor,
+  attendanceFor,
 }: {
   teams: LacrosseTeam[];
   conferences: Conference[];
@@ -47,6 +48,8 @@ export function ProgramsScreen({
   proDraftHistory?: ProDraftPick[];
   /** Your head-to-head series with a program. */
   seriesFor?: (teamId: string) => SeriesRecord | undefined;
+  /** A program's home crowds this season, once it has hosted a game. */
+  attendanceFor?: (teamId: string) => SeasonAttendance | null;
 }) {
   const [confFilter, setConfFilter] = useState<string>('ALL');
   const [sort, setSort] = useState<SortState<ProgramSortKey>>({ key: 'overall', direction: 'desc' });
@@ -72,6 +75,7 @@ export function ProgramsScreen({
         onSelectPlayer={onSelectPlayer}
         draftees={proDraftHistory.filter((p) => p.collegeTeamId === program.id)}
         series={program.id === userTeamId ? null : (seriesFor?.(program.id) ?? undefined)}
+        attendance={attendanceFor?.(program.id) ?? null}
       />
     );
   }
@@ -176,6 +180,7 @@ function ProgramDetail({
   onSelectPlayer,
   draftees,
   series,
+  attendance,
 }: {
   team: LacrosseTeam;
   row: ProgramRow | undefined;
@@ -189,6 +194,7 @@ function ProgramDetail({
   draftees: ProDraftPick[];
   /** Your series with them; null on your own program page. */
   series: SeriesRecord | null | undefined;
+  attendance: SeasonAttendance | null;
 }) {
   const rating = calculateLacrosseTeamRating(team);
   const nameById = new Map(teams.map((t) => [t.id, formatTeamName(t.name)]));
@@ -236,6 +242,14 @@ function ProgramDetail({
           {series !== null && (
             <KV label="Your Series" value={series ? `${series.wins}–${series.losses}${series.streak ? ` (${formatStreak(series)})` : ''}` : 'Never met'} />
           )}
+          <KV
+            label="Home Crowds"
+            value={
+              attendance
+                ? `${attendance.average.toLocaleString('en-US')} avg${attendance.sellouts > 0 ? ` · ${attendance.sellouts} sellout${attendance.sellouts === 1 ? '' : 's'}` : ''}`
+                : '—'
+            }
+          />
           <KV label="Scholarships" value={`${team.resources.scholarshipUsed.toFixed(1)} / ${team.resources.scholarshipLimit}`} />
         </div>
       </article>

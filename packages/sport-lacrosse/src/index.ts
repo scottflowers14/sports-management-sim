@@ -31,3 +31,4 @@ export * from './team-splits';
 export * from './team-talk';
 export * from './three-stars';
 export * from './scouting-report';
+export * from './attendance';
