@@ -23,6 +23,12 @@ describe('investmentBudget', () => {
     expect(investmentBudget(program({ nationalPrestige: 80, fanSupport: 75 }))).toBe(10);
     expect(investmentBudget(program({ nationalPrestige: 50, fanSupport: 50 }))).toBe(8);
   });
+
+  it('adds the gate receipts bonus, which CPU departments spend too', () => {
+    const team = program({ nationalPrestige: 90, fanSupport: 50, facilities: 40 });
+    expect(investmentBudget(team, 3)).toBe(investmentBudget(team) + 3);
+    expect(planCost(cpuInvestmentPlan(team, 3))).toBeGreaterThan(planCost(cpuInvestmentPlan(team)));
+  });
 });
 
 describe('funding projects', () => {

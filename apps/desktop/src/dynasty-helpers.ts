@@ -32,7 +32,9 @@ import {
   resolveLacrossePortal,
   runCoachingCarousel,
   ageProgram,
+  gateReceipts,
   seasonAttendance,
+  type GateReceipts,
   selloutFanGain,
   applyInvestmentPlan,
   cpuInvestmentPlan,
@@ -114,6 +116,8 @@ export interface OffseasonSummary {
   realignment?: RealignmentMove | null;
   /** A stronger league inviting the user's program; null once answered. */
   realignmentInvite?: RealignmentMove | null;
+  /** The user's gate receipts; their bonus adds to this offseason's investment budget. */
+  gate?: GateReceipts;
 }
 
 /** Production needs a few games behind it before scouts trust it. */
@@ -577,7 +581,8 @@ export function runOffseason(
   });
   const teamsWithPrestige = applyProDraftPrestige(carousel.teams, proDraft).map((team) => {
     const aged = ageProgram(withSelloutFans(team, season.schedule));
-    return team.id === userTeamId ? aged : applyInvestmentPlan(aged, cpuInvestmentPlan(aged));
+    if (team.id === userTeamId) return aged;
+    return applyInvestmentPlan(aged, cpuInvestmentPlan(aged, gateReceipts(seasonAttendance(season.schedule, team.id)).bonus));
   });
 
   // Run offseason for returning players first (advances class years, graduates seniors),
@@ -698,6 +703,7 @@ export function runOffseason(
     proDraft,
     realignment: realignment && !realignmentInvite ? realignment : null,
     realignmentInvite,
+    gate: gateReceipts(seasonAttendance(season.schedule, userTeamId)),
   };
 
   return {

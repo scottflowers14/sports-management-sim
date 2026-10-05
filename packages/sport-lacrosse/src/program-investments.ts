@@ -39,9 +39,12 @@ const FACILITY_WEAR = 1;
 /** Fans drift a tenth of the way toward the program's recent success each year. */
 const FAN_DRIFT = 0.1;
 
-/** Points the athletic department hands out: bigger, louder programs get more. */
-export function investmentBudget(team: LacrosseTeam): number {
-  return Math.round(3 + team.reputation.nationalPrestige / 20 + team.reputation.fanSupport / 25);
+/**
+ * Points the athletic department hands out: bigger, louder programs get more,
+ * plus whatever last season's gate receipts earned.
+ */
+export function investmentBudget(team: LacrosseTeam, gateBonus = 0): number {
+  return Math.round(3 + team.reputation.nationalPrestige / 20 + team.reputation.fanSupport / 25) + gateBonus;
 }
 
 export function planCost(plan: InvestmentPlan): number {
@@ -94,8 +97,8 @@ export function ageProgram(team: LacrosseTeam): LacrosseTeam {
  * A CPU athletic department keeps facilities, then fan support, in line with
  * the program's standing, and banks the rest.
  */
-export function cpuInvestmentPlan(team: LacrosseTeam): InvestmentPlan {
-  const budget = investmentBudget(team);
+export function cpuInvestmentPlan(team: LacrosseTeam, gateBonus = 0): InvestmentPlan {
+  const budget = investmentBudget(team, gateBonus);
   const target = team.reputation.nationalPrestige;
   let plan: InvestmentPlan = {};
   const fundToward = (project: 'facilities' | 'fans', current: number) => {

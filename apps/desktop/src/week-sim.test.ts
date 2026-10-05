@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { attendanceOf, createNewLacrosseDynasty, ensureHeadCoaches, seasonAttendance, stadiumCapacity, teamCaptains } from '@sports-management-sim/sport-lacrosse';
+import { attendanceOf, createNewLacrosseDynasty, gateReceipts, ensureHeadCoaches, seasonAttendance, stadiumCapacity, teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { createScoutingState } from './scouting';
 import { emptyRecruitingActivity } from './recruiting-activity';
 import { emptySeasonStats } from './stats';
 import { previewUserGame, simulateOneWeek, simulateRemainingWeeks, type WeekSimState } from './week-sim';
-import { healInjuriesOneWeek, withSelloutFans } from './dynasty-helpers';
+import { healInjuriesOneWeek, runOffseason, withSelloutFans } from './dynasty-helpers';
 import { createProgramStaff } from './program-staff';
 
 function seededRandom(seed: number): () => number {
@@ -319,5 +319,14 @@ describe('game-day attendance', () => {
     expect(after.reputation.fanSupport).toBeGreaterThan(seller!.reputation.fanSupport);
     const quiet = teams.find((t) => (seasonAttendance(schedule, t.id)?.sellouts ?? 0) < 2)!;
     expect(withSelloutFans(quiet, schedule)).toBe(quiet);
+  });
+
+  it('reports the user gate receipts in the offseason summary', () => {
+    const state = simulateRemainingWeeks(freshStateWith(fixedDynasty()), undefined, seededRandom(4));
+    const { summary } = runOffseason(state.dynasty);
+    const expected = gateReceipts(seasonAttendance(state.dynasty.season.schedule, state.dynasty.userTeamId));
+    expect(summary.gate).toEqual(expected);
+    expect(summary.gate!.homeGames).toBeGreaterThan(0);
+    expect(summary.gate!.bonus).toBeGreaterThan(0);
   });
 });

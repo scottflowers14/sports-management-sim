@@ -1469,8 +1469,9 @@ export function useDynastyController() {
     });
   }, [userTeam]);
 
-  // The AD's budget is set by the program as it stands after the season.
-  const userInvestmentBudget = userTeam ? investmentBudget(userTeam) : 0;
+  // The AD's budget is set by the program as it stands after the season,
+  // plus what the season's gate receipts earned.
+  const userInvestmentBudget = userTeam ? investmentBudget(userTeam, offseasonSummary?.gate?.bonus ?? 0) : 0;
   const upgradeCoachAbility = useCallback((ability: CoachAbility) => {
     if (!coachProfile) return;
     const upgraded = upgradeAbility(coachProfile, ability);
