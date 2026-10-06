@@ -39,6 +39,8 @@ export interface AchievementSnapshot {
   abilityTiers: readonly number[];
   /** Weekly challenges met. */
   challengesCompleted?: number;
+  /** Best star rating among recruits committed or signed to the user this cycle. */
+  bestCommitStars?: number;
 }
 
 export interface AchievementDef {
@@ -71,6 +73,15 @@ function titles(s: AchievementSnapshot): number {
   return s.history.filter((h) => h.nationalChampion).length;
 }
 
+function postseasonWins(s: AchievementSnapshot): number {
+  return allGames(s).filter((g) => g.postseason && won(g)).length;
+}
+
+/** A national award that went to the user's own program that season. */
+function ownAward(s: AchievementSnapshot, award: string): boolean {
+  return s.history.some((h) => (h.awards ?? []).some((a) => a.award === award && a.teamName === h.teamName));
+}
+
 /** Longest run of consecutive seasons (newest-first history) matching the test. */
 function longestRun(history: readonly DynastySeasonRecord[], test: (h: DynastySeasonRecord) => boolean): number {
   let best = 0;
@@ -98,6 +109,15 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     check: (s) => allGames(s).some((g) => won(g) && g.opponentRank != null && g.opponentRank <= 5),
   },
   { id: 'postseason-win', title: 'Playoff Lacrosse', description: 'Win a postseason game.', tier: 'silver', category: 'games', check: (s) => allGames(s).some((g) => g.postseason && won(g)) },
+  {
+    id: 'tournament-tested',
+    title: 'Tournament Tested',
+    description: 'Win 10 career postseason games.',
+    tier: 'gold',
+    category: 'games',
+    progress: (s) => ({ current: postseasonWins(s), target: 10 }),
+    check: (s) => postseasonWins(s) >= 10,
+  },
 
   // Seasons
   { id: 'winning-season', title: 'Over .500', description: 'Finish a season with a winning record.', tier: 'bronze', category: 'seasons', check: (s) => s.history.some((h) => h.wins > h.losses) },
@@ -122,6 +142,23 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     check: (s) => longestRun(s.history, (h) => h.nationalChampion) >= 2,
   },
   { id: 'dynasty', title: 'Dynasty', description: 'Win three national championships.', tier: 'platinum', category: 'seasons', progress: (s) => ({ current: titles(s), target: 3 }), check: (s) => titles(s) >= 3 },
+  {
+    id: 'perfection',
+    title: 'Perfection',
+    description: 'Win the national title without losing a game all season.',
+    tier: 'platinum',
+    category: 'seasons',
+    check: (s) => s.history.some((h) => h.nationalChampion && (h.games?.length ?? 0) > 0 && h.games!.every(won)),
+  },
+  {
+    id: 'conference-trifecta',
+    title: 'Trifecta',
+    description: 'Win three conference championships.',
+    tier: 'gold',
+    category: 'seasons',
+    progress: (s) => ({ current: s.history.filter((h) => h.confChampion).length, target: 3 }),
+    check: (s) => s.history.filter((h) => h.confChampion).length >= 3,
+  },
 
   // Program
   {
@@ -145,6 +182,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
       }),
   },
   { id: 'big-class', title: 'Loaded Class', description: 'Sign a recruiting class of 10 or more.', tier: 'bronze', category: 'program', check: (s) => s.history.some((h) => h.signingClassSize >= 10) },
+  { id: 'blue-chip', title: 'Blue Chip', description: 'Land a commitment from a 5★ recruit.', tier: 'silver', category: 'program', check: (s) => (s.bestCommitStars ?? 0) >= 5 },
   {
     id: 'staying-power',
     title: 'Staying Power',
@@ -165,12 +203,30 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     category: 'players',
     check: (s) => s.history.some((h) => (h.awards ?? []).some((a) => a.award === 'MVP' && a.teamName === h.teamName)),
   },
+  {
+    id: 'all-america-factory',
+    title: 'All-America Factory',
+    description: 'Coach three All-Americans in one season.',
+    tier: 'silver',
+    category: 'players',
+    check: (s) => s.history.some((h) => (h.allAmericans?.length ?? 0) >= 3),
+  },
+  {
+    id: 'award-season',
+    title: 'Award Season',
+    description: 'Coach the national Offensive or Defensive Player of the Year.',
+    tier: 'silver',
+    category: 'players',
+    check: (s) => ownAward(s, 'Offensive POY') || ownAward(s, 'Defensive POY'),
+  },
+  { id: 'freshman-phenom', title: 'Freshman Phenom', description: 'Coach the national Freshman of the Year.', tier: 'silver', category: 'players', check: (s) => ownAward(s, 'Freshman of the Year') },
   { id: 'hall-of-famer', title: 'Enshrined', description: 'Send a player to your program Hall of Fame.', tier: 'silver', category: 'players', check: (s) => s.hallOfFame >= 1 },
   { id: 'pro-pipeline', title: 'Pro Pipeline', description: 'Have 5 players drafted by the pros.', tier: 'silver', category: 'players', progress: (s) => ({ current: s.proPicks, target: 5 }), check: (s) => s.proPicks >= 5 },
 
   // Career
   { id: 'fifty-wins', title: 'Fifty', description: 'Win 50 career games.', tier: 'silver', category: 'career', progress: (s) => ({ current: careerWins(s), target: 50 }), check: (s) => careerWins(s) >= 50 },
   { id: 'hundred-wins', title: 'Century Club', description: 'Win 100 career games.', tier: 'gold', category: 'career', progress: (s) => ({ current: careerWins(s), target: 100 }), check: (s) => careerWins(s) >= 100 },
+  { id: 'two-hundred-wins', title: 'Double Century', description: 'Win 200 career games.', tier: 'platinum', category: 'career', progress: (s) => ({ current: careerWins(s), target: 200 }), check: (s) => careerWins(s) >= 200 },
   { id: 'ten-seasons', title: 'Lifer', description: 'Coach 10 seasons.', tier: 'gold', category: 'career', progress: (s) => ({ current: s.history.length, target: 10 }), check: (s) => s.history.length >= 10 },
   { id: 'coach-of-year', title: 'Coach of the Year', description: 'Be named national Coach of the Year.', tier: 'gold', category: 'career', check: (s) => s.history.some((h) => h.coachOfYear) },
   {

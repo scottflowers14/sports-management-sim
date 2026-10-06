@@ -143,4 +143,38 @@ describe('achievements', () => {
     expect(nextProfileTitle(5)).toEqual({ level: 7, title: 'Champion' });
     expect(nextProfileTitle(11)).toBeNull();
   });
+
+  it('unlocks perfection, trifecta, postseason, award and recruiting achievements', () => {
+    const g = (goalsFor: number, goalsAgainst: number, postseason = false) => ({ opponentId: 'x', goalsFor, goalsAgainst, ...(postseason ? { postseason: true as const } : {}) });
+    // A title season with one loss isn't perfection; an unbeaten one is.
+    const lossy = season(2028, { nationalChampion: true, games: [g(10, 8), g(7, 9), g(12, 6, true)] });
+    expect(ids(snapshot({ history: [lossy] }))).not.toContain('perfection');
+    const perfect = season(2029, { nationalChampion: true, games: [g(10, 8), g(12, 6, true)] });
+    expect(ids(snapshot({ history: [perfect] }))).toContain('perfection');
+
+    const conf = (year: number) => season(year, { confChampion: true });
+    expect(ids(snapshot({ history: [conf(2030), conf(2029)] }))).not.toContain('conference-trifecta');
+    expect(ids(snapshot({ history: [conf(2031), conf(2030), conf(2029)] }))).toContain('conference-trifecta');
+
+    const playoffRun = season(2030, { games: Array.from({ length: 9 }, () => g(11, 9, true)) });
+    const tested = ACHIEVEMENT_BY_ID.get('tournament-tested')!;
+    expect(achievementProgress(tested, snapshot({ history: [playoffRun] }))).toEqual({ current: 9, target: 10 });
+    expect(ids(snapshot({ history: [playoffRun], current: { games: [{ ...g(8, 7, true), opponentRank: 1 }] } }))).toContain('tournament-tested');
+
+    const aa = (n: number) => Array.from({ length: n }, (_, i) => ({ award: '1st Team', playerName: `P${i}`, teamName: 'Maryland State', position: 'ATT' }));
+    expect(ids(snapshot({ history: [season(2030, { allAmericans: aa(2) })] }))).not.toContain('all-america-factory');
+    expect(ids(snapshot({ history: [season(2030, { allAmericans: aa(3) })] }))).toContain('all-america-factory');
+
+    const award = (name: string, teamName: string) => ({ award: name, playerName: 'Star', teamName, position: 'DEF' });
+    // Another program's winner doesn't count.
+    expect(ids(snapshot({ history: [season(2030, { awards: [award('Defensive POY', 'Harbor City')] })] }))).not.toContain('award-season');
+    const awards = [award('Defensive POY', 'Maryland State'), award('Freshman of the Year', 'Maryland State')];
+    expect(ids(snapshot({ history: [season(2030, { awards })] }))).toEqual(expect.arrayContaining(['award-season', 'freshman-phenom']));
+
+    expect(ids(snapshot({ bestCommitStars: 4 }))).not.toContain('blue-chip');
+    expect(ids(snapshot({ bestCommitStars: 5 }))).toContain('blue-chip');
+
+    const many = Array.from({ length: 20 }, (_, i) => season(2000 + i, { wins: 10, losses: 2 }));
+    expect(ids(snapshot({ history: many }))).toContain('two-hundred-wins');
+  });
 });
