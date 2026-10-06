@@ -6651,7 +6651,9 @@ li span {
 
 .profile-hero {
   display: grid;
-  grid-template-columns: auto 1fr minmax(220px, 300px);
+  grid-template-columns: auto 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(200px, 240px);
   gap: 24px;
   align-items: center;
 }
@@ -6861,4 +6863,37 @@ li span {
 .profile-recent li span.dim {
   display: inline;
   margin: 0;
+}
+
+.achievement-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+}
+
+.achievement-progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.achievement-progress-bar span {
+  display: block;
+  height: 100%;
+  margin: 0;
+  background: var(--tier);
+}
+
+.achievement-progress-text {
+  display: inline;
+  margin: 0;
+  font-size: 0.76rem;
+  color: #9fb0c8;
+}
+
+.achievement-card.locked:has(.achievement-progress) {
+  opacity: 0.8;
 }

@@ -173,6 +173,7 @@ export function App() {
     setAutoRecruitingAssistant,
     autoRecruitingOffers,
     achievements,
+    achievementSnapshot,
     challengeLog,
     achievementToasts,
     dismissAchievementToasts,
@@ -882,6 +883,7 @@ export function App() {
           activeSaveId={activeSaveId}
           onSeen={dismissAchievementToasts}
           challenges={{ met: challengeLog.filter((c) => c.completed).length, faced: challengeLog.length }}
+          snapshot={achievementSnapshot}
         />
       )}
 

@@ -374,6 +374,8 @@ describe('Desktop App', () => {
     const card = screen.getByRole('listitem', { name: 'Off the Schneid' });
     expect(card).toHaveClass('unlocked');
     expect(card).toHaveTextContent(/this dynasty/);
+    // Count-based achievements show this dynasty's progress.
+    expect(screen.getByLabelText('Fifty progress')).toHaveTextContent(/^\d+ \/ 50$/);
     // Secret achievements stay hidden until earned.
     expect(screen.getAllByRole('listitem', { name: 'Secret achievement' }).length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: 'Locked' }));
