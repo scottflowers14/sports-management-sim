@@ -70,7 +70,7 @@ import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
 import { challengeMet, challengesCompleted, weeklyChallenge, type ChallengeResult } from './challenges';
-import { achievementXp, achievementPoints, newlyUnlocked, profileLevel, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
+import { achievementXp, coachRivalryRecord, achievementPoints, newlyUnlocked, profileLevel, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
 import { careerFromHistory, loadProfile, saveProfile, type PlayerProfile } from './profile';
 import { careerMilestonesForWeek } from './career-milestones';
 import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom, buildFinalPollRows } from './dynasty-helpers';
@@ -633,8 +633,11 @@ export function useDynastyController() {
 
   // Achievements: check the dynasty whenever something that could earn one
   // changes. Unlocks go into this save and into the cross-dynasty profile.
-  const userRivalryKey = useMemo(
-    () => rivalryFor(dynastyRivalries({ rivalries: dynasty.rivalries, season: dynasty.season }), dynasty.userTeamId)?.key ?? null,
+  const userRivalId = useMemo(
+    () =>
+      rivalryFor(dynastyRivalries({ rivalries: dynasty.rivalries, season: dynasty.season }), dynasty.userTeamId)?.teamIds.find(
+        (id) => id !== dynasty.userTeamId,
+      ) ?? null,
     [dynasty.rivalries, dynasty.season, dynasty.userTeamId],
   );
   const achievementSnapshot = useMemo(() => {
@@ -655,10 +658,10 @@ export function useDynastyController() {
       challengesCompleted: challengesCompleted(challengeLog),
       difficulty: dynasty.difficulty ?? 'normal',
       ...(() => {
-        const series = userRivalryKey ? rivalrySeries[userRivalryKey] : undefined;
-        return series
-          ? { rivalry: { wins: series.wins[dynasty.userTeamId] ?? 0, recentWins: series.recent.map((m) => m.winnerId === dynasty.userTeamId) } }
-          : {};
+        // The coach's own trophy games at this program, newest first. The
+        // league-wide series would credit wins from before a job change.
+        if (!userRivalId || !userTeam) return {};
+        return { rivalry: coachRivalryRecord(userRivalId, userTeam.name, games, dynastyHistory) };
       })(),
       bestCommitStars: Math.max(
         0,
@@ -672,8 +675,8 @@ export function useDynastyController() {
     dynasty.userTeamId,
     dynasty.recruits,
     dynasty.difficulty,
-    userRivalryKey,
-    rivalrySeries,
+    userRivalId,
+    userTeam,
     tournament,
     rankings,
     dynastyHistory,

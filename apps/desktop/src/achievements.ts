@@ -411,3 +411,20 @@ export function achievementWatch(
 export function achievementXp(defs: readonly Pick<AchievementDef, 'tier'>[]): number {
   return defs.reduce((sum, d) => sum + TIER_POINTS[d.tier] / 2, 0);
 }
+
+/**
+ * The coach's own record in trophy games against the program's rival, newest
+ * first: this season's regular-season meetings, then past seasons at the same
+ * program. (The league-wide series would credit wins from before a job change.)
+ */
+export function coachRivalryRecord(
+  rivalId: string,
+  teamName: string,
+  currentGames: readonly AchievementGame[],
+  history: readonly DynastySeasonRecord[],
+): { wins: number; recentWins: boolean[] } {
+  const vsRival = (list: readonly AchievementGame[]) => list.filter((g) => g.opponentId === rivalId && !g.postseason).reverse();
+  const meetings = [...vsRival(currentGames), ...history.filter((h) => h.teamName === teamName).flatMap((h) => vsRival(h.games ?? []))];
+  const recentWins = meetings.map(won);
+  return { wins: recentWins.filter(Boolean).length, recentWins };
+}
