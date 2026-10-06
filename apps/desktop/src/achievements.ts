@@ -374,3 +374,35 @@ export function profileTitle(level: number): string {
 export function nextProfileTitle(level: number): { level: number; title: string } | null {
   return PROFILE_TITLES.find((t) => t.level > level) ?? null;
 }
+
+export interface AchievementWatchItem {
+  def: AchievementDef;
+  current: number;
+  target: number;
+}
+
+/**
+ * The locked achievements closest to unlocking, for the Week Hub: count-based
+ * ones at least halfway there, fewest remaining first. A rivalry week adds
+ * Bragging Rights when the trophy game is still unwon.
+ */
+export function achievementWatch(
+  snapshot: AchievementSnapshot,
+  unlocked: UnlockedAchievements,
+  { rivalryWeek = false, max = 3 }: { rivalryWeek?: boolean; max?: number } = {},
+): AchievementWatchItem[] {
+  const items: AchievementWatchItem[] = [];
+  const bragging = ACHIEVEMENT_BY_ID.get('bragging-rights');
+  if (rivalryWeek && bragging && !unlocked[bragging.id]) items.push({ def: bragging, current: 0, target: 1 });
+  const counted = ACHIEVEMENTS.filter((a) => !unlocked[a.id] && !a.secret)
+    .map((def) => ({ def, progress: achievementProgress(def, snapshot) }))
+    .filter((x): x is { def: AchievementDef; progress: { current: number; target: number } } => x.progress !== null)
+    .filter(({ progress }) => progress.current < progress.target && progress.current * 2 >= progress.target)
+    .sort(
+      (a, b) =>
+        a.progress.target - a.progress.current - (b.progress.target - b.progress.current) ||
+        b.progress.current / b.progress.target - a.progress.current / a.progress.target,
+    )
+    .map(({ def, progress }) => ({ def, ...progress }));
+  return [...items, ...counted].slice(0, max);
+}

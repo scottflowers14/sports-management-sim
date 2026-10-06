@@ -233,6 +233,7 @@ export function WeekHubScreen({
   bracketStatus,
   teamTalkCard,
   formCard,
+  achievementCard,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -272,6 +273,7 @@ export function WeekHubScreen({
   teamTalkCard?: ReactNode;
   /** Hot and cold streaks on the roster. */
   formCard?: ReactNode;
+  achievementCard?: ReactNode;
 }) {
   const [showAllResults, setShowAllResults] = useState(false);
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
@@ -504,6 +506,8 @@ export function WeekHubScreen({
         </article>
 
         {formCard}
+
+        {achievementCard}
 
         {/* Recruiting Pulse */}
         <article className="card hub-card">
