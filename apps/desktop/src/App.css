@@ -7023,3 +7023,15 @@ li span {
   background: rgba(120, 200, 255, 0.12);
   color: #8fd0ff;
 }
+
+.profile-legacy {
+  margin: 4px 0 0;
+}
+
+.profile-legacy span.dim {
+  display: inline;
+}
+
+.legacy-cell strong {
+  font-weight: 700;
+}

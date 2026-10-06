@@ -1,3 +1,4 @@
+import { legacyScore } from './legacy';
 import type { DynastySeasonRecord } from './history';
 import type { SeasonGameRecord } from './series-history';
 
@@ -73,6 +74,16 @@ function careerWins(s: AchievementSnapshot): number {
 
 function titles(s: AchievementSnapshot): number {
   return s.history.filter((h) => h.nationalChampion).length;
+}
+
+/** Legacy over this dynasty's finished seasons. */
+function dynastyLegacy(s: AchievementSnapshot): number {
+  return legacyScore({
+    wins: s.history.reduce((n, h) => n + h.wins, 0),
+    losses: s.history.reduce((n, h) => n + h.losses, 0),
+    confTitles: s.history.filter((h) => h.confChampion).length,
+    nationalTitles: titles(s),
+  });
 }
 
 function postseasonWins(s: AchievementSnapshot): number {
@@ -239,6 +250,15 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'two-hundred-wins', title: 'Double Century', description: 'Win 200 career games.', tier: 'platinum', category: 'career', progress: (s) => ({ current: careerWins(s), target: 200 }), check: (s) => careerWins(s) >= 200 },
   { id: 'ten-seasons', title: 'Lifer', description: 'Coach 10 seasons.', tier: 'gold', category: 'career', progress: (s) => ({ current: s.history.length, target: 10 }), check: (s) => s.history.length >= 10 },
   { id: 'coach-of-year', title: 'Coach of the Year', description: 'Be named national Coach of the Year.', tier: 'gold', category: 'career', check: (s) => s.history.some((h) => h.coachOfYear) },
+  {
+    id: 'hall-of-fame-coach',
+    title: 'Hall of Fame Coach',
+    description: 'Build a Hall of Fame legacy (450) in one dynasty.',
+    tier: 'platinum',
+    category: 'career',
+    progress: (s) => ({ current: dynastyLegacy(s), target: 450 }),
+    check: (s) => dynastyLegacy(s) >= 450,
+  },
   {
     id: 'journeyman',
     title: 'Have Whistle, Will Travel',

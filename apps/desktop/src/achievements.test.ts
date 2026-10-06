@@ -184,4 +184,15 @@ describe('achievements', () => {
     expect(ids(snapshot({ history: [champ] }))).not.toContain('hard-way');
     expect(ids(snapshot({ history: [champ], difficulty: 'hard' }))).toContain('hard-way');
   });
+
+  it('builds a Hall of Fame legacy over one dynasty', () => {
+    const def = ACHIEVEMENT_BY_ID.get('hall-of-fame-coach')!;
+    // Ten seasons at 10-4: 100 wins + 30 margin bonus = 130.
+    const steady = Array.from({ length: 10 }, (_, i) => season(2030 + i, { wins: 10, losses: 4 }));
+    expect(achievementProgress(def, snapshot({ history: steady }))).toEqual({ current: 130, target: 450 });
+    expect(ids(snapshot({ history: steady }))).not.toContain('hall-of-fame-coach');
+    const decorated = steady.map((h, i) => ({ ...h, confChampion: true, nationalChampion: i < 4 }));
+    // 130 + 10 conf titles (120) + 4 national titles (200) = 450.
+    expect(ids(snapshot({ history: decorated }))).toContain('hall-of-fame-coach');
+  });
 });
