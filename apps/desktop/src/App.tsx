@@ -1,3 +1,5 @@
+import { AchievementWatchCard } from './components/AchievementWatchCard';
+import { achievementWatch } from './achievements';
 import { DIFFICULTY_LABELS } from './difficulty';
 import { seasonReport } from './season-report';
 import {
@@ -610,6 +612,12 @@ export function App() {
           onCoachGame={canCoachGame ? coachGame : undefined}
           onRushInjury={rushInjuredPlayer}
           bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          achievementCard={
+            <AchievementWatchCard
+              items={achievementWatch(achievementSnapshot, achievements, { rivalryWeek: !seasonComplete && Boolean(rivalryWeek) })}
+              onOpenProfile={() => setView('profile')}
+            />
+          }
           formCard={<FormWatchCard roster={userTeam.roster} form={userForm} onSelectPlayer={setSelectedPlayerId} />}
           teamTalkCard={
             // Hidden at halftime: a talk given then would change a first half already shown.

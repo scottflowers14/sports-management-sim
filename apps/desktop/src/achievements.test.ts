@@ -5,6 +5,7 @@ import {
   TIER_POINTS,
   achievementPoints,
   achievementProgress,
+  achievementWatch,
   nextProfileTitle,
   profileTitle,
   ACHIEVEMENT_BY_ID,
@@ -209,5 +210,29 @@ describe('achievements', () => {
     // Three straight needs the three newest meetings, not any three wins.
     expect(ids(snapshot({ rivalry: { wins: 4, recentWins: [true, false, true, true, true] } }))).not.toContain('own-the-rivalry');
     expect(ids(snapshot({ rivalry: { wins: 3, recentWins: [true, true, true] } }))).toContain('own-the-rivalry');
+  });
+
+  it('watches the locked achievements closest to unlocking', () => {
+    // 45 career wins and 4 of 5 rivalry wins; 9 seasons coached.
+    const history = Array.from({ length: 9 }, (_, i) => season(2030 + i, { wins: 5, losses: 5 }));
+    const snap = snapshot({ history, rivalry: { wins: 4, recentWins: [true] } });
+    const unlocked = Object.fromEntries(newlyUnlocked(snap, {}).map((a) => [a.id, { year: 2038, at: 'x' }]));
+    const watch = achievementWatch(snap, unlocked);
+    // Fewest remaining first (ties to the one further along): one season (9/10),
+    // one rivalry win (4/5), then five wins to Fifty.
+    expect(watch.map((w) => [w.def.id, w.target - w.current])).toEqual([
+      ['ten-seasons', 1],
+      ['trophy-case', 1],
+      ['fifty-wins', 5],
+    ]);
+    // Under halfway (Century Club at 45/100) never shows; unlocked ones drop out.
+    expect(achievementWatch(snap, unlocked, { max: 10 }).map((w) => w.def.id)).not.toContain('hundred-wins');
+    expect(achievementWatch(snap, { ...unlocked, 'trophy-case': { year: 2038, at: 'y' } }).map((w) => w.def.id)).not.toContain('trophy-case');
+  });
+
+  it('puts an unwon trophy game first in a rivalry week', () => {
+    expect(achievementWatch(snapshot(), {}, { rivalryWeek: true })[0]?.def.id).toBe('bragging-rights');
+    expect(achievementWatch(snapshot(), { 'bragging-rights': { year: 2030, at: 'x' } }, { rivalryWeek: true })).toEqual([]);
+    expect(achievementWatch(snapshot(), {})).toEqual([]);
   });
 });
