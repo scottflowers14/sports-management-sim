@@ -291,6 +291,17 @@ export function cpuPortalTargets<Position extends string, SportTraits>(
 }
 
 /**
+ * How many CPU offers a transfer draws. The best players in the portal are
+ * fought over; a playtest saw a 3-7 program land the top two transfers
+ * unopposed when every entry was capped at two CPU offers.
+ */
+export function portalOfferCap(overall: Rating): number {
+  if (overall >= 78) return 5;
+  if (overall >= 70) return 3;
+  return 2;
+}
+
+/**
  * Every CPU program shops the portal. Teams go in a shuffled order so the same
  * few programs don't always get first crack at the best players.
  */
@@ -300,7 +311,8 @@ export function generateCpuPortalOffers<Position extends string, SportTraits>(
   options: CpuPortalOfferOptions<Position, SportTraits>,
 ): PortalEntry<Position, SportTraits>[] {
   const maxPerTeam = options.maxOffersPerTeam ?? 4;
-  const maxPerEntry = options.maxOffersPerEntry ?? 2;
+  const maxPerEntry = (entry: PortalEntry<Position, SportTraits>) =>
+    options.maxOffersPerEntry ?? portalOfferCap(entry.ratings.overall);
   const skip = new Set(options.skipTeamIds ?? []);
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const offersOn = new Map<string, number>(
@@ -315,7 +327,7 @@ export function generateCpuPortalOffers<Position extends string, SportTraits>(
     for (const target of cpuPortalTargets(team, [...byId.values()], options)) {
       if (made >= maxPerTeam || room <= 0) break;
       const current = byId.get(target.entry.id)!;
-      if ((offersOn.get(current.id) ?? 0) >= maxPerEntry) continue;
+      if ((offersOn.get(current.id) ?? 0) >= maxPerEntry(current)) continue;
       if (current.offersByTeamId[team.id] !== undefined) continue;
       const percent = budget >= target.scholarshipPercent / 100 ? target.scholarshipPercent : budget >= 0.25 ? 25 : 0;
       byId.set(current.id, applyPortalOffer(current, team.id, percent));
@@ -340,6 +352,11 @@ export interface PortalCandidateRanking {
   /** Roster players at the position rated at or above the transfer. */
   playersAhead: number;
 }
+
+/** A transfer expects a program whose prestige is within this many points below their overall. */
+export const PORTAL_LEVEL_OFFSET = 10;
+/** Score lost per point a program falls short of that level. */
+export const PORTAL_LEVEL_PENALTY = 0.8;
 
 /** How a transfer weighs each program that offered; strongest pull first. */
 export function rankPortalCandidates<Position extends string, SportTraits>(
@@ -376,9 +393,12 @@ export function rankPortalCandidates<Position extends string, SportTraits>(
                 totalWeight,
             )
           : 50;
+      // A transfer good enough to start for a contender won't step far down:
+      // programs well below the player's level lose ground, however keen.
+      const levelGap = Math.max(0, entry.ratings.overall - PORTAL_LEVEL_OFFSET - prestigeScore);
       return {
         teamId: team.id,
-        score: Math.round(interest * 0.4 + fitScore * 0.6),
+        score: Math.round(interest * 0.4 + fitScore * 0.6 - levelGap * PORTAL_LEVEL_PENALTY),
         interest,
         fitScore,
         scholarshipPercent,

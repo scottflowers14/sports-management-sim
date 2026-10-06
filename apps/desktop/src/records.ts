@@ -247,7 +247,9 @@ export const HALL_OF_FAME_MIN_SEASONS = 3;
 /**
  * Departing players whose careers, three seasons or more, rank among the
  * program's best. Each list he tops goes on the plaque, along with any
- * national awards he won there.
+ * national awards he won there. A top-three career alone isn't enough while
+ * the record book is young: he also needs an honor (All-America, a national
+ * award, Conference Player of the Year) or the program record in a stat.
  */
 export function hallOfFameInductees(
   programRecords: ScopeRecords,
@@ -270,6 +272,8 @@ export function hallOfFameInductees(
   const inductees: HallOfFameEntry[] = [];
   for (const [playerId, { entry, citations }] of reasons) {
     const awards = awardsByPlayer.get(playerId) ?? [];
+    const holdsRecord = citations.some((c) => c.startsWith('#1 '));
+    if (awards.length === 0 && !holdsRecord) continue;
     inductees.push({
       playerId,
       name: entry.name,

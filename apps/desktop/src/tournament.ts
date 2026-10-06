@@ -101,6 +101,22 @@ export function tournamentGames(state: TournamentState): TournamentGame[] {
   ];
 }
 
+/** Each team's postseason wins and losses: conference tournament plus NCAA. */
+export function postseasonRecords(state: TournamentState | null | undefined): Map<string, { wins: number; losses: number }> {
+  const records = new Map<string, { wins: number; losses: number }>();
+  const bump = (teamId: string, key: 'wins' | 'losses') => {
+    const record = records.get(teamId) ?? { wins: 0, losses: 0 };
+    record[key] += 1;
+    records.set(teamId, record);
+  };
+  for (const game of state ? tournamentGames(state) : []) {
+    if (!game.result) continue;
+    bump(game.result.winnerId, 'wins');
+    bump(game.result.loserId, 'losses');
+  }
+  return records;
+}
+
 /** The game a team plays in the current round, read from the round once played. */
 export function teamGameThisRound(before: TournamentState, after: TournamentState, teamId: string): TournamentGame | null {
   const playedBefore = new Set(tournamentGames(before).filter((g) => g.result).map((g) => g.id));

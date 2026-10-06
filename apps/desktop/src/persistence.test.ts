@@ -19,6 +19,9 @@ import {
   saveDynastySlot,
   saveDynastyState,
   setActiveDynastySave,
+  SaveStorageFullError,
+  exportSaveAsJson,
+  importSaveFromJson,
   type DynastySaveState,
 } from './persistence';
 
@@ -38,6 +41,36 @@ function makeStorage(): Storage {
     key: (index: number) => Object.keys(store)[index] ?? null,
     get length() {
       return Object.keys(store).length;
+    },
+  };
+}
+
+/** Storage that throws the browser's quota error once it holds `limit` characters. */
+function makeLimitedStorage(limit: number): Storage {
+  const inner = makeStorage();
+  const used = () => {
+    let total = 0;
+    for (let i = 0; i < inner.length; i += 1) {
+      const key = inner.key(i)!;
+      total += key.length + (inner.getItem(key)?.length ?? 0);
+    }
+    return total;
+  };
+  return {
+    ...inner,
+    getItem: inner.getItem,
+    removeItem: inner.removeItem,
+    clear: inner.clear,
+    key: inner.key,
+    get length() {
+      return inner.length;
+    },
+    setItem: (key: string, value: string) => {
+      const existing = inner.getItem(key);
+      if (used() - (existing === null ? 0 : key.length + existing.length) + key.length + value.length > limit) {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+      }
+      inner.setItem(key, value);
     },
   };
 }
@@ -237,5 +270,47 @@ describe('save compaction', () => {
 
     const loaded = loadDynastySaveSlot('save-c', storage)!;
     expect(loaded.dynasty.recruitBoard.map((e) => e.recruit.id)).toEqual(save.dynasty.recruitBoard.map((e) => e.recruit.id));
+  });
+
+  it('stores slots compressed, well under a third of the raw JSON', () => {
+    const storage = makeStorage();
+    const save = playedSave();
+    saveDynastySlot({ saveId: 'save-z', state: save, storage });
+    const stored = storage.getItem(dynastySaveSlotKey('save-z'))!;
+    expect(stored.length).toBeLessThan(JSON.stringify(compactForStorage(save)).length / 3);
+    const loaded = loadDynastySaveSlot('save-z', storage)!;
+    expect(loaded.dynasty.season.schedule).toEqual(save.dynasty.season.schedule);
+    expect(loaded.seasonStats).toEqual(save.seasonStats);
+  });
+
+  it('exports plain JSON that imports back into a slot', () => {
+    const storage = makeStorage();
+    saveDynastySlot({ saveId: 'save-x', name: 'Export Me', state: makeSave(5005), storage });
+    const json = exportSaveAsJson('save-x', storage)!;
+    expect(json.startsWith('{')).toBe(true);
+    const other = makeStorage();
+    const result = importSaveFromJson(json, other);
+    expect(result).toEqual({ saveId: 'save-x' });
+    expect(loadDynastySaveSlot('save-x', other)?.name).toBe('Export Me');
+  });
+
+  it('reports a full storage instead of failing silently, and keeps the older save', () => {
+    const first = makeSave(6006);
+    const probe = makeStorage();
+    saveDynastySlot({ saveId: 'save-full', state: first, storage: probe });
+    const slotSize = probe.getItem(dynastySaveSlotKey('save-full'))!.length;
+    // Room for one slot plus the index, but not a second slot.
+    const storage = makeLimitedStorage(slotSize * 1.5);
+    saveDynastySlot({ saveId: 'save-full', state: first, storage });
+
+    expect(() => saveDynastySlot({ saveId: 'save-second', state: makeSave(7007, 'virginia-lakes'), storage })).toThrow(
+      SaveStorageFullError,
+    );
+    expect(listDynastySaves(storage).map((save) => save.saveId)).toEqual(['save-full']);
+    expect(storage.getItem(ACTIVE_DYNASTY_SAVE_KEY)).toBe('save-full');
+    expect(loadDynastySaveSlot('save-full', storage)?.dynasty.seed).toBe(first.dynasty.seed);
+
+    const imported = importSaveFromJson(JSON.stringify({ ...makeSave(8008), version: 1 }), storage);
+    expect(imported).toEqual({ error: new SaveStorageFullError().message });
   });
 });

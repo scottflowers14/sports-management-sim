@@ -12,7 +12,7 @@ export const INVESTMENT_PROJECTS: InvestmentProject[] = ['facilities', 'fans', '
 export const INVESTMENT_PROJECT_INFO: Record<InvestmentProject, { title: string; effect: string; cost: number; gain: number }> = {
   facilities: {
     title: 'Facility upgrades',
-    effect: 'Lifts recruiting pull and campus visits. Facilities lose a point a year without upkeep.',
+    effect: 'Lifts recruiting pull and campus visits. Facilities wear every year, faster at the top end.',
     cost: 3,
     gain: 3,
   },
@@ -66,18 +66,41 @@ export function unfundProject(plan: InvestmentPlan, project: InvestmentProject):
   return next;
 }
 
+/**
+ * What one funded round adds to a rating. The last points cost the most:
+ * full value below 80, half from 80, a single point from 90.
+ */
+export function investmentStep(rating: number, gain: number): number {
+  if (rating >= 90) return 1;
+  if (rating >= 80) return Math.ceil(gain / 2);
+  return gain;
+}
+
+/** A rating after `rounds` funded rounds of a project. */
+export function investedRating(rating: number, rounds: number, gain: number): number {
+  let next = rating;
+  for (let i = 0; i < rounds; i += 1) next = Math.min(RATING_CAP, next + investmentStep(next, gain));
+  return next;
+}
+
 export function applyInvestmentPlan(team: LacrosseTeam, plan: InvestmentPlan): LacrosseTeam {
-  const gain = (project: InvestmentProject) => (plan[project] ?? 0) * INVESTMENT_PROJECT_INFO[project].gain;
+  const raise = (rating: number, project: InvestmentProject) =>
+    investedRating(rating, plan[project] ?? 0, INVESTMENT_PROJECT_INFO[project].gain);
   const rep = team.reputation;
   return {
     ...team,
     reputation: {
       ...rep,
-      facilities: Math.min(RATING_CAP, rep.facilities + gain('facilities')),
-      fanSupport: Math.min(RATING_CAP, rep.fanSupport + gain('fans')),
-      academicPrestige: Math.min(RATING_CAP, rep.academicPrestige + gain('academics')),
+      facilities: raise(rep.facilities, 'facilities'),
+      fanSupport: raise(rep.fanSupport, 'fans'),
+      academicPrestige: raise(rep.academicPrestige, 'academics'),
     },
   };
+}
+
+/** Facilities lose a point a year, and top-end facilities need more upkeep: 2 a year from 85, 3 from 95. */
+export function facilityWear(facilities: number): number {
+  return FACILITY_WEAR + (facilities >= 95 ? 2 : facilities >= 85 ? 1 : 0);
 }
 
 /** The year passing: facilities wear, and fans follow how the program has been doing. */
@@ -87,7 +110,7 @@ export function ageProgram(team: LacrosseTeam): LacrosseTeam {
     ...team,
     reputation: {
       ...rep,
-      facilities: Math.max(1, rep.facilities - FACILITY_WEAR),
+      facilities: Math.max(1, rep.facilities - facilityWear(rep.facilities)),
       fanSupport: Math.round(rep.fanSupport + (rep.recentSuccess - rep.fanSupport) * FAN_DRIFT),
     },
   };
@@ -107,7 +130,7 @@ export function cpuInvestmentPlan(team: LacrosseTeam, gateBonus = 0): Investment
       const next = fundProject(plan, project, budget);
       if (next === plan) return;
       plan = next;
-      rating += INVESTMENT_PROJECT_INFO[project].gain;
+      rating += investmentStep(rating, INVESTMENT_PROJECT_INFO[project].gain);
     }
   };
   fundToward('facilities', team.reputation.facilities);

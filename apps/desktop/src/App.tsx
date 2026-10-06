@@ -106,6 +106,7 @@ export function App() {
     scheduleEditable,
     swapNonConferenceGame,
     saveStatus,
+    saveError,
     recruitPosFilter,
     setRecruitPosFilter,
     recruitTab,
@@ -120,6 +121,8 @@ export function App() {
     seasonGoals,
     gamePlan,
     setGamePlan,
+    autoGamePlan,
+    restoreStaffGamePlan,
     trainingFocus,
     setTrainingFocus,
     staff,
@@ -357,11 +360,11 @@ export function App() {
 
   const advance = (() => {
     if (offseasonSummary) {
-      if (view !== 'offseason') {
-        return { label: 'Offseason', title: 'Finish the offseason to start the new season', run: () => setView('offseason') };
-      }
       // A fired coach has to pick a new job first; that choice lives on the offseason screen.
-      if (pendingJobOffers) return null;
+      if (pendingJobOffers) {
+        if (view === 'offseason') return null;
+        return { label: 'Offseason', title: 'Pick your next job to start the new season', run: () => setView('offseason') };
+      }
       // The offseason already rolled the dynasty over to next year's season.
       return { label: `Season ${dynasty.season.year}`, title: 'Start the new season', run: startNewSeason };
     }
@@ -471,9 +474,20 @@ export function App() {
           <button type="button" onClick={resetDynasty}>
             New Dynasty
           </button>
-          <span>{saveStatus}</span>
+          <span className={saveError ? 'save-status save-status-failed' : 'save-status'} title={saveStatus}>
+            {saveStatus}
+          </span>
         </div>
       </header>
+      {saveError && (
+        <div className="save-error-banner" role="alert">
+          <strong>{saveError}</strong>
+          <span>Your latest progress is not saved yet. Autosave keeps trying after every change.</span>
+          <button type="button" onClick={() => setScreen('start')}>
+            Manage saves
+          </button>
+        </div>
+      )}
 
       <div className="shell-body">
         <aside className="side-nav">
@@ -638,6 +652,8 @@ export function App() {
           nextOpponentScout={nextOpponentScout}
           weeklyHub={weeklyHub}
           onGamePlanChange={setGamePlan}
+          autoGamePlan={autoGamePlan}
+          onUseStaffPlan={restoreStaffGamePlan}
           onTrainingFocusChange={setTrainingFocus}
           onSimWeek={simWeek}
           onSimToEnd={simToEnd}

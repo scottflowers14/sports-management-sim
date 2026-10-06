@@ -3,9 +3,13 @@ import { teamCaptains } from '@sports-management-sim/sport-lacrosse';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { loadActiveDynastySave, listDynastySaves } from './persistence';
+
+// These drive the whole app through many simulated weeks, each with an
+// autosave; shared CI runners need more than the default five seconds.
+vi.setConfig({ testTimeout: 20000 });
 
 function installMockLocalStorage() {
   let store: Record<string, string> = {};
@@ -132,8 +136,12 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
 
     expect(screen.getByRole('heading', { name: /^Coaching$/i })).toBeInTheDocument();
+    // New dynasties start on the staff's roster-built plan.
+    expect(screen.getByLabelText(/Game plan source/i)).toHaveTextContent(/Staff plan/i);
 
     await userEvent.selectOptions(screen.getByLabelText(/Offensive Tempo/i), 'uptempo');
+    expect(screen.getByLabelText(/Game plan source/i)).toHaveTextContent(/Your plan/i);
+    await userEvent.selectOptions(screen.getByLabelText(/Defensive Style/i), 'balanced');
     await userEvent.selectOptions(screen.getByLabelText(/^Ride$/i), 'aggressive');
     await userEvent.selectOptions(screen.getByLabelText(/Midfield Rotation/i), 'tight');
     await userEvent.selectOptions(screen.getByLabelText(/Training Focus/i), 'goalies');
@@ -145,6 +153,10 @@ describe('Desktop App', () => {
       expect(loadActiveDynastySave()?.gamePlan).toEqual({ tempo: 'uptempo', defense: 'balanced', ride: 'aggressive', rotation: 'tight' });
       expect(loadActiveDynastySave()?.trainingFocus).toBe('goalies');
     });
+
+    await userEvent.click(screen.getByRole('button', { name: /Use staff plan/i }));
+    expect(screen.getByLabelText(/Game plan source/i)).toHaveTextContent(/Staff plan/i);
+    await waitFor(() => expect(loadActiveDynastySave()?.autoGamePlan).toBe(true));
   });
 
   it('switches to the team tab and shows the full roster/depth chart screen', async () => {
@@ -306,6 +318,11 @@ describe('Desktop App', () => {
     await userEvent.click(within(pager).getByRole('button', { name: /Next/i }));
     expect(screen.getAllByRole('navigation', { name: /Recruit pages/i })[0]!).toHaveTextContent(/26–50 of/);
 
+    // New dynasties let the assistant make offers; turn that off to review them.
+    const autoOffers = screen.getByRole('checkbox', { name: /Assistant makes offers/i });
+    expect(autoOffers).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Auto each week/i })).toBeChecked();
+    await userEvent.click(autoOffers);
     await userEvent.click(screen.getByRole('button', { name: /^Run Assistant$/i }));
     const report = screen.getByLabelText(/Recruiting assistant report/i);
     expect(report).toHaveTextContent(/Scouting \(\d+\)/);
@@ -495,6 +512,11 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+
+    // From any other screen the top-bar Advance starts the season in one click.
+    await userEvent.click(screen.getByRole('button', { name: /^Recruiting/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Season 2029/i }));
+    expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   }, 20000);
 
   it('hires and releases assistant coaches on the Staff screen', async () => {
@@ -568,7 +590,9 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
     const again = screen.getByRole('dialog');
     expect(within(again).getByRole('heading').textContent).toBe(score);
-    await userEvent.selectOptions(within(again).getByLabelText('Second half Offensive Tempo'), 'uptempo');
+    // The staff plan follows the roster, so switch to whichever tempo it isn't using.
+    const tempo = within(again).getByLabelText<HTMLSelectElement>('Second half Offensive Tempo');
+    await userEvent.selectOptions(tempo, tempo.value === 'uptempo' ? 'patient' : 'uptempo');
     await userEvent.click(within(again).getByRole('button', { name: /Play Second Half \(1 adjustment\)/ }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => {

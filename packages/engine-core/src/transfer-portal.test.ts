@@ -12,6 +12,7 @@ import {
   portalPreferencesFor,
   portalScholarshipsPending,
   rankPortalCandidates,
+  portalOfferCap,
   resolvePortalCommitments,
   withdrawPortalOffer,
   type PortalEntry,
@@ -259,7 +260,15 @@ describe('cpuPortalTargets and generateCpuPortalOffers', () => {
     const entry = entryFor(player('hot', 'ATT', { ratings: ovr(76) }), from);
     const teams = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'].map((id) => team(id, weakRoster));
     const [offered] = generateCpuPortalOffers([entry], teams, { random: seeded(1), startersAt: () => 2, rosterLimit: 48 });
-    expect(Object.keys(offered!.offersByTeamId)).toHaveLength(2);
+    expect(Object.keys(offered!.offersByTeamId)).toHaveLength(portalOfferCap(76));
+  });
+
+  it('lets more programs fight over the best transfers', () => {
+    expect([portalOfferCap(60), portalOfferCap(72), portalOfferCap(84)]).toEqual([2, 3, 5]);
+    const teams = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7'].map((id) => team(id, weakRoster));
+    const star = entryFor(player('star', 'ATT', { ratings: ovr(84) }), from);
+    const [offered] = generateCpuPortalOffers([star], teams, { random: seeded(3), startersAt: () => 2, rosterLimit: 48 });
+    expect(Object.keys(offered!.offersByTeamId)).toHaveLength(5);
   });
 });
 
@@ -285,6 +294,15 @@ describe('rankPortalCandidates and resolvePortalCommitments', () => {
     const small = team('small', [], { reputation: { ...from.reputation, nationalPrestige: 35, recentSuccess: 35 } });
     const offered = applyPortalOffer(applyPortalOffer(entry, 'small', 100), 'power', 100);
     expect(rankPortalCandidates(offered, [small, power])[0]?.teamId).toBe('power');
+  });
+
+  it('an elite transfer will not step far below their level, even for a keener program', () => {
+    const entry = entryFor(player('p', 'GK', { ratings: ovr(84) }), from);
+    const contender = team('contender', [], { reputation: { ...from.reputation, nationalPrestige: 86, recentSuccess: 85 } });
+    const rebuild = team('rebuild', [], { reputation: { ...from.reputation, nationalPrestige: 62, recentSuccess: 40 } });
+    const offered = applyPortalOffer(applyPortalOffer(entry, 'contender', 50), 'rebuild', 100);
+    const keen = { ...offered, interestByTeamId: { ...offered.interestByTeamId, rebuild: (offered.interestByTeamId.rebuild ?? 0) + 20 } };
+    expect(rankPortalCandidates(keen, [rebuild, contender])[0]?.teamId).toBe('contender');
   });
 
   it('commits to the top candidate and withdraws without offers', () => {

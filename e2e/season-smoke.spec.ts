@@ -78,7 +78,7 @@ test('plays a season through the title game and offseason into year two', async 
   await expect(portal.locator('.portal-stats')).toContainText('1 our offers');
 
   // Starting the season settles the portal: every entry has an outcome.
-  await advance.click(); // back to the offseason screen
+  // One click from the portal starts the season.
   await advance.click();
   await expect(advance).toContainText('Week 1');
   await expect(page.locator('.top-bar')).toContainText(`Season ${nextYear}`);

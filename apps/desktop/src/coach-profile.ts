@@ -68,12 +68,88 @@ export function extendCoachContract(profile: CoachProfile, years = 3): CoachProf
   return { ...profile, contractYearsRemaining: profile.contractYearsRemaining + years };
 }
 
+/** AD confidence at which the AD offers a new deal ("On Extension Watch"). */
+export const EXTENSION_CONFIDENCE = 80;
+/** A full new deal runs this long. */
+export const FULL_CONTRACT_YEARS = 5;
+
+export type ContractDecision =
+  /** Rewarded with a fresh full-length deal. */
+  | 'extended'
+  /** Expiring, secure but not starring: a shorter renewal. */
+  | 'renewed'
+  /** Expiring under scrutiny: one more year to prove it. */
+  | 'prove-it'
+  /** Expiring on the hot seat: the AD lets the deal run out. */
+  | 'not-renewed';
+
+export interface ContractReview {
+  profile: CoachProfile;
+  decision: ContractDecision | null;
+  /** Years added to the contract by this review. */
+  yearsAdded: number;
+}
+
+/**
+ * The AD's offseason look at the coach's contract, after the tenure year has
+ * ticked off. A coach on extension watch gets a new full deal once two years or
+ * fewer remain, unless the season just played was a losing one. An expiring deal is renewed, cut to a one-year prove-it deal,
+ * or left to run out, depending on confidence.
+ */
+export function reviewCoachContract(
+  profile: CoachProfile,
+  confidence: number,
+  record?: { wins: number; losses: number },
+): ContractReview {
+  const left = profile.contractYearsRemaining;
+  // No AD hands out a new long deal straight off a losing season.
+  const winningSeason = !record || record.wins >= record.losses;
+  if (confidence >= EXTENSION_CONFIDENCE && left <= 2 && winningSeason) {
+    const yearsAdded = FULL_CONTRACT_YEARS - left;
+    return { profile: extendCoachContract(profile, yearsAdded), decision: 'extended', yearsAdded };
+  }
+  if (left > 0) return { profile, decision: null, yearsAdded: 0 };
+  if (confidence >= 60) return { profile: extendCoachContract(profile, 3), decision: 'renewed', yearsAdded: 3 };
+  if (confidence >= 40) return { profile: extendCoachContract(profile, 1), decision: 'prove-it', yearsAdded: 1 };
+  return { profile, decision: 'not-renewed', yearsAdded: 0 };
+}
+
+/** News headline for a contract decision, or null when nothing changed. */
+export function contractNewsHeadline(review: ContractReview, teamName: string, seasonYear: number): string | null {
+  const { name, contractYearsRemaining } = review.profile;
+  const through = seasonYear + contractYearsRemaining;
+  switch (review.decision) {
+    case 'extended':
+      return `${teamName} extends ${name} through ${through}, a ${FULL_CONTRACT_YEARS}-year deal`;
+    case 'renewed':
+      return `${teamName} renews ${name}'s contract through ${through}`;
+    case 'prove-it':
+      return `${teamName} gives ${name} a one-year deal: show progress in ${seasonYear + 1} or move on`;
+    case 'not-renewed':
+      return `${teamName} will not renew ${name}'s expiring contract`;
+    default:
+      return null;
+  }
+}
+
 export const DEFAULT_GOAL_SCHEDULE_LENGTH = 12;
 
+/** Where the preseason poll picked the program in its conference. */
+export interface SeasonOutlook {
+  pickedFinish: number;
+  conferenceSize: number;
+}
+
+/**
+ * The AD's goals for the season. Prestige sets the bar; the preseason pick
+ * moves it, so a program picked last in a rebuild isn't held to the same
+ * standard as one picked to win the league.
+ */
 export function generateSeasonGoals(
   prestige: number,
   year: number,
   scheduledGames = DEFAULT_GOAL_SCHEDULE_LENGTH,
+  outlook?: SeasonOutlook,
 ): SeasonGoals {
   let winFraction: number;
   let confChampGoal: boolean;
@@ -100,6 +176,15 @@ export function generateSeasonGoals(
     confChampGoal = false;
     rankingGoal = null;
     recruitClassGoal = 4;
+  }
+
+  if (outlook && outlook.conferenceSize > 1) {
+    // 0 for the favorite, 1 for the team picked last.
+    const pick = (outlook.pickedFinish - 1) / (outlook.conferenceSize - 1);
+    winFraction = Math.min(0.85, Math.max(0.2, winFraction + (0.5 - pick) * 0.3));
+    if (outlook.pickedFinish === 1) confChampGoal = true;
+    else if (pick > 0.4) confChampGoal = false;
+    if (pick > 0.6 && rankingGoal !== null) rankingGoal = rankingGoal <= 15 ? 25 : null;
   }
 
   // Win targets scale to the games actually on the schedule
@@ -149,12 +234,25 @@ export function evaluateSeasonGoals(
   return { ...goals, goals: evaluated };
 }
 
+/** What the AD knows beyond the goals: last year's wins and the preseason pick. */
+export interface ConfidenceContext {
+  wins?: number;
+  previousWins?: number;
+  pickedFinish?: number;
+  confFinish?: number;
+}
+
+/** AD confidence for a coach's first day on the job: "Secure", with a little room. */
+export const STARTING_AD_CONFIDENCE = 65;
+
 export function updateADConfidence(
   currentConfidence: number,
   evaluatedGoals: SeasonGoals,
   isNatChamp: boolean,
   profile: CoachProfile,
+  context?: ConfidenceContext,
 ): { confidence: number; events: ADConfidenceEvent[] } {
+  const wins = context?.wins;
   const events: ADConfidenceEvent[] = [];
   let delta = 0;
 
@@ -200,9 +298,33 @@ export function updateADConfidence(
     delta += 20;
   }
 
-  // Tenure honeymoon: slight boost in early years
+  // A program on the way up earns patience even when it misses the targets.
+  if (context?.previousWins !== undefined && wins !== undefined) {
+    const change = wins - context.previousWins;
+    if (change >= 2) {
+      events.push({ description: `Improved by ${change} wins`, delta: 5 });
+      delta += 5;
+    } else if (change <= -3) {
+      events.push({ description: `Slipped by ${-change} wins`, delta: -5 });
+      delta -= 5;
+    }
+  }
+  if (context?.pickedFinish !== undefined && context.confFinish !== undefined) {
+    const beat = context.pickedFinish - context.confFinish;
+    if (beat >= 2) {
+      events.push({ description: `Finished ${beat} spots above the preseason pick`, delta: 4 });
+      delta += 4;
+    } else if (beat <= -3) {
+      events.push({ description: `Finished ${-beat} spots below the preseason pick`, delta: -3 });
+      delta -= 3;
+    }
+  }
+
+  // Tenure honeymoon: the first two seasons forgive half of the bad news, the
+  // third a third of it. A rebuild needs time on a five-year deal.
   if (profile.tenureSeasons <= 2 && delta < 0) {
-    const honeymoon = Math.ceil(Math.abs(delta) * 0.3);
+    const share = profile.tenureSeasons <= 1 ? 0.5 : 0.3;
+    const honeymoon = Math.ceil(Math.abs(delta) * share);
     events.push({ description: 'Early tenure grace period', delta: honeymoon });
     delta += honeymoon;
   }
