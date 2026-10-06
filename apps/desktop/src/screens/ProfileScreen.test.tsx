@@ -19,5 +19,7 @@ describe('ProfileScreen legacy', () => {
     expect(screen.getByLabelText('Pat Lee legacy')).toHaveTextContent('Established 186');
     expect(screen.getByLabelText('Sam Ortiz legacy')).toHaveTextContent('Up-and-Comer 9');
     expect(screen.getByText('Hard')).toHaveClass('difficulty-tag');
+    // Each category header counts what's unlocked.
+    expect(screen.getByLabelText('Career achievements')).toHaveTextContent(/Career 0\/\d+/);
   });
 });

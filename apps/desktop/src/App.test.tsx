@@ -380,6 +380,8 @@ describe('Desktop App', () => {
     const toast = screen.getByRole('status', { name: /Achievement unlocked/i });
     // A big first win can unlock several at once; the toast lists three and counts the rest.
     expect(toast).toHaveTextContent(/Off the Schneid|and \d+ more/);
+    // Unlocks pay coach XP toward abilities.
+    expect(toast).toHaveTextContent(/\+\d+ coach XP/);
     await waitFor(() => expect(loadActiveDynastySave()?.achievements?.['first-win']?.year).toBe(2028));
     expect(JSON.parse(localStorage.getItem(PROFILE_KEY)!).achievements['first-win']).toBeTruthy();
 

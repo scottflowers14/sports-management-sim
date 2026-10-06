@@ -331,7 +331,13 @@ export function ProfileScreen({
           if (list.length === 0) return null;
           return (
             <section key={category} className="achievement-group">
-              <p className="section-label">{CATEGORY_LABELS[category]}</p>
+              <p className="section-label" aria-label={`${CATEGORY_LABELS[category]} achievements`}>
+                {CATEGORY_LABELS[category]}{" "}
+                <span className="achievement-group-count">
+                  {ACHIEVEMENTS.filter((a) => a.category === category && profile.achievements[a.id]).length}/
+                  {ACHIEVEMENTS.filter((a) => a.category === category).length}
+                </span>
+              </p>
               <ul className="achievement-grid">
                 {list.map((a) => (
                   <AchievementCard

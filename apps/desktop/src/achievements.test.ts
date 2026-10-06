@@ -6,6 +6,7 @@ import {
   achievementPoints,
   achievementProgress,
   achievementWatch,
+  achievementXp,
   nextProfileTitle,
   profileTitle,
   ACHIEVEMENT_BY_ID,
@@ -234,5 +235,10 @@ describe('achievements', () => {
     expect(achievementWatch(snapshot(), {}, { rivalryWeek: true })[0]?.def.id).toBe('bragging-rights');
     expect(achievementWatch(snapshot(), { 'bragging-rights': { year: 2030, at: 'x' } }, { rivalryWeek: true })).toEqual([]);
     expect(achievementWatch(snapshot(), {})).toEqual([]);
+  });
+
+  it('pays half the points in coach XP', () => {
+    expect(achievementXp([])).toBe(0);
+    expect(achievementXp([{ tier: 'bronze' }, { tier: 'gold' }, { tier: 'platinum' }])).toBe(5 + 25 + 50);
   });
 });

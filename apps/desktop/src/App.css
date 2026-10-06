@@ -7053,3 +7053,9 @@ li span {
   margin: 2px 0 0 18px;
   font-size: 0.8rem;
 }
+
+.achievement-group-count {
+  margin-left: 4px;
+  color: #aab8ca;
+  letter-spacing: 0;
+}

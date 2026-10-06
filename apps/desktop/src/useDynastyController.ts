@@ -70,7 +70,7 @@ import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
 import { challengeMet, challengesCompleted, weeklyChallenge, type ChallengeResult } from './challenges';
-import { achievementPoints, newlyUnlocked, profileLevel, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
+import { achievementXp, achievementPoints, newlyUnlocked, profileLevel, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
 import { careerFromHistory, loadProfile, saveProfile, type PlayerProfile } from './profile';
 import { careerMilestonesForWeek } from './career-milestones';
 import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom, buildFinalPollRows } from './dynasty-helpers';
@@ -709,6 +709,9 @@ export function useDynastyController() {
       const after = profileLevel(achievementPoints({ ...added, ...profile.achievements })).level;
       if (after > before) setLevelUp(after);
       setAchievements({ ...achievements, ...added });
+      // Each dynasty pays its own unlocks in coach XP, even ones the profile already holds.
+      const xp = achievementXp(earnedAchievements);
+      if (xp > 0 && coachProfile) setCoachProfile(addCoachXp(coachProfile, xp));
       setAchievementToasts([...achievementToasts, ...earnedAchievements.map((a) => a.id)]);
     }
     setProfile({

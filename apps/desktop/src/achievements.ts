@@ -406,3 +406,8 @@ export function achievementWatch(
     .map(({ def, progress }) => ({ def, ...progress }));
   return [...items, ...counted].slice(0, max);
 }
+
+/** Coach XP an unlock pays toward abilities: half its points, once per dynasty. */
+export function achievementXp(defs: readonly Pick<AchievementDef, 'tier'>[]): number {
+  return defs.reduce((sum, d) => sum + TIER_POINTS[d.tier] / 2, 0);
+}
