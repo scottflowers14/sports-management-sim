@@ -134,6 +134,16 @@ describe('Desktop App', () => {
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   }, 20000);
 
+  it('starts a dynasty on the chosen difficulty and shows it in the sidebar', async () => {
+    render(<App />);
+    expect(screen.getByRole('button', { name: 'Normal' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Hard' }));
+    expect(screen.getByText(/recruit harder and your AD has less patience/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+    await waitFor(() => expect(loadActiveDynastySave()?.dynasty.difficulty).toBe('hard'));
+    expect(screen.getByText(/yr left · Hard/)).toBeInTheDocument();
+  });
+
   it('shows coaching controls and persists a game plan change', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));

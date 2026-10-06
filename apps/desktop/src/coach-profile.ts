@@ -236,6 +236,8 @@ export function evaluateSeasonGoals(
 
 /** What the AD knows beyond the goals: last year's wins and the preseason pick. */
 export interface ConfidenceContext {
+  /** Scales confidence losses; 1 is normal difficulty. */
+  penaltyScale?: number;
   wins?: number;
   previousWins?: number;
   pickedFinish?: number;
@@ -317,6 +319,16 @@ export function updateADConfidence(
     } else if (beat <= -3) {
       events.push({ description: `Finished ${-beat} spots below the preseason pick`, delta: -3 });
       delta -= 3;
+    }
+  }
+
+  // Difficulty: a harder AD takes bad news harder, an easier one shrugs some off.
+  const penaltyScale = context?.penaltyScale ?? 1;
+  if (penaltyScale !== 1 && delta < 0) {
+    const adjust = Math.round(delta * penaltyScale) - delta;
+    if (adjust !== 0) {
+      events.push({ description: adjust < 0 ? 'Impatient athletic director (Hard)' : 'Patient athletic director (Easy)', delta: adjust });
+      delta += adjust;
     }
   }
 

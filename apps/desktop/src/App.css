@@ -6997,3 +6997,7 @@ li span {
 .season-report-list .tier-dot {
   margin-right: 8px;
 }
+
+.difficulty-picker {
+  margin: 4px 0 6px;
+}

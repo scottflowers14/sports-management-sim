@@ -328,6 +328,8 @@ export function autoCommitWeekly(
   currentWeek: number,
   random: () => number,
   finalWeek = 10,
+  /** Difficulty scale on CPU programs' interest gains (1 = normal). */
+  cpuInterestScale = 1,
 ): LacrosseRecruit[] {
   // CPU teams gradually extend offers week by week
   const updated = applyCpuWeeklyOffers(recruits, teams, userTeamId, random);
@@ -369,7 +371,7 @@ export function autoCommitWeekly(
       } else {
         // CPU staffs work their boards off-screen, so their drift stays stronger.
         const prestigeBonus = (team.reputation.nationalPrestige / 100) * 4;
-        const gain = Math.round((5 + recruit.starRating * 0.5 + prestigeBonus + random() * 3) * prestigeMult);
+        const gain = Math.round((5 + recruit.starRating * 0.5 + prestigeBonus + random() * 3) * prestigeMult * cpuInterestScale);
         updatedInterest[team.id] = Math.min(100, current + gain);
       }
     }

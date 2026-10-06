@@ -1,12 +1,15 @@
 import { useRef, useState } from 'react';
 import type { DynastySaveMetadata } from '../persistence';
 import type { DynastyTeamChoice } from '../dynasty-factory';
+import { DIFFICULTIES, DIFFICULTY_DESCRIPTIONS, DIFFICULTY_LABELS, type Difficulty } from '../difficulty';
 
 export function StartScreen({
   saves,
   teamChoices,
   selectedTeamId,
   coachName,
+  difficulty = 'normal',
+  onDifficultyChange,
   onTeamChange,
   onCoachNameChange,
   onCreateDynasty,
@@ -26,6 +29,8 @@ export function StartScreen({
   teamChoices: DynastyTeamChoice[];
   selectedTeamId: string;
   coachName: string;
+  difficulty?: Difficulty;
+  onDifficultyChange?: (difficulty: Difficulty) => void;
   onTeamChange: (teamId: string) => void;
   onCoachNameChange: (name: string) => void;
   onCreateDynasty: () => void;
@@ -123,6 +128,27 @@ export function StartScreen({
               Start as {selectedTeam.name}
               {selectedTeam.conferenceId ? ` in ${selectedTeam.conferenceId.toUpperCase()}` : ''}.
             </p>
+          )}
+          {onDifficultyChange && (
+            <>
+              <p className="field-label" id="difficulty-label">
+                Difficulty
+              </p>
+              <div className="news-filters difficulty-picker" role="group" aria-labelledby="difficulty-label">
+                {DIFFICULTIES.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`pos-filter-btn${difficulty === d ? ' active' : ''}`}
+                    aria-pressed={difficulty === d}
+                    onClick={() => onDifficultyChange(d)}
+                  >
+                    {DIFFICULTY_LABELS[d]}
+                  </button>
+                ))}
+              </div>
+              <p className="dim">{DIFFICULTY_DESCRIPTIONS[difficulty]}</p>
+            </>
           )}
           {confirmingNewDynasty ? (
             <div className="new-dynasty-confirm">

@@ -41,6 +41,8 @@ export interface AchievementSnapshot {
   challengesCompleted?: number;
   /** Best star rating among recruits committed or signed to the user this cycle. */
   bestCommitStars?: number;
+  /** This dynasty's difficulty. */
+  difficulty?: 'easy' | 'normal' | 'hard';
 }
 
 export interface AchievementDef {
@@ -149,6 +151,14 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     tier: 'platinum',
     category: 'seasons',
     check: (s) => s.history.some((h) => h.nationalChampion && (h.games?.length ?? 0) > 0 && h.games!.every(won)),
+  },
+  {
+    id: 'hard-way',
+    title: 'The Hard Way',
+    description: 'Win a national championship on Hard difficulty.',
+    tier: 'gold',
+    category: 'seasons',
+    check: (s) => s.difficulty === 'hard' && titles(s) >= 1,
   },
   {
     id: 'conference-trifecta',
