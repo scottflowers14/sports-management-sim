@@ -1,3 +1,4 @@
+import { legacyScore, legacyTier, nextLegacyTier } from '../legacy';
 import { useEffect, useState } from "react";
 import {
   ACHIEVEMENTS,
@@ -126,6 +127,9 @@ export function ProfileScreen({
       value: bests.mostTitles ? `${bests.mostTitles.value}` : "",
     },
   ];
+  const currentCareer = activeSaveId ? profile.careers[activeSaveId] : undefined;
+  const currentLegacy = currentCareer ? legacyScore(currentCareer) : null;
+  const nextLegacy = currentLegacy !== null ? nextLegacyTier(currentLegacy) : null;
   const careers = Object.entries(profile.careers).sort(
     ([, a], [, b]) => b.lastYear - a.lastYear,
   );
@@ -163,6 +167,17 @@ export function ProfileScreen({
             {perLevel - intoLevel} points to level {level + 1}
             {nextTitle && ` · "${nextTitle.title}" at level ${nextTitle.level}`}
           </p>
+          {currentLegacy !== null && (
+            <p className="profile-legacy" aria-label="Current legacy">
+              Legacy: <strong>{legacyTier(currentLegacy)}</strong> <span className="dim">({currentLegacy})</span>
+              {nextLegacy && (
+                <span className="dim">
+                  {" "}
+                  · {nextLegacy.min - currentLegacy} to {nextLegacy.label}
+                </span>
+              )}
+            </p>
+          )}
         </div>
         {withinReach.length > 0 && (
           <div className="profile-recent" aria-label="Within reach">
@@ -251,6 +266,7 @@ export function ProfileScreen({
                 <th>Record</th>
                 <th>Conf</th>
                 <th>Titles</th>
+                <th>Legacy</th>
               </tr>
             </thead>
             <tbody>
@@ -277,6 +293,9 @@ export function ProfileScreen({
                   </td>
                   <td>{c.confTitles}</td>
                   <td>{c.nationalTitles}</td>
+                  <td className="legacy-cell" aria-label={`${c.coachName} legacy`}>
+                    <strong>{legacyTier(legacyScore(c))}</strong> <span className="dim">{legacyScore(c)}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
