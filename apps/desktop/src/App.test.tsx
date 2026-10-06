@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
+import { PROFILE_KEY } from './profile';
 import { loadActiveDynastySave, listDynastySaves } from './persistence';
 
 // These drive the whole app through many simulated weeks, each with an
@@ -340,6 +341,28 @@ describe('Desktop App', () => {
     await userEvent.click(makeAll);
     expect(within(report).queryByRole('button', { name: /^Make All/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Scholarships [1-3]\.\d\d \/ 3\.25/)).toBeInTheDocument();
+  });
+
+  it('unlocks an achievement on the first win and shows it on the profile', async () => {
+    await renderStartedApp();
+    for (let week = 1; week <= 6 && !screen.queryByRole('status', { name: /Achievement unlocked/i }); week += 1) {
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+    }
+    const toast = screen.getByRole('status', { name: /Achievement unlocked/i });
+    expect(toast).toHaveTextContent('Off the Schneid');
+    await waitFor(() => expect(loadActiveDynastySave()?.achievements?.['first-win']?.year).toBe(2028));
+    expect(JSON.parse(localStorage.getItem(PROFILE_KEY)!).achievements['first-win']).toBeTruthy();
+
+    await userEvent.click(within(toast).getByRole('button', { name: 'View profile' }));
+    expect(screen.queryByRole('status', { name: /Achievement unlocked/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Profile level')).toHaveTextContent(/of \d+ achievements/);
+    const card = screen.getByRole('listitem', { name: 'Off the Schneid' });
+    expect(card).toHaveClass('unlocked');
+    expect(card).toHaveTextContent(/this dynasty/);
+    // Secret achievements stay hidden until earned.
+    expect(screen.getAllByRole('listitem', { name: 'Secret achievement' }).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Locked' }));
+    expect(screen.queryByRole('listitem', { name: 'Off the Schneid' })).not.toBeInTheDocument();
   });
 
   it('shows the weekly hub and opens a player card from a player to watch', async () => {

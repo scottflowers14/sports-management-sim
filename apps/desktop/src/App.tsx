@@ -36,6 +36,9 @@ import { StaffScreen } from './screens/StaffScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
 import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
+import { ACHIEVEMENTS, achievementPoints, profileLevel } from './achievements';
+import { AchievementToast } from './components/AchievementToast';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
@@ -169,6 +172,10 @@ export function App() {
     autoRecruitingAssistant,
     setAutoRecruitingAssistant,
     autoRecruitingOffers,
+    achievements,
+    achievementToasts,
+    dismissAchievementToasts,
+    profile,
     setAutoRecruitingOffers,
     hasHomeGameThisWeek,
     offerPortalPlayer,
@@ -225,6 +232,12 @@ export function App() {
         onClearCustomTeams={customTeams ? handleClearCustomTeams : undefined}
         hasCustomTeams={customTeams !== null}
         saveStatus={saveStatus}
+        profileSummary={{
+          level: profileLevel(achievementPoints(profile.achievements)).level,
+          unlocked: Object.keys(profile.achievements).length,
+          total: ACHIEVEMENTS.length,
+          points: achievementPoints(profile.achievements),
+        }}
       />
     );
   }
@@ -398,6 +411,7 @@ export function App() {
         { view: 'week-hub', label: 'Week Hub', ...(highPriorityCount > 0 ? { badge: highPriorityCount, alert: true } : {}) },
         { view: 'season', label: 'Season' },
         { view: 'news', label: 'News', ...(unreadNewsCount > 0 ? { badge: unreadNewsCount } : {}) },
+        { view: 'profile', label: 'Profile', ...(achievementToasts.length > 0 ? { badge: achievementToasts.length } : {}) },
       ],
     },
     {
@@ -487,6 +501,17 @@ export function App() {
             Manage saves
           </button>
         </div>
+      )}
+
+      {achievementToasts.length > 0 && view !== 'profile' && (
+        <AchievementToast
+          ids={achievementToasts}
+          onView={() => {
+            setView('profile');
+            dismissAchievementToasts();
+          }}
+          onDismiss={dismissAchievementToasts}
+        />
       )}
 
       <div className="shell-body">
@@ -846,6 +871,15 @@ export function App() {
           seasonYear={dynasty.season.year}
           userTeamName={userTeam.name}
           onSelectPlayer={setSelectedPlayerId}
+        />
+      )}
+
+      {view === 'profile' && (
+        <ProfileScreen
+          profile={profile}
+          dynastyAchievements={achievements}
+          activeSaveId={activeSaveId}
+          onSeen={dismissAchievementToasts}
         />
       )}
 

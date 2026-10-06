@@ -20,6 +20,7 @@ export function StartScreen({
   onClearCustomTeams,
   hasCustomTeams,
   saveStatus,
+  profileSummary,
 }: {
   saves: DynastySaveMetadata[];
   teamChoices: DynastyTeamChoice[];
@@ -38,6 +39,8 @@ export function StartScreen({
   onClearCustomTeams?: (() => void) | undefined;
   hasCustomTeams?: boolean | undefined;
   saveStatus?: string;
+  /** Profile level and achievement count, once the player has earned any. */
+  profileSummary?: { level: number; unlocked: number; total: number; points: number } | undefined;
 }) {
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +79,12 @@ export function StartScreen({
         <p className="dim">
           Load an existing career or start a new dynasty with a fresh recruiting universe.
         </p>
+        {profileSummary && profileSummary.unlocked > 0 && (
+          <p className="start-profile-summary" aria-label="Profile summary">
+            <strong>Profile level {profileSummary.level}</strong> · {profileSummary.unlocked} of {profileSummary.total} achievements ·{' '}
+            {profileSummary.points} pts
+          </p>
+        )}
         {onContinue && (
           <button type="button" className="primary-action continue-btn" onClick={onContinue}>
             Continue
