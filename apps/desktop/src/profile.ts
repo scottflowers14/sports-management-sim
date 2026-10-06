@@ -21,6 +21,8 @@ export interface ProfileCareer {
   nationalTitles: number;
   /** Best marks of this career; missing on profiles saved before they existed. */
   bests?: CareerBests;
+  /** Set for Easy and Hard dynasties; Normal (and older profiles) leave it out. */
+  difficulty?: 'easy' | 'hard';
 }
 
 export interface CareerBests {
@@ -72,7 +74,11 @@ export function saveProfile(profile: PlayerProfile, storage: Storage | null = de
 }
 
 /** Sum a dynasty's finished seasons into its career line. */
-export function careerFromHistory(history: readonly DynastySeasonRecord[], coachName: string): ProfileCareer | null {
+export function careerFromHistory(
+  history: readonly DynastySeasonRecord[],
+  coachName: string,
+  difficulty: 'easy' | 'normal' | 'hard' = 'normal',
+): ProfileCareer | null {
   if (history.length === 0) return null;
   const newest = history[0]!;
   const oldest = history[history.length - 1]!;
@@ -87,6 +93,7 @@ export function careerFromHistory(history: readonly DynastySeasonRecord[], coach
     confTitles: history.filter((h) => h.confChampion).length,
     nationalTitles: history.filter((h) => h.nationalChampion).length,
     bests: careerBests(history),
+    ...(difficulty !== 'normal' ? { difficulty } : {}),
   };
 }
 

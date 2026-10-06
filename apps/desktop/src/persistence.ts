@@ -113,6 +113,8 @@ export interface DynastySaveMetadata {
   currentWeek: number;
   record: { wins: number; losses: number };
   seed: number;
+  /** Left out for Normal and for saves indexed before difficulty existed. */
+  difficulty?: 'easy' | 'hard';
   createdAt: string;
   updatedAt: string;
 }
@@ -383,6 +385,7 @@ function createSaveMetadata(
     currentWeek: state.dynasty.season.currentWeek,
     record: userTeam?.record ?? { wins: 0, losses: 0 },
     seed: state.dynasty.seed,
+    ...(state.dynasty.difficulty && state.dynasty.difficulty !== 'normal' ? { difficulty: state.dynasty.difficulty } : {}),
     createdAt,
     updatedAt,
   };

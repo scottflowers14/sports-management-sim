@@ -12,14 +12,24 @@ export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 
 export const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
-  easy: 'CPU staffs recruit softer and your AD forgives more of a bad season.',
+  easy: 'Recruits lean your way, CPU staffs recruit softer, and your AD forgives more of a bad season.',
   normal: 'The standard game.',
-  hard: 'CPU staffs recruit harder and your AD has less patience.',
+  hard: 'Recruits are harder to win, CPU staffs recruit harder, and your AD has less patience.',
 };
 
 /** Scales CPU programs' weekly interest gains with recruits. */
 export function cpuRecruitingScale(difficulty: Difficulty | undefined): number {
   return difficulty === 'easy' ? 0.85 : difficulty === 'hard' ? 1.15 : 1;
+}
+
+/** Weighs the user's interest when a recruit picks a school. */
+export function userDecisionScale(difficulty: Difficulty | undefined): number {
+  return difficulty === 'easy' ? 1.1 : difficulty === 'hard' ? 0.85 : 1;
+}
+
+/** Hard only: CPU staffs skip long shots and chase talent over depth. */
+export function sharpCpuRecruiting(difficulty: Difficulty | undefined): boolean {
+  return difficulty === 'hard';
 }
 
 /** Scales the AD's confidence losses after a season (gains are untouched). */

@@ -193,4 +193,11 @@ describe("player profile", () => {
     expect(bests.mostTitles).toMatchObject({ value: 1, coachName: "Pat Lee" });
     expect(profileBests(emptyProfile()).bestSeason).toBeNull();
   });
+
+  it('records Easy and Hard careers but leaves Normal unmarked', () => {
+    const history = [season(2030, 8, 2)];
+    expect(careerFromHistory(history, 'Pat Lee', 'hard')?.difficulty).toBe('hard');
+    expect(careerFromHistory(history, 'Pat Lee', 'easy')?.difficulty).toBe('easy');
+    expect(careerFromHistory(history, 'Pat Lee')).not.toHaveProperty('difficulty');
+  });
 });

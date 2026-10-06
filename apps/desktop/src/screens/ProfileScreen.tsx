@@ -261,6 +261,9 @@ export function ProfileScreen({
                 >
                   <td>
                     {c.coachName}
+                    {c.difficulty && (
+                      <span className={`difficulty-tag difficulty-${c.difficulty}`}>{c.difficulty === 'hard' ? 'Hard' : 'Easy'}</span>
+                    )}
                     {saveId === activeSaveId && (
                       <span className="dim"> · current</span>
                     )}

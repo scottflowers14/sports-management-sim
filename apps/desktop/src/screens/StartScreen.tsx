@@ -196,7 +196,12 @@ export function StartScreen({
               {saves.map((save) => (
                 <div key={save.saveId} className="save-slot">
                   <span>
-                    <strong>{save.name}</strong>
+                    <strong>
+                      {save.name}
+                      {save.difficulty && (
+                        <span className={`difficulty-tag difficulty-${save.difficulty}`}>{DIFFICULTY_LABELS[save.difficulty]}</span>
+                      )}
+                    </strong>
                     <small>
                       {save.userTeamName} · {save.seasonYear} Week {save.currentWeek} · {save.record.wins}–
                       {save.record.losses}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { adPenaltyScale, cpuRecruitingScale } from './difficulty';
+import { adPenaltyScale, cpuRecruitingScale, sharpCpuRecruiting, userDecisionScale } from './difficulty';
+import { recruitPrestigeMultiplier } from '@sports-management-sim/engine-core';
 import { createFreshLacrosseDynasty } from './dynasty-factory';
 import { autoCommitWeekly } from './dynasty-helpers';
 import { createCoachProfile, evaluateSeasonGoals, generateSeasonGoals, updateADConfidence } from './coach-profile';
@@ -52,5 +53,24 @@ describe('difficulty', () => {
     const good = evaluateSeasonGoals(generateSeasonGoals(62, 2030, 10), { wins: 9, losses: 1 }, 3, true, 9);
     const goodNormal = updateADConfidence(60, good, true, coach).confidence;
     expect(updateADConfidence(60, good, true, coach, { penaltyScale: adPenaltyScale('hard') }).confidence).toBe(goodNormal);
+  });
+
+  it('sharpens CPU boards on hard: no long shots, more talent', () => {
+    expect(sharpCpuRecruiting('hard')).toBe(true);
+    expect(sharpCpuRecruiting('normal')).toBe(false);
+    expect(userDecisionScale('hard')).toBeLessThan(1);
+    const dynasty = createFreshLacrosseDynasty({ now: () => 4242 });
+    const teams = new Map(dynasty.season.teams.map((t) => [t.id, t]));
+    const cpuOffers = (sharp: boolean) =>
+      autoCommitWeekly(dynasty.recruits, dynasty.season.teams, dynasty.userTeamId, 1, seededRandom(9), 10, 1, 1, sharp).flatMap((r) =>
+        r.scholarshipOffers.filter((o) => o.teamId !== dynasty.userTeamId).map((o) => ({ recruit: r, team: teams.get(o.teamId)! })),
+      );
+    const sharp = cpuOffers(true);
+    expect(sharp.length).toBeGreaterThan(0);
+    for (const { recruit, team } of sharp) {
+      expect(recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige)).toBeGreaterThanOrEqual(0.6);
+    }
+    const avgOverall = (offers: typeof sharp) => offers.reduce((n, o) => n + o.recruit.ratings.overall, 0) / offers.length;
+    expect(avgOverall(sharp)).toBeGreaterThan(avgOverall(cpuOffers(false)));
   });
 });
