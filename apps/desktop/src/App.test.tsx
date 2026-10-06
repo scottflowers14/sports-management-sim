@@ -126,6 +126,8 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
 
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+    // The recap carries the season's coach report card: every game had a weekly challenge.
+    expect(screen.getByRole('article', { name: 'Coach report card' })).toHaveTextContent(/\/1[0-9] weekly challenges/);
 
     await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
     expect(screen.getByText(/Men's College Lacrosse · Season 2029/i)).toBeInTheDocument();
