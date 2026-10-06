@@ -24,7 +24,9 @@ import {
 } from "../profile";
 import { formatTeamName } from "../ui/format";
 
-type Filter = "all" | "unlocked" | "locked";
+type Filter = "all" | "unlocked" | "locked" | "dynasty";
+
+const FILTER_LABELS: Record<Filter, string> = { all: "All", unlocked: "Unlocked", locked: "Locked", dynasty: "This Dynasty" };
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as AchievementCategory[];
 
@@ -136,9 +138,11 @@ export function ProfileScreen({
 
   const shown = (a: AchievementDef) =>
     filter === "all" ||
-    (filter === "unlocked"
-      ? Boolean(profile.achievements[a.id])
-      : !profile.achievements[a.id]);
+    (filter === "dynasty"
+      ? Boolean(dynastyAchievements[a.id])
+      : filter === "unlocked"
+        ? Boolean(profile.achievements[a.id])
+        : !profile.achievements[a.id]);
 
   return (
     <div className="profile-layout">
@@ -311,7 +315,7 @@ export function ProfileScreen({
             role="group"
             aria-label="Filter achievements"
           >
-            {(["all", "unlocked", "locked"] as const).map((f) => (
+            {(["all", "unlocked", "locked", "dynasty"] as const).map((f) => (
               <button
                 key={f}
                 type="button"
@@ -319,7 +323,7 @@ export function ProfileScreen({
                 aria-pressed={filter === f}
                 onClick={() => setFilter(f)}
               >
-                {f === "all" ? "All" : f === "unlocked" ? "Unlocked" : "Locked"}
+                {FILTER_LABELS[f]}
               </button>
             ))}
           </div>

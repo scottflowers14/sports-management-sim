@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it } from 'vitest';
 import { ProfileScreen } from './ProfileScreen';
 import { emptyProfile } from '../profile';
+
+afterEach(cleanup);
 
 describe('ProfileScreen legacy', () => {
   it('shows the current career legacy and a Legacy column per career', () => {
@@ -21,5 +24,16 @@ describe('ProfileScreen legacy', () => {
     expect(screen.getByText('Hard')).toHaveClass('difficulty-tag');
     // Each category header counts what's unlocked.
     expect(screen.getByLabelText('Career achievements')).toHaveTextContent(/Career 0\/\d+/);
+  });
+
+  it('filters to what this dynasty has earned', async () => {
+    const profile = {
+      ...emptyProfile(),
+      achievements: { 'first-win': { year: 2020, at: 'a' }, 'ten-wins': { year: 2030, at: 'b' } },
+    };
+    render(<ProfileScreen profile={profile} dynastyAchievements={{ 'ten-wins': { year: 2030, at: 'b' } }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'This Dynasty' }));
+    expect(screen.getByRole('listitem', { name: 'Double Digits' })).toBeInTheDocument();
+    expect(screen.queryByRole('listitem', { name: 'Off the Schneid' })).not.toBeInTheDocument();
   });
 });
