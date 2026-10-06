@@ -4,6 +4,8 @@ import {
   MAX_ACHIEVEMENT_POINTS,
   TIER_POINTS,
   achievementPoints,
+  achievementProgress,
+  ACHIEVEMENT_BY_ID,
   newlyUnlocked,
   profileLevel,
   type AchievementSnapshot,
@@ -117,5 +119,18 @@ describe('achievements', () => {
     expect(achievementPoints({ 'first-win': at, 'national-title': at, unknown: at })).toBe(60);
     expect(profileLevel(0)).toEqual({ level: 1, intoLevel: 0, perLevel: 100 });
     expect(profileLevel(260)).toEqual({ level: 3, intoLevel: 60, perLevel: 100 });
+  });
+
+  it('reports progress toward count-based achievements, capped at the target', () => {
+    const history = [season(2030, { wins: 9, losses: 1, nationalChampion: true, proPicks: 2 }), season(2029, { wins: 7, losses: 3 })];
+    const snap = snapshot({ history, proPicks: 7, challengesCompleted: 4, current: { games: [{ opponentId: 'a', goalsFor: 9, goalsAgainst: 2 }] } });
+    const progress = (id: string) => achievementProgress(ACHIEVEMENT_BY_ID.get(id)!, snap);
+    expect(progress('fifty-wins')).toEqual({ current: 17, target: 50 });
+    expect(progress('ten-wins')).toEqual({ current: 9, target: 10 });
+    expect(progress('dynasty')).toEqual({ current: 1, target: 3 });
+    expect(progress('staying-power')).toEqual({ current: 2, target: 5 });
+    expect(progress('pro-pipeline')).toEqual({ current: 5, target: 5 });
+    expect(progress('challenge-accepted')).toEqual({ current: 4, target: 10 });
+    expect(progress('national-title')).toBeNull();
   });
 });

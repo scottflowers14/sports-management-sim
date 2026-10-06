@@ -5,9 +5,11 @@ import {
   MAX_ACHIEVEMENT_POINTS,
   TIER_POINTS,
   achievementPoints,
+  achievementProgress,
   profileLevel,
   type AchievementCategory,
   type AchievementDef,
+  type AchievementSnapshot,
   type AchievementUnlock,
   type UnlockedAchievements,
 } from '../achievements';
@@ -25,6 +27,7 @@ export function ProfileScreen({
   activeSaveId = null,
   onSeen,
   challenges = { met: 0, faced: 0 },
+  snapshot = null,
 }: {
   profile: PlayerProfile;
   /** What this dynasty has earned, to mark "this dynasty" on the cards. */
@@ -34,6 +37,8 @@ export function ProfileScreen({
   onSeen?: () => void;
   /** This dynasty's weekly challenges. */
   challenges?: { met: number; faced: number };
+  /** This dynasty's progress, for the count-based achievements. */
+  snapshot?: AchievementSnapshot | null;
 }) {
   useEffect(() => {
     onSeen?.();
@@ -46,6 +51,14 @@ export function ProfileScreen({
   const recent = Object.entries(profile.achievements)
     .sort(([, a], [, b]) => b.at.localeCompare(a.at))
     .slice(0, 3);
+  // The locked achievements this dynasty is closest to.
+  const withinReach = snapshot
+    ? ACHIEVEMENTS.filter((a) => !profile.achievements[a.id])
+        .map((a) => ({ def: a, progress: achievementProgress(a, snapshot) }))
+        .filter((x): x is { def: AchievementDef; progress: { current: number; target: number } } => x.progress !== null && x.progress.current > 0)
+        .sort((a, b) => b.progress.current / b.progress.target - a.progress.current / a.progress.target)
+        .slice(0, 3)
+    : [];
   const careers = Object.entries(profile.careers).sort(([, a], [, b]) => b.lastYear - a.lastYear);
 
   const shown = (a: AchievementDef) =>
@@ -70,6 +83,22 @@ export function ProfileScreen({
             {unlockedCount} of {ACHIEVEMENTS.length} achievements · {perLevel - intoLevel} points to level {level + 1}
           </p>
         </div>
+        {withinReach.length > 0 && (
+          <div className="profile-recent" aria-label="Within reach">
+            <p className="section-label">Within reach</p>
+            <ul>
+              {withinReach.map(({ def, progress }) => (
+                <li key={def.id}>
+                  <span className={`tier-dot tier-${def.tier}`} aria-hidden="true" />
+                  {def.title}{' '}
+                  <span className="dim">
+                    · {progress.current}/{progress.target}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {recent.length > 0 && (
           <div className="profile-recent">
             <p className="section-label">Recently unlocked</p>
@@ -159,7 +188,13 @@ export function ProfileScreen({
               <p className="section-label">{CATEGORY_LABELS[category]}</p>
               <ul className="achievement-grid">
                 {list.map((a) => (
-                  <AchievementCard key={a.id} def={a} unlock={profile.achievements[a.id]} thisDynasty={Boolean(dynastyAchievements[a.id])} />
+                  <AchievementCard
+                    key={a.id}
+                    def={a}
+                    unlock={profile.achievements[a.id]}
+                    thisDynasty={Boolean(dynastyAchievements[a.id])}
+                    progress={snapshot && !profile.achievements[a.id] ? achievementProgress(a, snapshot) : null}
+                  />
                 ))}
               </ul>
             </section>
@@ -179,7 +214,17 @@ function Stat({ value, label }: { value: string | number; label: string }) {
   );
 }
 
-function AchievementCard({ def, unlock, thisDynasty }: { def: AchievementDef; unlock: AchievementUnlock | undefined; thisDynasty: boolean }) {
+function AchievementCard({
+  def,
+  unlock,
+  thisDynasty,
+  progress = null,
+}: {
+  def: AchievementDef;
+  unlock: AchievementUnlock | undefined;
+  thisDynasty: boolean;
+  progress?: { current: number; target: number } | null;
+}) {
   const hidden = def.secret && !unlock;
   return (
     <li className={`achievement-card tier-${def.tier}${unlock ? ' unlocked' : ' locked'}`} aria-label={hidden ? 'Secret achievement' : def.title}>
@@ -194,6 +239,16 @@ function AchievementCard({ def, unlock, thisDynasty }: { def: AchievementDef; un
             {def.tier} · {TIER_POINTS[def.tier]} pts
           </span>
         </p>
+        {progress && progress.current > 0 && (
+          <div className="achievement-progress" aria-label={`${def.title} progress`}>
+            <span className="achievement-progress-bar">
+              <span style={{ width: `${(progress.current / progress.target) * 100}%` }} />
+            </span>
+            <span className="achievement-progress-text">
+              {progress.current} / {progress.target}
+            </span>
+          </div>
+        )}
         {unlock && (
           <p className="achievement-meta">
             {unlock.year}

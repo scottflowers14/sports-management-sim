@@ -2013,6 +2013,7 @@ export function useDynastyController() {
     runRecruitingAssistant,
     assistantReport,
     achievements,
+    achievementSnapshot,
     challengeLog,
     achievementToasts,
     dismissAchievementToasts,

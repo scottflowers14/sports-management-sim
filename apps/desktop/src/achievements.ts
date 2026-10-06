@@ -50,6 +50,8 @@ export interface AchievementDef {
   /** Shown as ??? until unlocked. */
   secret?: boolean;
   check: (s: AchievementSnapshot) => boolean;
+  /** For count-based achievements: how far this dynasty has come. */
+  progress?: (s: AchievementSnapshot) => { current: number; target: number };
 }
 
 const regularSeason = (games: readonly SeasonGameRecord[] | undefined) => (games ?? []).filter((g) => !g.postseason);
@@ -99,7 +101,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
 
   // Seasons
   { id: 'winning-season', title: 'Over .500', description: 'Finish a season with a winning record.', tier: 'bronze', category: 'seasons', check: (s) => s.history.some((h) => h.wins > h.losses) },
-  { id: 'ten-wins', title: 'Double Digits', description: 'Win 10 games in a season.', tier: 'silver', category: 'seasons', check: (s) => s.history.some((h) => h.wins >= 10) },
+  { id: 'ten-wins', title: 'Double Digits', description: 'Win 10 games in a season.', tier: 'silver', category: 'seasons', progress: (s) => ({ current: Math.max(0, ...s.history.map((h) => h.wins)), target: 10 }), check: (s) => s.history.some((h) => h.wins >= 10) },
   {
     id: 'perfect-regular-season',
     title: 'Unblemished',
@@ -119,7 +121,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     category: 'seasons',
     check: (s) => longestRun(s.history, (h) => h.nationalChampion) >= 2,
   },
-  { id: 'dynasty', title: 'Dynasty', description: 'Win three national championships.', tier: 'platinum', category: 'seasons', check: (s) => titles(s) >= 3 },
+  { id: 'dynasty', title: 'Dynasty', description: 'Win three national championships.', tier: 'platinum', category: 'seasons', progress: (s) => ({ current: titles(s), target: 3 }), check: (s) => titles(s) >= 3 },
 
   // Program
   {
@@ -149,6 +151,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     description: 'Post five straight winning seasons.',
     tier: 'gold',
     category: 'program',
+    progress: (s) => ({ current: longestRun(s.history, (h) => h.wins > h.losses), target: 5 }),
     check: (s) => longestRun(s.history, (h) => h.wins > h.losses) >= 5,
   },
 
@@ -163,12 +166,12 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     check: (s) => s.history.some((h) => (h.awards ?? []).some((a) => a.award === 'MVP' && a.teamName === h.teamName)),
   },
   { id: 'hall-of-famer', title: 'Enshrined', description: 'Send a player to your program Hall of Fame.', tier: 'silver', category: 'players', check: (s) => s.hallOfFame >= 1 },
-  { id: 'pro-pipeline', title: 'Pro Pipeline', description: 'Have 5 players drafted by the pros.', tier: 'silver', category: 'players', check: (s) => s.proPicks >= 5 },
+  { id: 'pro-pipeline', title: 'Pro Pipeline', description: 'Have 5 players drafted by the pros.', tier: 'silver', category: 'players', progress: (s) => ({ current: s.proPicks, target: 5 }), check: (s) => s.proPicks >= 5 },
 
   // Career
-  { id: 'fifty-wins', title: 'Fifty', description: 'Win 50 career games.', tier: 'silver', category: 'career', check: (s) => careerWins(s) >= 50 },
-  { id: 'hundred-wins', title: 'Century Club', description: 'Win 100 career games.', tier: 'gold', category: 'career', check: (s) => careerWins(s) >= 100 },
-  { id: 'ten-seasons', title: 'Lifer', description: 'Coach 10 seasons.', tier: 'gold', category: 'career', check: (s) => s.history.length >= 10 },
+  { id: 'fifty-wins', title: 'Fifty', description: 'Win 50 career games.', tier: 'silver', category: 'career', progress: (s) => ({ current: careerWins(s), target: 50 }), check: (s) => careerWins(s) >= 50 },
+  { id: 'hundred-wins', title: 'Century Club', description: 'Win 100 career games.', tier: 'gold', category: 'career', progress: (s) => ({ current: careerWins(s), target: 100 }), check: (s) => careerWins(s) >= 100 },
+  { id: 'ten-seasons', title: 'Lifer', description: 'Coach 10 seasons.', tier: 'gold', category: 'career', progress: (s) => ({ current: s.history.length, target: 10 }), check: (s) => s.history.length >= 10 },
   { id: 'coach-of-year', title: 'Coach of the Year', description: 'Be named national Coach of the Year.', tier: 'gold', category: 'career', check: (s) => s.history.some((h) => h.coachOfYear) },
   {
     id: 'journeyman',
@@ -185,6 +188,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     description: 'Complete 10 weekly challenges.',
     tier: 'bronze',
     category: 'career',
+    progress: (s) => ({ current: s.challengesCompleted ?? 0, target: 10 }),
     check: (s) => (s.challengesCompleted ?? 0) >= 10,
   },
   {
@@ -193,6 +197,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     description: 'Complete 50 weekly challenges.',
     tier: 'gold',
     category: 'career',
+    progress: (s) => ({ current: s.challengesCompleted ?? 0, target: 50 }),
     check: (s) => (s.challengesCompleted ?? 0) >= 50,
   },
   { id: 'first-upgrade', title: 'Continuing Education', description: 'Buy your first coach ability.', tier: 'bronze', category: 'career', check: (s) => s.abilityTiers.some((t) => t > 0) },
@@ -231,4 +236,11 @@ export const POINTS_PER_LEVEL = 100;
 
 export function profileLevel(points: number): { level: number; intoLevel: number; perLevel: number } {
   return { level: Math.floor(points / POINTS_PER_LEVEL) + 1, intoLevel: points % POINTS_PER_LEVEL, perLevel: POINTS_PER_LEVEL };
+}
+
+/** Progress toward a count-based achievement, capped at its target. */
+export function achievementProgress(def: AchievementDef, snapshot: AchievementSnapshot): { current: number; target: number } | null {
+  if (!def.progress) return null;
+  const { current, target } = def.progress(snapshot);
+  return { current: Math.min(current, target), target };
 }
