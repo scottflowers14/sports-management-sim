@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   ACHIEVEMENTS,
   CATEGORY_LABELS,
@@ -14,11 +14,16 @@ import {
   type AchievementSnapshot,
   type AchievementUnlock,
   type UnlockedAchievements,
-} from '../achievements';
-import { profileTotals, type PlayerProfile } from '../profile';
-import { formatTeamName } from '../ui/format';
+} from "../achievements";
+import {
+  profileBests,
+  profileTotals,
+  type PlayerProfile,
+  type ProfileBest,
+} from "../profile";
+import { formatTeamName } from "../ui/format";
 
-type Filter = 'all' | 'unlocked' | 'locked';
+type Filter = "all" | "unlocked" | "locked";
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as AchievementCategory[];
 
@@ -45,7 +50,7 @@ export function ProfileScreen({
   useEffect(() => {
     onSeen?.();
   }, [onSeen]);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<Filter>("all");
   const points = achievementPoints(profile.achievements);
   const { level, intoLevel, perLevel } = profileLevel(points);
   const unlockedCount = Object.keys(profile.achievements).length;
@@ -58,14 +63,78 @@ export function ProfileScreen({
   const withinReach = snapshot
     ? ACHIEVEMENTS.filter((a) => !profile.achievements[a.id])
         .map((a) => ({ def: a, progress: achievementProgress(a, snapshot) }))
-        .filter((x): x is { def: AchievementDef; progress: { current: number; target: number } } => x.progress !== null && x.progress.current > 0)
-        .sort((a, b) => b.progress.current / b.progress.target - a.progress.current / a.progress.target)
+        .filter(
+          (
+            x,
+          ): x is {
+            def: AchievementDef;
+            progress: { current: number; target: number };
+          } => x.progress !== null && x.progress.current > 0,
+        )
+        .sort(
+          (a, b) =>
+            b.progress.current / b.progress.target -
+            a.progress.current / a.progress.target,
+        )
         .slice(0, 3)
     : [];
-  const careers = Object.entries(profile.careers).sort(([, a], [, b]) => b.lastYear - a.lastYear);
+  const bests = profileBests(profile);
+  const bestRows: {
+    label: string;
+    best: ProfileBest<unknown> | null;
+    value: string;
+    year?: number | undefined;
+  }[] = [
+    {
+      label: "Best season",
+      best: bests.bestSeason,
+      value: bests.bestSeason
+        ? `${bests.bestSeason.value.wins}–${bests.bestSeason.value.losses}`
+        : "",
+      year: bests.bestSeason?.value.year,
+    },
+    {
+      label: "Best finish",
+      best: bests.bestFinish,
+      value: bests.bestFinish ? `#${bests.bestFinish.value.rank}` : "",
+      year: bests.bestFinish?.value.year,
+    },
+    {
+      label: "Biggest win",
+      best: bests.biggestWin,
+      value: bests.biggestWin
+        ? `${bests.biggestWin.value.goalsFor}–${bests.biggestWin.value.goalsAgainst}`
+        : "",
+      year: bests.biggestWin?.value.year,
+    },
+    {
+      label: "Most goals in a game",
+      best: bests.mostGoals,
+      value: bests.mostGoals ? `${bests.mostGoals.value.goalsFor}` : "",
+      year: bests.mostGoals?.value.year,
+    },
+    {
+      label: "Longest win streak",
+      best: bests.longestWinStreak,
+      value: bests.longestWinStreak
+        ? `${bests.longestWinStreak.value} games`
+        : "",
+    },
+    {
+      label: "Most national titles",
+      best: bests.mostTitles,
+      value: bests.mostTitles ? `${bests.mostTitles.value}` : "",
+    },
+  ];
+  const careers = Object.entries(profile.careers).sort(
+    ([, a], [, b]) => b.lastYear - a.lastYear,
+  );
 
   const shown = (a: AchievementDef) =>
-    filter === 'all' || (filter === 'unlocked' ? Boolean(profile.achievements[a.id]) : !profile.achievements[a.id]);
+    filter === "all" ||
+    (filter === "unlocked"
+      ? Boolean(profile.achievements[a.id])
+      : !profile.achievements[a.id]);
 
   return (
     <div className="profile-layout">
@@ -77,13 +146,21 @@ export function ProfileScreen({
         <div className="profile-hero-body">
           <p className="eyebrow">Coach Profile · {profileTitle(level)}</p>
           <h2>
-            {points} <span className="dim">/ {MAX_ACHIEVEMENT_POINTS} points</span>
+            {points}{" "}
+            <span className="dim">/ {MAX_ACHIEVEMENT_POINTS} points</span>
           </h2>
-          <div className="profile-progress" role="progressbar" aria-valuemin={0} aria-valuemax={perLevel} aria-valuenow={intoLevel}>
+          <div
+            className="profile-progress"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={perLevel}
+            aria-valuenow={intoLevel}
+          >
             <span style={{ width: `${(intoLevel / perLevel) * 100}%` }} />
           </div>
           <p className="dim">
-            {unlockedCount} of {ACHIEVEMENTS.length} achievements · {perLevel - intoLevel} points to level {level + 1}
+            {unlockedCount} of {ACHIEVEMENTS.length} achievements ·{" "}
+            {perLevel - intoLevel} points to level {level + 1}
             {nextTitle && ` · "${nextTitle.title}" at level ${nextTitle.level}`}
           </p>
         </div>
@@ -93,8 +170,11 @@ export function ProfileScreen({
             <ul>
               {withinReach.map(({ def, progress }) => (
                 <li key={def.id}>
-                  <span className={`tier-dot tier-${def.tier}`} aria-hidden="true" />
-                  {def.title}{' '}
+                  <span
+                    className={`tier-dot tier-${def.tier}`}
+                    aria-hidden="true"
+                  />
+                  {def.title}{" "}
                   <span className="dim">
                     · {progress.current}/{progress.target}
                   </span>
@@ -111,7 +191,10 @@ export function ProfileScreen({
                 const def = ACHIEVEMENTS.find((a) => a.id === id);
                 return def ? (
                   <li key={id}>
-                    <span className={`tier-dot tier-${def.tier}`} aria-hidden="true" />
+                    <span
+                      className={`tier-dot tier-${def.tier}`}
+                      aria-hidden="true"
+                    />
                     {def.title} <span className="dim">· {unlock.year}</span>
                   </li>
                 ) : null;
@@ -122,13 +205,39 @@ export function ProfileScreen({
       </article>
 
       <div className="history-summary-row" aria-label="Lifetime totals">
-        <Stat value={`${totals.wins}–${totals.losses}`} label="Lifetime Record" />
+        <Stat
+          value={`${totals.wins}–${totals.losses}`}
+          label="Lifetime Record"
+        />
         <Stat value={totals.nationalTitles} label="Nat. Championships" />
         <Stat value={totals.confTitles} label="Conf. Titles" />
         <Stat value={totals.seasons} label="Seasons" />
         <Stat value={totals.dynasties} label="Dynasties" />
-        <Stat value={`${challenges.met}/${challenges.faced}`} label="Challenges Met" />
+        <Stat
+          value={`${challenges.met}/${challenges.faced}`}
+          label="Challenges Met"
+        />
       </div>
+
+      {bestRows.some((r) => r.best) && (
+        <article className="card" aria-label="Personal bests">
+          <h2>Personal Bests</h2>
+          <ul className="personal-bests">
+            {bestRows
+              .filter((r) => r.best)
+              .map((r) => (
+                <li key={r.label}>
+                  <p className="section-label">{r.label}</p>
+                  <p className="personal-best-value">{r.value}</p>
+                  <p className="dim personal-best-detail">
+                    {r.year !== undefined ? `${r.year} · ` : ""}
+                    {r.best!.coachName}, {formatTeamName(r.best!.teamName)}
+                  </p>
+                </li>
+              ))}
+          </ul>
+        </article>
+      )}
 
       {careers.length > 0 && (
         <article className="card">
@@ -146,10 +255,15 @@ export function ProfileScreen({
             </thead>
             <tbody>
               {careers.map(([saveId, c]) => (
-                <tr key={saveId} className={saveId === activeSaveId ? 'user-row' : undefined}>
+                <tr
+                  key={saveId}
+                  className={saveId === activeSaveId ? "user-row" : undefined}
+                >
                   <td>
                     {c.coachName}
-                    {saveId === activeSaveId && <span className="dim"> · current</span>}
+                    {saveId === activeSaveId && (
+                      <span className="dim"> · current</span>
+                    )}
                   </td>
                   <td>{formatTeamName(c.teamName)}</td>
                   <td>
@@ -170,22 +284,28 @@ export function ProfileScreen({
       <article className="card">
         <div className="profile-achievements-head">
           <h2>Achievements</h2>
-          <div className="news-filters" role="group" aria-label="Filter achievements">
-            {(['all', 'unlocked', 'locked'] as const).map((f) => (
+          <div
+            className="news-filters"
+            role="group"
+            aria-label="Filter achievements"
+          >
+            {(["all", "unlocked", "locked"] as const).map((f) => (
               <button
                 key={f}
                 type="button"
-                className={`pos-filter-btn${filter === f ? ' active' : ''}`}
+                className={`pos-filter-btn${filter === f ? " active" : ""}`}
                 aria-pressed={filter === f}
                 onClick={() => setFilter(f)}
               >
-                {f === 'all' ? 'All' : f === 'unlocked' ? 'Unlocked' : 'Locked'}
+                {f === "all" ? "All" : f === "unlocked" ? "Unlocked" : "Locked"}
               </button>
             ))}
           </div>
         </div>
         {CATEGORIES.map((category) => {
-          const list = ACHIEVEMENTS.filter((a) => a.category === category && shown(a));
+          const list = ACHIEVEMENTS.filter(
+            (a) => a.category === category && shown(a),
+          );
           if (list.length === 0) return null;
           return (
             <section key={category} className="achievement-group">
@@ -197,7 +317,11 @@ export function ProfileScreen({
                     def={a}
                     unlock={profile.achievements[a.id]}
                     thisDynasty={Boolean(dynastyAchievements[a.id])}
-                    progress={snapshot && !profile.achievements[a.id] ? achievementProgress(a, snapshot) : null}
+                    progress={
+                      snapshot && !profile.achievements[a.id]
+                        ? achievementProgress(a, snapshot)
+                        : null
+                    }
                   />
                 ))}
               </ul>
@@ -231,22 +355,34 @@ function AchievementCard({
 }) {
   const hidden = def.secret && !unlock;
   return (
-    <li className={`achievement-card tier-${def.tier}${unlock ? ' unlocked' : ' locked'}`} aria-label={hidden ? 'Secret achievement' : def.title}>
+    <li
+      className={`achievement-card tier-${def.tier}${unlock ? " unlocked" : " locked"}`}
+      aria-label={hidden ? "Secret achievement" : def.title}
+    >
       <span className="achievement-medal" aria-hidden="true">
-        {unlock ? '★' : '☆'}
+        {unlock ? "★" : "☆"}
       </span>
       <div>
-        <p className="achievement-title">{hidden ? '???' : def.title}</p>
-        <p className="achievement-desc">{hidden ? 'Keep coaching to find out.' : def.description}</p>
+        <p className="achievement-title">{hidden ? "???" : def.title}</p>
+        <p className="achievement-desc">
+          {hidden ? "Keep coaching to find out." : def.description}
+        </p>
         <p className="achievement-meta">
           <span className="achievement-tier">
             {def.tier} · {TIER_POINTS[def.tier]} pts
           </span>
         </p>
         {progress && progress.current > 0 && (
-          <div className="achievement-progress" aria-label={`${def.title} progress`}>
+          <div
+            className="achievement-progress"
+            aria-label={`${def.title} progress`}
+          >
             <span className="achievement-progress-bar">
-              <span style={{ width: `${(progress.current / progress.target) * 100}%` }} />
+              <span
+                style={{
+                  width: `${(progress.current / progress.target) * 100}%`,
+                }}
+              />
             </span>
             <span className="achievement-progress-text">
               {progress.current} / {progress.target}
@@ -256,8 +392,8 @@ function AchievementCard({
         {unlock && (
           <p className="achievement-meta">
             {unlock.year}
-            {unlock.teamName ? `, ${formatTeamName(unlock.teamName)}` : ''}
-            {thisDynasty ? ' · this dynasty' : ''}
+            {unlock.teamName ? `, ${formatTeamName(unlock.teamName)}` : ""}
+            {thisDynasty ? " · this dynasty" : ""}
           </p>
         )}
       </div>
