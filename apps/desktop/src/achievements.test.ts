@@ -195,4 +195,19 @@ describe('achievements', () => {
     // 130 + 10 conf titles (120) + 4 national titles (200) = 450.
     expect(ids(snapshot({ history: decorated }))).toContain('hall-of-fame-coach');
   });
+
+  it('tracks the rivalry trophy series', () => {
+    expect(ids(snapshot())).not.toContain('bragging-rights');
+    const lostOnly = snapshot({ rivalry: { wins: 0, recentWins: [false] } });
+    expect(ids(lostOnly)).not.toContain('bragging-rights');
+    expect(ids(snapshot({ rivalry: { wins: 1, recentWins: [true] } }))).toContain('bragging-rights');
+
+    const trophyCase = ACHIEVEMENT_BY_ID.get('trophy-case')!;
+    expect(achievementProgress(trophyCase, snapshot({ rivalry: { wins: 4, recentWins: [] } }))).toEqual({ current: 4, target: 5 });
+    expect(ids(snapshot({ rivalry: { wins: 5, recentWins: [] } }))).toContain('trophy-case');
+
+    // Three straight needs the three newest meetings, not any three wins.
+    expect(ids(snapshot({ rivalry: { wins: 4, recentWins: [true, false, true, true, true] } }))).not.toContain('own-the-rivalry');
+    expect(ids(snapshot({ rivalry: { wins: 3, recentWins: [true, true, true] } }))).toContain('own-the-rivalry');
+  });
 });

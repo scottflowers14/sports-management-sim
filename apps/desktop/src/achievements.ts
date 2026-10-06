@@ -44,6 +44,8 @@ export interface AchievementSnapshot {
   bestCommitStars?: number;
   /** This dynasty's difficulty. */
   difficulty?: 'easy' | 'normal' | 'hard';
+  /** The user program's rivalry: wins in the trophy series and whether the user won each recent meeting, newest first. */
+  rivalry?: { wins: number; recentWins: readonly boolean[] };
 }
 
 export interface AchievementDef {
@@ -201,6 +203,27 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
         const prev = s.history[i + 1];
         return prev !== undefined && h.teamName === prev.teamName && h.wins - prev.wins >= 4;
       }),
+  },
+  { id: 'bragging-rights', title: 'Bragging Rights', description: 'Win your rivalry trophy game.', tier: 'bronze', category: 'program', check: (s) => (s.rivalry?.wins ?? 0) >= 1 },
+  {
+    id: 'trophy-case',
+    title: 'Trophy Case',
+    description: 'Win your rivalry trophy game five times.',
+    tier: 'silver',
+    category: 'program',
+    progress: (s) => ({ current: s.rivalry?.wins ?? 0, target: 5 }),
+    check: (s) => (s.rivalry?.wins ?? 0) >= 5,
+  },
+  {
+    id: 'own-the-rivalry',
+    title: 'Own the Rivalry',
+    description: 'Win your rivalry trophy game three years running.',
+    tier: 'gold',
+    category: 'program',
+    check: (s) => {
+      const recent = s.rivalry?.recentWins ?? [];
+      return recent.length >= 3 && recent.slice(0, 3).every(Boolean);
+    },
   },
   { id: 'big-class', title: 'Loaded Class', description: 'Sign a recruiting class of 10 or more.', tier: 'bronze', category: 'program', check: (s) => s.history.some((h) => h.signingClassSize >= 10) },
   { id: 'blue-chip', title: 'Blue Chip', description: 'Land a commitment from a 5★ recruit.', tier: 'silver', category: 'program', check: (s) => (s.bestCommitStars ?? 0) >= 5 },
