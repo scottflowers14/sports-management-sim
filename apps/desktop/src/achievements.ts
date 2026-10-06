@@ -355,15 +355,18 @@ export function achievementProgress(def: AchievementDef, snapshot: AchievementSn
 }
 
 /** Titles a profile earns as it levels up; the highest reached is shown. */
+// Spread across the whole points range: a ten-season run at a top program
+// reached Legend at level 11 with ten achievements still locked, so the top
+// title now needs nearly everything.
 export const PROFILE_TITLES: readonly { level: number; title: string }[] = [
   { level: 1, title: 'Rookie Coach' },
   { level: 2, title: 'Grinder' },
-  { level: 3, title: 'Tactician' },
-  { level: 4, title: 'Recruiting Ace' },
-  { level: 5, title: 'Program Builder' },
-  { level: 7, title: 'Champion' },
-  { level: 9, title: 'Hall of Famer' },
-  { level: 11, title: 'Legend of the Game' },
+  { level: 4, title: 'Tactician' },
+  { level: 6, title: 'Recruiting Ace' },
+  { level: 8, title: 'Program Builder' },
+  { level: 10, title: 'Champion' },
+  { level: 13, title: 'Hall of Famer' },
+  { level: 16, title: 'Legend of the Game' },
 ];
 
 export function profileTitle(level: number): string {

@@ -10,6 +10,7 @@ import {
   coachRivalryRecord,
   nextProfileTitle,
   profileTitle,
+  PROFILE_TITLES,
   ACHIEVEMENT_BY_ID,
   newlyUnlocked,
   profileLevel,
@@ -141,10 +142,14 @@ describe('achievements', () => {
 
   it('names each profile level and points to the next title', () => {
     expect(profileTitle(1)).toBe('Rookie Coach');
-    expect(profileTitle(6)).toBe('Program Builder');
+    expect(profileTitle(9)).toBe('Program Builder');
     expect(profileTitle(40)).toBe('Legend of the Game');
-    expect(nextProfileTitle(5)).toEqual({ level: 7, title: 'Champion' });
-    expect(nextProfileTitle(11)).toBeNull();
+    expect(nextProfileTitle(9)).toEqual({ level: 10, title: 'Champion' });
+    expect(nextProfileTitle(16)).toBeNull();
+    // The top title needs nearly every point there is, and stays reachable.
+    const top = PROFILE_TITLES[PROFILE_TITLES.length - 1]!.level;
+    expect(profileLevel(MAX_ACHIEVEMENT_POINTS).level).toBeGreaterThanOrEqual(top);
+    expect((top - 1) * 100).toBeGreaterThanOrEqual(MAX_ACHIEVEMENT_POINTS * 0.85);
   });
 
   it('unlocks perfection, trifecta, postseason, award and recruiting achievements', () => {
