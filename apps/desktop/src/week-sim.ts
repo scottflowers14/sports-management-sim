@@ -1,3 +1,4 @@
+import { cpuRecruitingScale } from './difficulty';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { seededGameRandom } from './halftime';
 import { bracketMovementHeadline, projectNcaaField } from './tournament';
@@ -362,6 +363,7 @@ export function simulateOneWeek(
     weekToSim,
     random,
     finalWeek,
+    cpuRecruitingScale(dynasty.difficulty),
   );
   const newBoard = sortRecruitBoardForTeam(updatedUserTeam, newRecruits, dynasty.rosterTargets);
   const newDynasty = { ...dynasty, season: newSeason, recruits: newRecruits, recruitBoard: newBoard };

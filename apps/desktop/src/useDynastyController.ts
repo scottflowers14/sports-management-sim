@@ -1,3 +1,4 @@
+import { adPenaltyScale, type Difficulty } from './difficulty';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   applyRecruitPitch,
@@ -306,6 +307,7 @@ export function useDynastyController() {
   /** The profile level just reached, shown with the unlock toast. */
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
+  const [selectedNewDifficulty, setSelectedNewDifficulty] = useState<Difficulty>('normal');
 
   const saveState = useCallback((): DynastySaveState => ({
     dynasty,
@@ -416,7 +418,10 @@ export function useDynastyController() {
   }, [activeSaveId, dynasty.seed, refreshSaves, saveState, writeSave]);
 
   const startNewDynasty = useCallback(() => {
-    const nextDynasty = createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId, ...(customTeams ? { customTeams } : {}) });
+    const nextDynasty = {
+      ...createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId, ...(customTeams ? { customTeams } : {}) }),
+      difficulty: selectedNewDifficulty,
+    };
     const saveId = createDynastySaveId(nextDynasty.seed);
     const newCoach = createCoachProfile(selectedNewCoachName.trim() || generateCoachName(nextDynasty.seed));
     const userTeamForGoals = nextDynasty.season.teams.find((t) => t.id === selectedNewTeamId);
@@ -494,7 +499,7 @@ export function useDynastyController() {
     refreshSaves();
     if (saved) setSaveStatus('New dynasty started');
     setScreen('game');
-  }, [customTeams, refreshSaves, resetUiState, selectedNewTeamId, selectedNewCoachName, writeSave]);
+  }, [customTeams, refreshSaves, resetUiState, selectedNewTeamId, selectedNewCoachName, selectedNewDifficulty, writeSave]);
 
   const loadSave = useCallback((saveId: string) => {
     const save = loadDynastySaveSlot(saveId);
@@ -643,6 +648,7 @@ export function useDynastyController() {
       proPicks: dynastyHistory.reduce((n, h) => n + (h.proPicks ?? 0), 0),
       abilityTiers: Object.values(coachProfile?.abilities ?? {}),
       challengesCompleted: challengesCompleted(challengeLog),
+      difficulty: dynasty.difficulty ?? 'normal',
       bestCommitStars: Math.max(
         0,
         ...dynasty.recruits
@@ -654,6 +660,7 @@ export function useDynastyController() {
     dynasty.season.schedule,
     dynasty.userTeamId,
     dynasty.recruits,
+    dynasty.difficulty,
     tournament,
     rankings,
     dynastyHistory,
@@ -1442,6 +1449,7 @@ export function useDynastyController() {
         isNatChamp,
         coachProfile,
         {
+          penaltyScale: adPenaltyScale(dynasty.difficulty),
           wins: userRecord.wins,
           ...(lastSeasonHere && coachProfile.tenureSeasons > 0 ? { previousWins: lastSeasonHere.wins } : {}),
           ...(pickedFinish !== null && confRank > 0 ? { pickedFinish, confFinish: confRank } : {}),
@@ -1948,6 +1956,8 @@ export function useDynastyController() {
     setSelectedNewTeamId,
     selectedNewCoachName,
     setSelectedNewCoachName,
+    selectedNewDifficulty,
+    setSelectedNewDifficulty,
     dynasty,
     view,
     setView,

@@ -177,4 +177,11 @@ describe('achievements', () => {
     const many = Array.from({ length: 20 }, (_, i) => season(2000 + i, { wins: 10, losses: 2 }));
     expect(ids(snapshot({ history: many }))).toContain('two-hundred-wins');
   });
+
+  it('only awards The Hard Way for a title on hard', () => {
+    const champ = season(2030, { nationalChampion: true });
+    expect(ids(snapshot({ history: [champ], difficulty: 'normal' }))).not.toContain('hard-way');
+    expect(ids(snapshot({ history: [champ] }))).not.toContain('hard-way');
+    expect(ids(snapshot({ history: [champ], difficulty: 'hard' }))).toContain('hard-way');
+  });
 });

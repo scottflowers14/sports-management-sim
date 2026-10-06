@@ -1,3 +1,4 @@
+import { DIFFICULTY_LABELS } from './difficulty';
 import { seasonReport } from './season-report';
 import {
   calculateLacrosseTeamRating,
@@ -76,6 +77,8 @@ export function App() {
     setSelectedNewTeamId,
     selectedNewCoachName,
     setSelectedNewCoachName,
+    selectedNewDifficulty,
+    setSelectedNewDifficulty,
     dynasty,
     view,
     setView,
@@ -225,6 +228,8 @@ export function App() {
         coachName={selectedNewCoachName}
         onTeamChange={setSelectedNewTeamId}
         onCoachNameChange={setSelectedNewCoachName}
+        difficulty={selectedNewDifficulty}
+        onDifficultyChange={setSelectedNewDifficulty}
         onCreateDynasty={startNewDynasty}
         onLoadSave={(saveId) => { loadSave(saveId); setScreen('game'); }}
         onDeleteSave={deleteSave}
@@ -554,6 +559,7 @@ export function App() {
               </button>
               <span className="coach-tenure">
                 Year {coachProfile.tenureSeasons + 1} · {coachProfile.contractYearsRemaining}yr left
+                {dynasty.difficulty && dynasty.difficulty !== 'normal' && ` · ${DIFFICULTY_LABELS[dynasty.difficulty]}`}
               </span>
               <div className="ad-confidence-row">
                 <span className="ad-confidence-label" style={{ color: getJobSecurityColor(adConfidence) }}>
