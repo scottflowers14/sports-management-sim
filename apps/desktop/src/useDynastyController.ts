@@ -37,6 +37,7 @@ import {
   applyRealignment,
   createLacrosseSeasonSchedule,
   dynastyRivalries,
+  rivalryFor,
   calculateLacrosseTeamRating,
   rivalryForGame,
   realignmentHeadline,
@@ -632,6 +633,10 @@ export function useDynastyController() {
 
   // Achievements: check the dynasty whenever something that could earn one
   // changes. Unlocks go into this save and into the cross-dynasty profile.
+  const userRivalryKey = useMemo(
+    () => rivalryFor(dynastyRivalries({ rivalries: dynasty.rivalries, season: dynasty.season }), dynasty.userTeamId)?.key ?? null,
+    [dynasty.rivalries, dynasty.season, dynasty.userTeamId],
+  );
   const achievementSnapshot = useMemo(() => {
     const games: AchievementGame[] = userSeasonGames(dynasty.season.schedule, tournament, dynasty.userTeamId);
     // Rankings are refreshed after each week, so previousRank is the poll
@@ -649,6 +654,12 @@ export function useDynastyController() {
       abilityTiers: Object.values(coachProfile?.abilities ?? {}),
       challengesCompleted: challengesCompleted(challengeLog),
       difficulty: dynasty.difficulty ?? 'normal',
+      ...(() => {
+        const series = userRivalryKey ? rivalrySeries[userRivalryKey] : undefined;
+        return series
+          ? { rivalry: { wins: series.wins[dynasty.userTeamId] ?? 0, recentWins: series.recent.map((m) => m.winnerId === dynasty.userTeamId) } }
+          : {};
+      })(),
       bestCommitStars: Math.max(
         0,
         ...dynasty.recruits
@@ -661,6 +672,8 @@ export function useDynastyController() {
     dynasty.userTeamId,
     dynasty.recruits,
     dynasty.difficulty,
+    userRivalryKey,
+    rivalrySeries,
     tournament,
     rankings,
     dynastyHistory,
