@@ -68,7 +68,7 @@ import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
 import { challengeMet, challengesCompleted, weeklyChallenge, type ChallengeResult } from './challenges';
-import { newlyUnlocked, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
+import { achievementPoints, newlyUnlocked, profileLevel, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
 import { careerFromHistory, loadProfile, saveProfile, type PlayerProfile } from './profile';
 import { careerMilestonesForWeek } from './career-milestones';
 import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom, buildFinalPollRows } from './dynasty-helpers';
@@ -303,6 +303,8 @@ export function useDynastyController() {
   const [profile, setProfile] = useState<PlayerProfile>(() => loadProfile());
   /** Achievement ids unlocked since the player last dismissed the toast. */
   const [achievementToasts, setAchievementToasts] = useState<string[]>([]);
+  /** The profile level just reached, shown with the unlock toast. */
+  const [levelUp, setLevelUp] = useState<number | null>(null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
 
   const saveState = useCallback((): DynastySaveState => ({
@@ -401,6 +403,7 @@ export function useDynastyController() {
     setAssistantReport(null);
     setAchievements({});
     setAchievementToasts([]);
+    setLevelUp(null);
     setChallengeLog([]);
   }, []);
 
@@ -666,6 +669,9 @@ export function useDynastyController() {
     };
     const added: UnlockedAchievements = Object.fromEntries(earnedAchievements.map((a) => [a.id, unlock]));
     if (earnedAchievements.length > 0) {
+      const before = profileLevel(achievementPoints(profile.achievements)).level;
+      const after = profileLevel(achievementPoints({ ...added, ...profile.achievements })).level;
+      if (after > before) setLevelUp(after);
       setAchievements({ ...achievements, ...added });
       setAchievementToasts([...achievementToasts, ...earnedAchievements.map((a) => a.id)]);
     }
@@ -681,7 +687,10 @@ export function useDynastyController() {
     if (profile !== profileLoaded.current) saveProfile(profile);
   }, [profile]);
 
-  const dismissAchievementToasts = useCallback(() => setAchievementToasts([]), []);
+  const dismissAchievementToasts = useCallback(() => {
+    setAchievementToasts([]);
+    setLevelUp(null);
+  }, []);
   // The staff's plan is the one CPU programs use: tailored to the roster.
   // A playtest found the neutral default plan won about a tenth fewer
   // postseason games than the tailored plan with the same team.
@@ -2016,6 +2025,7 @@ export function useDynastyController() {
     achievementSnapshot,
     challengeLog,
     achievementToasts,
+    levelUp,
     dismissAchievementToasts,
     profile,
     autoRecruitingAssistant,

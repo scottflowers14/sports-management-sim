@@ -244,3 +244,24 @@ export function achievementProgress(def: AchievementDef, snapshot: AchievementSn
   const { current, target } = def.progress(snapshot);
   return { current: Math.min(current, target), target };
 }
+
+/** Titles a profile earns as it levels up; the highest reached is shown. */
+export const PROFILE_TITLES: readonly { level: number; title: string }[] = [
+  { level: 1, title: 'Rookie Coach' },
+  { level: 2, title: 'Grinder' },
+  { level: 3, title: 'Tactician' },
+  { level: 4, title: 'Recruiting Ace' },
+  { level: 5, title: 'Program Builder' },
+  { level: 7, title: 'Champion' },
+  { level: 9, title: 'Hall of Famer' },
+  { level: 11, title: 'Legend of the Game' },
+];
+
+export function profileTitle(level: number): string {
+  return [...PROFILE_TITLES].reverse().find((t) => level >= t.level)?.title ?? PROFILE_TITLES[0]!.title;
+}
+
+/** The next title up and the level it needs, or null at the top. */
+export function nextProfileTitle(level: number): { level: number; title: string } | null {
+  return PROFILE_TITLES.find((t) => t.level > level) ?? null;
+}

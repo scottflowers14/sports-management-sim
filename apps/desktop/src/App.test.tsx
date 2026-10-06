@@ -368,6 +368,8 @@ describe('Desktop App', () => {
     await waitFor(() => expect(loadActiveDynastySave()?.achievements?.['first-win']?.year).toBe(2028));
     expect(JSON.parse(localStorage.getItem(PROFILE_KEY)!).achievements['first-win']).toBeTruthy();
 
+    // The sidebar names the profile level, and opens the profile.
+    expect(screen.getByRole('button', { name: /^Lv \d+ · / })).toBeInTheDocument();
     await userEvent.click(within(toast).getByRole('button', { name: 'View profile' }));
     expect(screen.queryByRole('status', { name: /Achievement unlocked/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Profile level')).toHaveTextContent(/of \d+ achievements/);
