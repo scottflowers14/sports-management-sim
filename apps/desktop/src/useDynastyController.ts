@@ -673,8 +673,8 @@ export function useDynastyController() {
     [screen, achievementSnapshot, achievements],
   );
   const currentCareer = useMemo(
-    () => (screen === 'game' && activeSaveId ? careerFromHistory(dynastyHistory, coachProfile?.name ?? '') : null),
-    [screen, activeSaveId, dynastyHistory, coachProfile?.name],
+    () => (screen === 'game' && activeSaveId ? careerFromHistory(dynastyHistory, coachProfile?.name ?? '', dynasty.difficulty) : null),
+    [screen, activeSaveId, dynastyHistory, coachProfile?.name, dynasty.difficulty],
   );
   const careerChanged =
     activeSaveId !== null && currentCareer !== null && JSON.stringify(profile.careers[activeSaveId]) !== JSON.stringify(currentCareer);

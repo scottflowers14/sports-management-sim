@@ -138,10 +138,12 @@ describe('Desktop App', () => {
     render(<App />);
     expect(screen.getByRole('button', { name: 'Normal' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Hard' }));
-    expect(screen.getByText(/recruit harder and your AD has less patience/i)).toBeInTheDocument();
+    expect(screen.getByText(/Recruits are harder to win/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
     await waitFor(() => expect(loadActiveDynastySave()?.dynasty.difficulty).toBe('hard'));
     expect(screen.getByText(/yr left · Hard/)).toBeInTheDocument();
+    // The save list marks the difficulty.
+    expect(listDynastySaves()[0]?.difficulty).toBe('hard');
   });
 
   it('shows coaching controls and persists a game plan change', async () => {
@@ -376,7 +378,8 @@ describe('Desktop App', () => {
       await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
     }
     const toast = screen.getByRole('status', { name: /Achievement unlocked/i });
-    expect(toast).toHaveTextContent('Off the Schneid');
+    // A big first win can unlock several at once; the toast lists three and counts the rest.
+    expect(toast).toHaveTextContent(/Off the Schneid|and \d+ more/);
     await waitFor(() => expect(loadActiveDynastySave()?.achievements?.['first-win']?.year).toBe(2028));
     expect(JSON.parse(localStorage.getItem(PROFILE_KEY)!).achievements['first-win']).toBeTruthy();
 

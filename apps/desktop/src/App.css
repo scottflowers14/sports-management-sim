@@ -7001,3 +7001,25 @@ li span {
 .difficulty-picker {
   margin: 4px 0 6px;
 }
+
+.difficulty-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.difficulty-hard {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff8a8a;
+}
+
+.difficulty-easy {
+  background: rgba(120, 200, 255, 0.12);
+  color: #8fd0ff;
+}
