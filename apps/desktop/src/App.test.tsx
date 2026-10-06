@@ -343,6 +343,21 @@ describe('Desktop App', () => {
     expect(screen.getByText(/Scholarships [1-3]\.\d\d \/ 3\.25/)).toBeInTheDocument();
   });
 
+  it('sets a weekly challenge on the coach desk and judges it after the game', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    const challenge = screen.getByLabelText('Weekly challenge');
+    expect(challenge).toHaveTextContent(/\+\d+ XP/);
+    const text = challenge.textContent!.replace('Weekly challenge', '').replace(/\+\d+ XP/, '').trim();
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week 1/i }));
+    await waitFor(() => expect(loadActiveDynastySave()?.challengeLog).toHaveLength(1));
+    const result = loadActiveDynastySave()!.challengeLog![0]!;
+    expect(result).toMatchObject({ year: 2028, week: 1, text });
+    if (result.completed) {
+      expect(loadActiveDynastySave()!.coachProfile!.xp).toBeGreaterThan(150);
+    }
+  });
+
   it('unlocks an achievement on the first win and shows it on the profile', async () => {
     await renderStartedApp();
     for (let week = 1; week <= 6 && !screen.queryByRole('status', { name: /Achievement unlocked/i }); week += 1) {

@@ -37,6 +37,8 @@ export interface AchievementSnapshot {
   proPicks: number;
   /** Coach ability tiers bought so far, by ability. */
   abilityTiers: readonly number[];
+  /** Weekly challenges met. */
+  challengesCompleted?: number;
 }
 
 export interface AchievementDef {
@@ -176,6 +178,22 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     category: 'career',
     secret: true,
     check: (s) => new Set(s.history.map((h) => h.teamName).filter(Boolean)).size >= 2,
+  },
+  {
+    id: 'challenge-accepted',
+    title: 'Challenge Accepted',
+    description: 'Complete 10 weekly challenges.',
+    tier: 'bronze',
+    category: 'career',
+    check: (s) => (s.challengesCompleted ?? 0) >= 10,
+  },
+  {
+    id: 'challenge-master',
+    title: 'Overachiever',
+    description: 'Complete 50 weekly challenges.',
+    tier: 'gold',
+    category: 'career',
+    check: (s) => (s.challengesCompleted ?? 0) >= 50,
   },
   { id: 'first-upgrade', title: 'Continuing Education', description: 'Buy your first coach ability.', tier: 'bronze', category: 'career', check: (s) => s.abilityTiers.some((t) => t > 0) },
   { id: 'master', title: 'Master of the Craft', description: 'Max out a coach ability.', tier: 'gold', category: 'career', check: (s) => s.abilityTiers.some((t) => t >= 3) },

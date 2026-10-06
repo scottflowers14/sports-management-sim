@@ -1,6 +1,7 @@
 import type { WeeklyHubData } from '../weekly-hub';
 import { formatTeamName, formatTeamShort } from '../ui/format';
 import { formatSeries, formatStreak } from '../series-history';
+import { weeklyChallenge } from '../challenges';
 
 export function WeeklyHub({
   hub,
@@ -14,6 +15,7 @@ export function WeeklyHub({
   const oppPct = 100 - userPct;
   const userName = formatTeamShort(preview.userTeam.shortName);
   const oppName = formatTeamShort(preview.opponent.shortName);
+  const challenge = weeklyChallenge(preview.ratingEdge, preview.game.week);
 
   return (
     <article className="card weekly-hub-card" aria-label="Weekly hub">
@@ -34,6 +36,10 @@ export function WeeklyHub({
                 hub.series.last.postseason ? ' postseason' : ''
               })`}
             {hub.series?.streak && hub.series.streak.count > 1 && ` · ${formatStreak(hub.series)} streak`}
+          </p>
+          <p className="weekly-challenge" aria-label="Weekly challenge">
+            <span className="weekly-challenge-label">Weekly challenge</span> {challenge.text}{' '}
+            <span className="weekly-challenge-xp">+{challenge.xp} XP</span>
           </p>
         </div>
         <div className="matchup-line">
