@@ -378,6 +378,8 @@ describe('Desktop App', () => {
     expect(card).toHaveTextContent(/this dynasty/);
     // Count-based achievements show this dynasty's progress.
     expect(screen.getByLabelText('Fifty progress')).toHaveTextContent(/^\d+ \/ 50$/);
+    // Personal bests come from finished seasons, so none show mid-first-season.
+    expect(screen.queryByRole('article', { name: 'Personal bests' })).toBeNull();
     // Secret achievements stay hidden until earned.
     expect(screen.getAllByRole('listitem', { name: 'Secret achievement' }).length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: 'Locked' }));

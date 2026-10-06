@@ -19,6 +19,16 @@ export interface ProfileCareer {
   losses: number;
   confTitles: number;
   nationalTitles: number;
+  /** Best marks of this career; missing on profiles saved before they existed. */
+  bests?: CareerBests;
+}
+
+export interface CareerBests {
+  bestSeason: { year: number; wins: number; losses: number } | null;
+  bestFinish: { year: number; rank: number } | null;
+  biggestWin: { year: number; goalsFor: number; goalsAgainst: number } | null;
+  mostGoals: { year: number; goalsFor: number; goalsAgainst: number } | null;
+  longestWinStreak: number;
 }
 
 export interface PlayerProfile {
@@ -76,6 +86,71 @@ export function careerFromHistory(history: readonly DynastySeasonRecord[], coach
     losses: history.reduce((n, h) => n + h.losses, 0),
     confTitles: history.filter((h) => h.confChampion).length,
     nationalTitles: history.filter((h) => h.nationalChampion).length,
+    bests: careerBests(history),
+  };
+}
+
+/** A career's best season, finish, games and winning streak, from its history. */
+export function careerBests(history: readonly DynastySeasonRecord[]): CareerBests {
+  const oldestFirst = [...history].reverse();
+  let bestSeason: CareerBests['bestSeason'] = null;
+  let bestFinish: CareerBests['bestFinish'] = null;
+  let biggestWin: CareerBests['biggestWin'] = null;
+  let mostGoals: CareerBests['mostGoals'] = null;
+  let streak = 0;
+  let longestWinStreak = 0;
+  for (const h of oldestFirst) {
+    const pct = (r: { wins: number; losses: number }) => r.wins / Math.max(1, r.wins + r.losses);
+    if (!bestSeason || pct(h) > pct(bestSeason) || (pct(h) === pct(bestSeason) && h.wins > bestSeason.wins)) {
+      bestSeason = { year: h.year, wins: h.wins, losses: h.losses };
+    }
+    if (h.natRankAtEnd != null && (!bestFinish || h.natRankAtEnd < bestFinish.rank)) bestFinish = { year: h.year, rank: h.natRankAtEnd };
+    for (const g of h.games ?? []) {
+      const margin = g.goalsFor - g.goalsAgainst;
+      if (margin > 0 && (!biggestWin || margin > biggestWin.goalsFor - biggestWin.goalsAgainst)) {
+        biggestWin = { year: h.year, goalsFor: g.goalsFor, goalsAgainst: g.goalsAgainst };
+      }
+      if (!mostGoals || g.goalsFor > mostGoals.goalsFor) mostGoals = { year: h.year, goalsFor: g.goalsFor, goalsAgainst: g.goalsAgainst };
+      streak = margin > 0 ? streak + 1 : 0;
+      longestWinStreak = Math.max(longestWinStreak, streak);
+    }
+  }
+  return { bestSeason, bestFinish, biggestWin, mostGoals, longestWinStreak };
+}
+
+export interface ProfileBest<T> {
+  value: T;
+  coachName: string;
+  teamName: string;
+}
+
+/** The best of each mark across every career in the profile. */
+export function profileBests(profile: PlayerProfile): {
+  bestSeason: ProfileBest<NonNullable<CareerBests['bestSeason']>> | null;
+  bestFinish: ProfileBest<NonNullable<CareerBests['bestFinish']>> | null;
+  biggestWin: ProfileBest<NonNullable<CareerBests['biggestWin']>> | null;
+  mostGoals: ProfileBest<NonNullable<CareerBests['mostGoals']>> | null;
+  longestWinStreak: ProfileBest<number> | null;
+  mostTitles: ProfileBest<number> | null;
+} {
+  const careers = Object.values(profile.careers);
+  function best<T>(pick: (c: ProfileCareer) => T | null | undefined, better: (a: T, b: T) => boolean): ProfileBest<T> | null {
+    let top: ProfileBest<T> | null = null;
+    for (const c of careers) {
+      const value = pick(c);
+      if (value === null || value === undefined) continue;
+      if (!top || better(value, top.value)) top = { value, coachName: c.coachName, teamName: c.teamName };
+    }
+    return top;
+  }
+  const pct = (r: { wins: number; losses: number }) => r.wins / Math.max(1, r.wins + r.losses);
+  return {
+    bestSeason: best((c) => c.bests?.bestSeason, (a, b) => pct(a) > pct(b) || (pct(a) === pct(b) && a.wins > b.wins)),
+    bestFinish: best((c) => c.bests?.bestFinish, (a, b) => a.rank < b.rank),
+    biggestWin: best((c) => c.bests?.biggestWin, (a, b) => a.goalsFor - a.goalsAgainst > b.goalsFor - b.goalsAgainst),
+    mostGoals: best((c) => c.bests?.mostGoals, (a, b) => a.goalsFor > b.goalsFor),
+    longestWinStreak: best((c) => (c.bests && c.bests.longestWinStreak > 0 ? c.bests.longestWinStreak : null), (a, b) => a > b),
+    mostTitles: best((c) => (c.nationalTitles > 0 ? c.nationalTitles : null), (a, b) => a > b),
   };
 }
 
