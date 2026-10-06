@@ -383,7 +383,8 @@ describe('Desktop App', () => {
 
   it('unlocks an achievement on the first win and shows it on the profile', async () => {
     await renderStartedApp();
-    for (let week = 1; week <= 6 && !screen.queryByRole('status', { name: /Achievement unlocked/i }); week += 1) {
+    // Advance until the first win lands; a recruiting unlock (a 5-star commit) can come first.
+    for (let week = 1; week <= 6 && !loadActiveDynastySave()?.achievements?.['first-win']; week += 1) {
       await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
     }
     const toast = screen.getByRole('status', { name: /Achievement unlocked/i });
