@@ -128,6 +128,15 @@ describe('Desktop App', () => {
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
     // The recap carries the season's coach report card: every game had a weekly challenge.
     expect(screen.getByRole('article', { name: 'Coach report card' })).toHaveTextContent(/\/1[0-9] weekly challenges/);
+    // The finished season counts once in the offseason, not again from the still-loaded bracket.
+    await waitFor(() => expect(loadActiveDynastySave()?.dynastyHistory.length).toBeGreaterThan(0));
+    const finished = loadActiveDynastySave()!.dynastyHistory[0]!;
+    const postseasonWins = (finished.games ?? []).filter((g) => g.postseason && g.goalsFor > g.goalsAgainst).length;
+    await userEvent.click(screen.getByRole('button', { name: /^Profile/ }));
+    if (postseasonWins > 0) {
+      expect(screen.getByLabelText('Tournament Tested progress')).toHaveTextContent(`${postseasonWins} / 10`);
+    }
+    await userEvent.click(screen.getByRole('button', { name: /^Offseason/ }));
 
     await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
     expect(screen.getByText(/Men's College Lacrosse · Season 2029/i)).toBeInTheDocument();
@@ -374,7 +383,8 @@ describe('Desktop App', () => {
 
   it('unlocks an achievement on the first win and shows it on the profile', async () => {
     await renderStartedApp();
-    for (let week = 1; week <= 6 && !screen.queryByRole('status', { name: /Achievement unlocked/i }); week += 1) {
+    // Advance until the first win lands; a recruiting unlock (a 5-star commit) can come first.
+    for (let week = 1; week <= 6 && !loadActiveDynastySave()?.achievements?.['first-win']; week += 1) {
       await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
     }
     const toast = screen.getByRole('status', { name: /Achievement unlocked/i });

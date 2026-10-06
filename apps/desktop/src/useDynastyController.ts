@@ -641,7 +641,10 @@ export function useDynastyController() {
     [dynasty.rivalries, dynasty.season, dynasty.userTeamId],
   );
   const achievementSnapshot = useMemo(() => {
-    const games: AchievementGame[] = userSeasonGames(dynasty.season.schedule, tournament, dynasty.userTeamId);
+    // In the offseason the finished season is already in history, but the
+    // bracket stays loaded until the next season starts; counting it again
+    // doubled postseason wins (Tournament Tested unlocked in year one).
+    const games: AchievementGame[] = offseasonSummary ? [] : userSeasonGames(dynasty.season.schedule, tournament, dynasty.userTeamId);
     // Rankings are refreshed after each week, so previousRank is the poll
     // going into the latest game. Older games were checked when they were played.
     const latest = games[games.length - 1];
@@ -675,6 +678,7 @@ export function useDynastyController() {
     dynasty.userTeamId,
     dynasty.recruits,
     dynasty.difficulty,
+    offseasonSummary,
     userRivalId,
     userTeam,
     tournament,

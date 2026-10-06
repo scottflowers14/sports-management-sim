@@ -246,6 +246,8 @@ describe('achievements', () => {
   it('pays half the points in coach XP', () => {
     expect(achievementXp([])).toBe(0);
     expect(achievementXp([{ tier: 'bronze' }, { tier: 'gold' }, { tier: 'platinum' }])).toBe(5 + 25 + 50);
+    // Silver pays a whole 13, never a fractional 12.5.
+    expect(achievementXp([{ tier: 'silver' }])).toBe(13);
   });
 
   it('counts only the coach\'s own trophy games at this program', () => {

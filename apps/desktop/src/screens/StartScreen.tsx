@@ -24,6 +24,7 @@ export function StartScreen({
   hasCustomTeams,
   saveStatus,
   profileSummary,
+  saveLegacies = {},
 }: {
   saves: DynastySaveMetadata[];
   teamChoices: DynastyTeamChoice[];
@@ -46,6 +47,8 @@ export function StartScreen({
   saveStatus?: string;
   /** Profile level and achievement count, once the player has earned any. */
   profileSummary?: { level: number; unlocked: number; total: number; points: number } | undefined;
+  /** Legacy tier of each save's coaching career, by save id, from the profile. */
+  saveLegacies?: Readonly<Record<string, string>>;
 }) {
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -205,6 +208,7 @@ export function StartScreen({
                     <small>
                       {save.userTeamName} · {save.seasonYear} Week {save.currentWeek} · {save.record.wins}–
                       {save.record.losses}
+                      {saveLegacies[save.saveId] && ` · ${saveLegacies[save.saveId]} legacy`}
                     </small>
                   </span>
                   <span className="save-slot-actions">

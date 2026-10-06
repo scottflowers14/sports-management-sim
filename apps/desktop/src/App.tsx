@@ -1,3 +1,4 @@
+import { legacyScore, legacyTier } from './legacy';
 import { AchievementWatchCard } from './components/AchievementWatchCard';
 import { achievementWatch } from './achievements';
 import { DIFFICULTY_LABELS } from './difficulty';
@@ -249,6 +250,9 @@ export function App() {
           total: ACHIEVEMENTS.length,
           points: achievementPoints(profile.achievements),
         }}
+        saveLegacies={Object.fromEntries(
+          Object.entries(profile.careers).map(([saveId, career]) => [saveId, legacyTier(legacyScore(career))]),
+        )}
       />
     );
   }
