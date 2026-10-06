@@ -643,8 +643,24 @@ export function useDynastyController() {
       proPicks: dynastyHistory.reduce((n, h) => n + (h.proPicks ?? 0), 0),
       abilityTiers: Object.values(coachProfile?.abilities ?? {}),
       challengesCompleted: challengesCompleted(challengeLog),
+      bestCommitStars: Math.max(
+        0,
+        ...dynasty.recruits
+          .filter((r) => r.committedTeamId === dynasty.userTeamId || r.signedTeamId === dynasty.userTeamId)
+          .map((r) => r.starRating),
+      ),
     };
-  }, [dynasty.season.schedule, dynasty.userTeamId, tournament, rankings, dynastyHistory, hallOfFame, coachProfile?.abilities, challengeLog]);
+  }, [
+    dynasty.season.schedule,
+    dynasty.userTeamId,
+    dynasty.recruits,
+    tournament,
+    rankings,
+    dynastyHistory,
+    hallOfFame,
+    coachProfile?.abilities,
+    challengeLog,
+  ]);
   const earnedAchievements = useMemo(
     () => (screen === 'game' ? newlyUnlocked(achievementSnapshot, achievements) : []),
     [screen, achievementSnapshot, achievements],
