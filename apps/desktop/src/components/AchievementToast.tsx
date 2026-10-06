@@ -1,4 +1,4 @@
-import { ACHIEVEMENT_BY_ID, TIER_POINTS, profileTitle } from '../achievements';
+import { ACHIEVEMENT_BY_ID, TIER_POINTS, achievementXp, profileTitle } from '../achievements';
 
 /** Pops up when achievements unlock; lists the first few and links to the profile. */
 export function AchievementToast({
@@ -20,7 +20,7 @@ export function AchievementToast({
   const points = defs.reduce((sum, d) => sum + TIER_POINTS[d.tier], 0);
   return (
     <aside className="achievement-toast" role="status" aria-label="Achievement unlocked">
-      <p className="eyebrow">{defs.length === 1 ? 'Achievement unlocked' : `${defs.length} achievements unlocked`} · +{points} pts</p>
+      <p className="eyebrow">{defs.length === 1 ? 'Achievement unlocked' : `${defs.length} achievements unlocked`} · +{points} pts · +{achievementXp(defs)} coach XP</p>
       {levelUp !== null && (
         <p className="achievement-levelup">
           Level {levelUp}! You're now a <strong>{profileTitle(levelUp)}</strong>.

@@ -6,6 +6,8 @@ import {
   achievementPoints,
   achievementProgress,
   achievementWatch,
+  achievementXp,
+  coachRivalryRecord,
   nextProfileTitle,
   profileTitle,
   ACHIEVEMENT_BY_ID,
@@ -234,5 +236,28 @@ describe('achievements', () => {
     expect(achievementWatch(snapshot(), {}, { rivalryWeek: true })[0]?.def.id).toBe('bragging-rights');
     expect(achievementWatch(snapshot(), { 'bragging-rights': { year: 2030, at: 'x' } }, { rivalryWeek: true })).toEqual([]);
     expect(achievementWatch(snapshot(), {})).toEqual([]);
+  });
+
+  it('pays half the points in coach XP', () => {
+    expect(achievementXp([])).toBe(0);
+    expect(achievementXp([{ tier: 'bronze' }, { tier: 'gold' }, { tier: 'platinum' }])).toBe(5 + 25 + 50);
+  });
+
+  it('counts only the coach\'s own trophy games at this program', () => {
+    const g = (opponentId: string, goalsFor: number, goalsAgainst: number, postseason = false) => ({
+      opponentId,
+      goalsFor,
+      goalsAgainst,
+      ...(postseason ? { postseason: true as const } : {}),
+    });
+    const history = [
+      season(2030, { games: [g('rival', 10, 8), g('other', 12, 3), g('rival', 9, 7, true)] }),
+      // Coached at another program before: its rivalry games don't count here.
+      season(2029, { teamName: 'Harbor City', games: [g('rival', 11, 2)] }),
+      season(2028, { games: [g('rival', 6, 9)] }),
+    ];
+    const record = coachRivalryRecord('rival', 'Maryland State', [{ ...g('rival', 14, 13), opponentRank: null }], history);
+    // This season's win, then 2030's regular-season win, then the 2028 loss; the postseason meeting is skipped.
+    expect(record).toEqual({ wins: 2, recentWins: [true, true, false] });
   });
 });
