@@ -1,5 +1,6 @@
 import { compactGameLog, normalizeGamePlan } from '@sports-management-sim/sport-lacrosse';
 import type { UnlockedAchievements } from './achievements';
+import type { ChallengeResult } from './challenges';
 import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, LacrossePortalEntry, LacrossePracticePlan, LacrosseStaff, RivalrySeriesMap, StaffMember } from '@sports-management-sim/sport-lacrosse';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
@@ -94,6 +95,8 @@ export interface DynastySaveState {
   autoGamePlan?: boolean;
   /** Achievements this dynasty has unlocked. */
   achievements?: UnlockedAchievements;
+  /** Every weekly challenge the coach has faced. */
+  challengeLog?: ChallengeResult[];
   /** The user's assistant coaches. Older saves get a starting staff on load. */
   staff?: LacrosseStaff;
   /** Coaches available to hire this year. */

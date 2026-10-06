@@ -6835,3 +6835,30 @@ li span {
 .achievement-meta + .achievement-meta {
   margin-top: 2px;
 }
+
+.weekly-challenge {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
+.weekly-challenge-label {
+  margin-right: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 200, 76, 0.14);
+  color: #f5c84c;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.weekly-challenge-xp {
+  color: #72f2c6;
+  font-weight: 700;
+}
+
+.profile-recent li span.dim {
+  display: inline;
+  margin: 0;
+}

@@ -24,6 +24,7 @@ export function ProfileScreen({
   dynastyAchievements,
   activeSaveId = null,
   onSeen,
+  challenges = { met: 0, faced: 0 },
 }: {
   profile: PlayerProfile;
   /** What this dynasty has earned, to mark "this dynasty" on the cards. */
@@ -31,6 +32,8 @@ export function ProfileScreen({
   activeSaveId?: string | null;
   /** Called on open, so the new-unlock badge clears once the profile is seen. */
   onSeen?: () => void;
+  /** This dynasty's weekly challenges. */
+  challenges?: { met: number; faced: number };
 }) {
   useEffect(() => {
     onSeen?.();
@@ -91,6 +94,7 @@ export function ProfileScreen({
         <Stat value={totals.confTitles} label="Conf. Titles" />
         <Stat value={totals.seasons} label="Seasons" />
         <Stat value={totals.dynasties} label="Dynasties" />
+        <Stat value={`${challenges.met}/${challenges.faced}`} label="Challenges Met" />
       </div>
 
       {careers.length > 0 && (

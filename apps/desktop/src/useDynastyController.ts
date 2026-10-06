@@ -67,6 +67,7 @@ import { addCoachXp, availablePoints, seasonCoachXp, upgradeAbility, withCoachAb
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
+import { challengeMet, challengesCompleted, weeklyChallenge, type ChallengeResult } from './challenges';
 import { newlyUnlocked, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
 import { careerFromHistory, loadProfile, saveProfile, type PlayerProfile } from './profile';
 import { careerMilestonesForWeek } from './career-milestones';
@@ -298,6 +299,7 @@ export function useDynastyController() {
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [achievements, setAchievements] = useState<UnlockedAchievements>(() => loadedSave?.achievements ?? {});
+  const [challengeLog, setChallengeLog] = useState<ChallengeResult[]>(() => loadedSave?.challengeLog ?? []);
   const [profile, setProfile] = useState<PlayerProfile>(() => loadProfile());
   /** Achievement ids unlocked since the player last dismissed the toast. */
   const [achievementToasts, setAchievementToasts] = useState<string[]>([]);
@@ -344,9 +346,10 @@ export function useDynastyController() {
     autoRecruitingAssistant,
     autoRecruitingOffers,
     achievements,
+    challengeLog,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, achievements]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, achievements, challengeLog]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -398,6 +401,7 @@ export function useDynastyController() {
     setAssistantReport(null);
     setAchievements({});
     setAchievementToasts([]);
+    setChallengeLog([]);
   }, []);
 
   const persistDynasty = useCallback((status = 'Saved locally') => {
@@ -478,6 +482,7 @@ export function useDynastyController() {
       autoRecruitingAssistant: true,
       autoRecruitingOffers: true,
       achievements: {},
+      challengeLog: [],
       ...newStaff,
     };
     const saved = writeSave(saveId, state);
@@ -540,6 +545,7 @@ export function useDynastyController() {
     setPendingJobOffers(save.pendingJobOffers ?? null);
     setAchievements(save.achievements ?? {});
     setAchievementToasts([]);
+    setChallengeLog(save.challengeLog ?? []);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
     setView(save.offseasonSummary ? 'offseason' : 'week-hub');
@@ -633,8 +639,9 @@ export function useDynastyController() {
       hallOfFame: hallOfFame.length,
       proPicks: dynastyHistory.reduce((n, h) => n + (h.proPicks ?? 0), 0),
       abilityTiers: Object.values(coachProfile?.abilities ?? {}),
+      challengesCompleted: challengesCompleted(challengeLog),
     };
-  }, [dynasty.season.schedule, dynasty.userTeamId, tournament, rankings, dynastyHistory, hallOfFame, coachProfile?.abilities]);
+  }, [dynasty.season.schedule, dynasty.userTeamId, tournament, rankings, dynastyHistory, hallOfFame, coachProfile?.abilities, challengeLog]);
   const earnedAchievements = useMemo(
     () => (screen === 'game' ? newlyUnlocked(achievementSnapshot, achievements) : []),
     [screen, achievementSnapshot, achievements],
@@ -783,10 +790,50 @@ export function useDynastyController() {
         };
       },
     );
+    const userId = result.dynasty.userTeamId;
+    // Weekly challenges: judge each user game that went final this sim, sized
+    // to the matchup as it stood before the game.
+    const challengeResults: ChallengeResult[] = [];
+    const finalBefore = new Set(dynasty.season.schedule.filter((g) => g.status === 'final').map((g) => g.id));
+    const ratingOf = (teamId: string) => {
+      const team = dynasty.season.teams.find((t) => t.id === teamId);
+      return team ? calculateLacrosseTeamRating(team).overall : 0;
+    };
+    for (const game of result.dynasty.season.schedule) {
+      if (game.status !== 'final' || !game.result || finalBefore.has(game.id)) continue;
+      const home = game.homeTeamId === userId;
+      if (!home && game.awayTeamId !== userId) continue;
+      const opponentId = home ? game.awayTeamId : game.homeTeamId;
+      const challenge = weeklyChallenge(ratingOf(userId) - ratingOf(opponentId), game.week);
+      const goalsFor = home ? game.result.homeScore : game.result.awayScore;
+      const goalsAgainst = home ? game.result.awayScore : game.result.homeScore;
+      challengeResults.push({
+        year: result.dynasty.season.year,
+        week: game.week,
+        opponentId,
+        text: challenge.text,
+        xp: challenge.xp,
+        completed: challengeMet(challenge, { goalsFor, goalsAgainst }),
+      });
+    }
+    const challengeNews: NewsItem[] = challengeResults
+      .filter((c) => c.completed)
+      .map((c) => ({
+        id: `challenge-${c.year}-${c.week}`,
+        week: c.week,
+        category: 'coaching' as const,
+        featured: true,
+        headline: `Weekly challenge complete: ${c.text} (+${c.xp} coach XP)`,
+      }));
+    if (challengeResults.length > 0) {
+      setChallengeLog((log) => [...log, ...challengeResults]);
+      const xp = challengeResults.reduce((n, c) => n + (c.completed ? c.xp : 0), 0);
+      if (xp > 0) setCoachProfile((coach) => (coach ? addCoachXp(coach, xp) : coach));
+    }
     setDynasty(result.dynasty);
     setRankings(result.rankings);
     setInjuries(result.injuries);
-    setNewsItems([...promiseNews, ...recordNews, ...milestoneNews, ...result.newsItems]);
+    setNewsItems([...challengeNews, ...promiseNews, ...recordNews, ...milestoneNews, ...result.newsItems]);
     setScouting(result.scouting);
     setRecruitingActivity(result.recruitingActivity);
     setRecruitTrends(result.recruitTrends);
@@ -799,14 +846,13 @@ export function useDynastyController() {
     setWeeklyHonors(result.weeklyHonors ?? []);
     setAssistantReport(null);
     // Offers the assistant made during the sim pin those recruits, as manual offers do.
-    const userId = result.dynasty.userTeamId;
     const offeredIds = result.dynasty.recruits
       .filter((r) => r.status === 'open' && r.scholarshipOffers.some((o) => o.teamId === userId))
       .map((r) => r.id);
     if (offeredIds.length > 0) {
       setShortlistIds((prev) => [...prev, ...offeredIds.filter((id) => !prev.includes(id))]);
     }
-  }, [recordBook, careerStats, seasonStats, dynasty.season.teams, lockerRoom.promises]);
+  }, [recordBook, careerStats, seasonStats, dynasty.season.teams, dynasty.season.schedule, lockerRoom.promises]);
 
   // Simming is locked while the offseason is pending; send the coach back there instead.
   const simWeek = useCallback(() => {
@@ -1967,6 +2013,7 @@ export function useDynastyController() {
     runRecruitingAssistant,
     assistantReport,
     achievements,
+    challengeLog,
     achievementToasts,
     dismissAchievementToasts,
     profile,

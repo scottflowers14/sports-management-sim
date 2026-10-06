@@ -173,6 +173,7 @@ export function App() {
     setAutoRecruitingAssistant,
     autoRecruitingOffers,
     achievements,
+    challengeLog,
     achievementToasts,
     dismissAchievementToasts,
     profile,
@@ -880,6 +881,7 @@ export function App() {
           dynastyAchievements={achievements}
           activeSaveId={activeSaveId}
           onSeen={dismissAchievementToasts}
+          challenges={{ met: challengeLog.filter((c) => c.completed).length, faced: challengeLog.length }}
         />
       )}
 
