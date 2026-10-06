@@ -6949,3 +6949,51 @@ li span {
   margin: 0;
   font-size: 0.8rem;
 }
+
+.season-report-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.season-report-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 4px 0 10px;
+}
+
+.season-report-stats p {
+  margin: 0;
+}
+
+.season-report-stats strong {
+  font-size: 1.25rem;
+}
+
+.season-report-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.season-report-list li span.dim {
+  display: inline;
+  margin-top: 0;
+}
+
+.season-report-list li span.tier-dot {
+  display: inline-block;
+  margin-top: 0;
+}
+
+.season-report-head .link-btn {
+  white-space: nowrap;
+}
+
+.season-report-list .tier-dot {
+  margin-right: 8px;
+}

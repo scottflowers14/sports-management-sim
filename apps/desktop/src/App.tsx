@@ -1,3 +1,4 @@
+import { seasonReport } from './season-report';
 import {
   calculateLacrosseTeamRating,
   deriveCpuGamePlan,
@@ -921,6 +922,8 @@ export function App() {
           onOpenPortal={() => { setRecruitTab('portal'); setView('recruiting'); }}
           investments={{ budget: investmentBudget, plan: investmentPlan, onFund: fundInvestment, onUnfund: unfundInvestment }}
           realignment={{ conferences: dynasty.season.conferences, teams: dynasty.season.teams, onAnswer: answerRealignmentInvite }}
+          seasonReport={seasonReport(offseasonSummary.seasonYear, achievements, challengeLog)}
+          onOpenProfile={() => setView('profile')}
         />
       )}
 
