@@ -6,6 +6,8 @@ import {
   TIER_POINTS,
   achievementPoints,
   achievementProgress,
+  nextProfileTitle,
+  profileTitle,
   profileLevel,
   type AchievementCategory,
   type AchievementDef,
@@ -47,6 +49,7 @@ export function ProfileScreen({
   const points = achievementPoints(profile.achievements);
   const { level, intoLevel, perLevel } = profileLevel(points);
   const unlockedCount = Object.keys(profile.achievements).length;
+  const nextTitle = nextProfileTitle(level);
   const totals = profileTotals(profile);
   const recent = Object.entries(profile.achievements)
     .sort(([, a], [, b]) => b.at.localeCompare(a.at))
@@ -72,7 +75,7 @@ export function ProfileScreen({
           <span className="profile-level-label">Level</span>
         </div>
         <div className="profile-hero-body">
-          <p className="eyebrow">Coach Profile</p>
+          <p className="eyebrow">Coach Profile · {profileTitle(level)}</p>
           <h2>
             {points} <span className="dim">/ {MAX_ACHIEVEMENT_POINTS} points</span>
           </h2>
@@ -81,6 +84,7 @@ export function ProfileScreen({
           </div>
           <p className="dim">
             {unlockedCount} of {ACHIEVEMENTS.length} achievements · {perLevel - intoLevel} points to level {level + 1}
+            {nextTitle && ` · "${nextTitle.title}" at level ${nextTitle.level}`}
           </p>
         </div>
         {withinReach.length > 0 && (

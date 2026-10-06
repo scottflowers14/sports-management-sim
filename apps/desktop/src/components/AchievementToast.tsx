@@ -1,7 +1,18 @@
-import { ACHIEVEMENT_BY_ID, TIER_POINTS } from '../achievements';
+import { ACHIEVEMENT_BY_ID, TIER_POINTS, profileTitle } from '../achievements';
 
 /** Pops up when achievements unlock; lists the first few and links to the profile. */
-export function AchievementToast({ ids, onView, onDismiss }: { ids: readonly string[]; onView: () => void; onDismiss: () => void }) {
+export function AchievementToast({
+  ids,
+  levelUp = null,
+  onView,
+  onDismiss,
+}: {
+  ids: readonly string[];
+  /** The profile level just reached, if these unlocks crossed one. */
+  levelUp?: number | null;
+  onView: () => void;
+  onDismiss: () => void;
+}) {
   const defs = ids.map((id) => ACHIEVEMENT_BY_ID.get(id)).filter((d) => d !== undefined);
   if (defs.length === 0) return null;
   // Newest first: the toast stays up until dismissed, so it can collect several.
@@ -10,6 +21,11 @@ export function AchievementToast({ ids, onView, onDismiss }: { ids: readonly str
   return (
     <aside className="achievement-toast" role="status" aria-label="Achievement unlocked">
       <p className="eyebrow">{defs.length === 1 ? 'Achievement unlocked' : `${defs.length} achievements unlocked`} · +{points} pts</p>
+      {levelUp !== null && (
+        <p className="achievement-levelup">
+          Level {levelUp}! You're now a <strong>{profileTitle(levelUp)}</strong>.
+        </p>
+      )}
       <ul>
         {shown.map((d) => (
           <li key={d.id} className={`tier-${d.tier}`}>

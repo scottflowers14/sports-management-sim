@@ -37,7 +37,7 @@ import { PracticeScreen } from './screens/PracticeScreen';
 import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
-import { ACHIEVEMENTS, achievementPoints, profileLevel } from './achievements';
+import { ACHIEVEMENTS, achievementPoints, profileLevel, profileTitle } from './achievements';
 import { AchievementToast } from './components/AchievementToast';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
@@ -176,6 +176,7 @@ export function App() {
     achievementSnapshot,
     challengeLog,
     achievementToasts,
+    levelUp,
     dismissAchievementToasts,
     profile,
     setAutoRecruitingOffers,
@@ -508,6 +509,7 @@ export function App() {
       {achievementToasts.length > 0 && view !== 'profile' && (
         <AchievementToast
           ids={achievementToasts}
+          levelUp={levelUp}
           onView={() => {
             setView('profile');
             dismissAchievementToasts();
@@ -546,6 +548,9 @@ export function App() {
           {coachProfile && (
             <div className="coach-block">
               <span className="coach-name">HC {coachProfile.name}</span>
+              <button type="button" className="coach-title" onClick={() => setView('profile')} title="Open your profile">
+                Lv {profileLevel(achievementPoints(profile.achievements)).level} · {profileTitle(profileLevel(achievementPoints(profile.achievements)).level)}
+              </button>
               <span className="coach-tenure">
                 Year {coachProfile.tenureSeasons + 1} · {coachProfile.contractYearsRemaining}yr left
               </span>

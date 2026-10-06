@@ -5,6 +5,8 @@ import {
   TIER_POINTS,
   achievementPoints,
   achievementProgress,
+  nextProfileTitle,
+  profileTitle,
   ACHIEVEMENT_BY_ID,
   newlyUnlocked,
   profileLevel,
@@ -132,5 +134,13 @@ describe('achievements', () => {
     expect(progress('pro-pipeline')).toEqual({ current: 5, target: 5 });
     expect(progress('challenge-accepted')).toEqual({ current: 4, target: 10 });
     expect(progress('national-title')).toBeNull();
+  });
+
+  it('names each profile level and points to the next title', () => {
+    expect(profileTitle(1)).toBe('Rookie Coach');
+    expect(profileTitle(6)).toBe('Program Builder');
+    expect(profileTitle(40)).toBe('Legend of the Game');
+    expect(nextProfileTitle(5)).toEqual({ level: 7, title: 'Champion' });
+    expect(nextProfileTitle(11)).toBeNull();
   });
 });
