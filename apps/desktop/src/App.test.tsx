@@ -122,10 +122,18 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Finals/i }));
+    // Selection day posts bracket odds for all twelve teams.
+    const oddsCard = screen.getByRole('article', { name: 'Bracket odds' });
+    expect(within(oddsCard).getAllByRole('row')).toHaveLength(13);
+    expect(oddsCard).toHaveTextContent(/Favorite: .+ at \d+%/);
     await userEvent.click(screen.getByRole('button', { name: /Sim NCAA First Round/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim NCAA Quarterfinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Championship/i }));
+    // Once the title game is played exactly one team is left standing.
+    const titleCells = [...screen.getByRole('article', { name: 'Bracket odds' }).querySelectorAll('td.odds-title')].map((td) => td.textContent);
+    expect(titleCells.filter((t) => t === '✓')).toHaveLength(1);
+    expect(titleCells.filter((t) => t === 'Out')).toHaveLength(11);
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
 
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
