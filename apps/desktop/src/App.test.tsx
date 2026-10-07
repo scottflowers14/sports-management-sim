@@ -106,7 +106,10 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
     await userEvent.click(screen.getAllByRole('button', { name: /Scout/i })[0]!);
-    await userEvent.click(screen.getAllByRole('button', { name: /Offer/i })[0]!);
+    // The recruiting assistant makes offers by default and can use the whole
+    // budget in week 1, leaving no Offer button; then there's nothing to add.
+    const offerButtons = screen.queryAllByRole('button', { name: /Offer/i });
+    if (offerButtons.length > 0) await userEvent.click(offerButtons[0]!);
     await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
     cleanup();
 
@@ -834,10 +837,11 @@ describe('Desktop App', () => {
     // Before any games there is no tape, only the opponent's plan.
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
     expect(within(screen.getByLabelText('Opponent scouting report')).queryByLabelText('Tale of the tape')).not.toBeInTheDocument();
-    for (let week = 1; week <= 2; week += 1) {
+    // The next opponent may have had a bye, so advance until both teams have a box score.
+    for (let week = 1; week <= 4 && !screen.queryByLabelText('Tale of the tape'); week += 1) {
       await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+      await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
     }
-    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
     const tape = within(screen.getByLabelText('Opponent scouting report')).getByLabelText('Tale of the tape');
     const rows = within(tape).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(8);
