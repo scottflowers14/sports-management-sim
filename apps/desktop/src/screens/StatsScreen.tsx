@@ -16,6 +16,7 @@ import { AWARD_RACE_KEYS, AWARD_RACE_LABELS, computeAwardsRace } from '../awards
 import type { SeasonStatsMap, PlayerSeasonStats } from '../stats';
 import { formatTeamShort } from '../ui/format';
 import { TEAM_STAT_SHORT, formatTeamStat } from '../ui/team-stat-format';
+import { STAT_SCOPES, inScope, scopeTeams, type StatScope } from '../stats-scope';
 import { WEEKLY_HONOR_LABELS, weeklyHonorCounts } from '../weekly-honors';
 import type { WeeklyHonor } from '../weekly-honors';
 
@@ -51,10 +52,23 @@ export function StatsScreen({
   rivalries?: Rivalry[];
 }) {
   const [category, setCategory] = useState<StatCategory>('scoring');
+  const [scope, setScope] = useState<StatScope>('national');
+  // Team Stats ranks teams against each other, so "your team" alone means nothing there.
+  const effectiveScope: StatScope = category === 'team' && scope === 'team' ? 'conference' : scope;
+  const scoped = scopeTeams(effectiveScope, userTeamId, season?.conferences ?? []);
+  const scopeLabels: Record<StatScope, string> = {
+    national: 'National',
+    conference: scopeTeams('conference', userTeamId, season?.conferences ?? []).label,
+    team: 'Your team',
+  };
+  const showScopes = category !== 'awards' && category !== 'splits';
 
-  const allStats = Object.values(seasonStats).filter((s) => s.gamesPlayed > 0);
+  const allStats = Object.values(seasonStats).filter(
+    (s) => s.gamesPlayed > 0 && inScope(scoped, playerLookup.get(s.playerId)?.teamId),
+  );
+  const titleOf = (title: string) => (scoped.teamIds === null ? title : `${title} · ${scoped.label}`);
 
-  if (allStats.length === 0) {
+  if (!Object.values(seasonStats).some((s) => s.gamesPlayed > 0)) {
     return (
       <article className="card">
         <h2>Season Stats</h2>
@@ -81,9 +95,25 @@ export function StatsScreen({
         ))}
       </div>
 
+      {showScopes && (
+        <div className="news-filters stat-scope-bar" role="group" aria-label="Leaderboard scope">
+          {STAT_SCOPES.filter((sc) => !(category === 'team' && sc === 'team')).map((sc) => (
+            <button
+              key={sc}
+              type="button"
+              className={`pos-filter-btn${effectiveScope === sc ? ' active' : ''}`}
+              aria-pressed={effectiveScope === sc}
+              onClick={() => setScope(sc)}
+            >
+              {scopeLabels[sc]}
+            </button>
+          ))}
+        </div>
+      )}
+
       {category === 'scoring' && (
         <StatTable
-          title="Scoring Leaders"
+          title={titleOf('Scoring Leaders')}
           rows={allStats
             .filter((s) => {
               const info = playerLookup.get(s.playerId);
@@ -105,7 +135,7 @@ export function StatsScreen({
 
       {category === 'goalkeeping' && (
         <StatTable
-          title="Goalkeeping Leaders"
+          title={titleOf('Goalkeeping Leaders')}
           rows={allStats
             .filter((s) => {
               const info = playerLookup.get(s.playerId);
@@ -126,7 +156,7 @@ export function StatsScreen({
 
       {category === 'faceoffs' && (
         <StatTable
-          title="Faceoff Leaders"
+          title={titleOf('Faceoff Leaders')}
           rows={allStats
             .filter((s) => s.faceoffAttempts > 0)
             .sort((a, b) => b.faceoffWins - a.faceoffWins)
@@ -144,7 +174,7 @@ export function StatsScreen({
 
       {category === 'defense' && (
         <StatTable
-          title="Defensive Leaders"
+          title={titleOf('Defensive Leaders')}
           rows={allStats
             .filter((s) => {
               const info = playerLookup.get(s.playerId);
@@ -173,7 +203,14 @@ export function StatsScreen({
         />
       )}
 
-      {category === 'team' && season && <TeamStatsPanel season={season} userTeamId={userTeamId} />}
+      {category === 'team' && season && (
+        <TeamStatsPanel
+          season={season}
+          userTeamId={userTeamId}
+          teamIds={scoped.teamIds}
+          scopeLabel={scoped.teamIds === null ? null : scoped.label}
+        />
+      )}
 
       {category === 'splits' && season && (
         <TeamSplitsPanel season={season} userTeamId={userTeamId} rivalries={rivalries} />
@@ -333,11 +370,27 @@ function StatTable({
 }
 
 /** Every team's per-game numbers, sortable by any column, with national ranks. */
-function TeamStatsPanel({ season, userTeamId }: { season: LacrosseSeason; userTeamId: string }) {
+function TeamStatsPanel({
+  season,
+  userTeamId,
+  teamIds,
+  scopeLabel,
+}: {
+  season: LacrosseSeason;
+  userTeamId: string;
+  /** Rank only these teams against each other; null ranks the whole country. */
+  teamIds: ReadonlySet<string> | null;
+  /** Names the scope when it isn't national, e.g. a conference. */
+  scopeLabel: string | null;
+}) {
   const [sortKey, setSortKey] = useState<TeamStatKey>('margin');
   const rows = useMemo(
-    () => teamStatRankings(season.schedule, season.teams.map((t) => t.id)),
-    [season.schedule, season.teams],
+    () =>
+      teamStatRankings(
+        season.schedule,
+        season.teams.map((t) => t.id).filter((id) => teamIds === null || teamIds.has(id)),
+      ),
+    [season.schedule, season.teams, teamIds],
   );
   const names = useMemo(() => new Map(season.teams.map((t) => [t.id, t.name])), [season.teams]);
   const highlights = teamStatHighlights(rows, userTeamId);
@@ -345,7 +398,7 @@ function TeamStatsPanel({ season, userTeamId }: { season: LacrosseSeason; userTe
 
   return (
     <article className="card" aria-label="Team stats">
-      <h2>Team Stats</h2>
+      <h2>Team Stats{scopeLabel ? ` · ${scopeLabel}` : ''}</h2>
       {rows.length === 0 ? (
         <p className="dim">No games played yet this season.</p>
       ) : (
@@ -354,6 +407,7 @@ function TeamStatsPanel({ season, userTeamId }: { season: LacrosseSeason; userTe
             <p className="team-stat-highlights" aria-label="Your team stat ranks">
               Your best: <strong>#{highlights.best.rank}</strong> in {TEAM_STAT_LABELS[highlights.best.key]} · Your worst:{' '}
               <strong>#{highlights.worst.rank}</strong> in {TEAM_STAT_LABELS[highlights.worst.key]}
+              {scopeLabel ? ` (${scopeLabel} ranks)` : ''}
             </p>
           )}
           <table className="standings-table stats-table team-stats-table">

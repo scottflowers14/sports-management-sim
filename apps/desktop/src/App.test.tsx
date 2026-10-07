@@ -863,6 +863,39 @@ describe('Desktop App', () => {
     expect(yours! + theirs!).toBe(edges);
   });
 
+  it('filters stat leaders and team stats to the conference or the user team', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Stats/ }));
+    const scopes = screen.getByRole('group', { name: 'Leaderboard scope' });
+    const leaders = () => screen.getByRole('heading', { name: /^Scoring Leaders/ }).closest('article')!;
+    const nationalRows = within(leaders()).getAllByRole('row').length;
+
+    // Your team: every leader plays for the user, and the heading says so.
+    await userEvent.click(within(scopes).getByRole('button', { name: 'Your team' }));
+    expect(screen.getByRole('heading', { name: 'Scoring Leaders · Your team' })).toBeInTheDocument();
+    const teamRows = within(leaders()).getAllByRole('row').slice(1);
+    expect(teamRows.length).toBeGreaterThan(0);
+    for (const row of teamRows) expect(row).toHaveClass('user-row');
+
+    // Conference: Team Stats ranks only the league's teams, and "Your team" isn't offered there.
+    const conferenceButton = within(scopes).getAllByRole('button')[1]!;
+    const conference = conferenceButton.textContent!;
+    await userEvent.click(screen.getByRole('button', { name: 'Team Stats' }));
+    expect(within(screen.getByRole('group', { name: 'Leaderboard scope' })).queryByRole('button', { name: 'Your team' })).not.toBeInTheDocument();
+    // Coming from "Your team", Team Stats shows the conference.
+    expect(screen.getByRole('heading', { name: `Team Stats · ${conference}` })).toBeInTheDocument();
+    const confTeams = within(screen.getByLabelText('Team stats')).getAllByRole('row').length - 1;
+    await userEvent.click(within(screen.getByRole('group', { name: 'Leaderboard scope' })).getByRole('button', { name: 'National' }));
+    const allTeams = within(screen.getByLabelText('Team stats')).getAllByRole('row').length - 1;
+    expect(confTeams).toBeLessThan(allTeams);
+    expect(confTeams).toBeGreaterThan(1);
+
+    // Back on scoring, national shows the full list again.
+    await userEvent.click(screen.getByRole('button', { name: 'Scoring' }));
+    expect(within(leaders()).getAllByRole('row')).toHaveLength(nationalRows);
+  });
+
   it('makes a playing-time promise and calls out a broken one', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Team/ }));
