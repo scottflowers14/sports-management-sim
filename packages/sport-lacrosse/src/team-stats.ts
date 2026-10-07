@@ -110,3 +110,31 @@ export function teamStatHighlights(
   }
   return { best, worst };
 }
+
+export interface TapeLine {
+  key: TeamStatKey;
+  user: { value: number; rank: number };
+  opponent: { value: number; rank: number };
+  /** Who ranks better nationally in this stat; even when the ranks tie. */
+  edge: 'user' | 'opponent' | 'even';
+}
+
+/**
+ * The tale of the tape for a matchup: both teams' numbers and national ranks
+ * in every team stat, and who holds the edge. Null until both have played.
+ */
+export function taleOfTheTape(rows: readonly TeamStatRow[], userId: string, opponentId: string): TapeLine[] | null {
+  const user = rows.find((r) => r.teamId === userId);
+  const opponent = rows.find((r) => r.teamId === opponentId);
+  if (!user || !opponent) return null;
+  return TEAM_STAT_KEYS.map((key) => {
+    const u = user.ranks[key];
+    const o = opponent.ranks[key];
+    return {
+      key,
+      user: { value: user.values[key], rank: u },
+      opponent: { value: opponent.values[key], rank: o },
+      edge: u < o ? 'user' : o < u ? 'opponent' : 'even',
+    };
+  });
+}

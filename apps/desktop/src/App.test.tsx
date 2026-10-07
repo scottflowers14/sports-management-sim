@@ -106,7 +106,10 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
     await userEvent.click(screen.getAllByRole('button', { name: /Scout/i })[0]!);
-    await userEvent.click(screen.getAllByRole('button', { name: /Offer/i })[0]!);
+    // The recruiting assistant makes offers by default and can use the whole
+    // budget in week 1, leaving no Offer button; then there's nothing to add.
+    const offerButtons = screen.queryAllByRole('button', { name: /Offer/i });
+    if (offerButtons.length > 0) await userEvent.click(offerButtons[0]!);
     await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
     cleanup();
 
@@ -827,6 +830,37 @@ describe('Desktop App', () => {
       .map((row) => Number(within(row).getAllByRole('cell')[4]!.textContent));
     expect(goalsAgainst).toEqual([...goalsAgainst].sort((a, b) => a - b));
     expect(within(within(card).getAllByRole('row')[1]!).getAllByRole('cell')[0]).toHaveTextContent('#1');
+  });
+
+  it('puts a tale of the tape in the scouting report once both teams have played', async () => {
+    await renderStartedApp();
+    // Before any games there is no tape, only the opponent's plan.
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    expect(within(screen.getByLabelText('Opponent scouting report')).queryByLabelText('Tale of the tape')).not.toBeInTheDocument();
+    // The next opponent may have had a bye, so advance until both teams have a box score.
+    for (let week = 1; week <= 4 && !screen.queryByLabelText('Tale of the tape'); week += 1) {
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+      await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    }
+    const tape = within(screen.getByLabelText('Opponent scouting report')).getByLabelText('Tale of the tape');
+    const rows = within(tape).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(8);
+    // The highlighted side in each row is the one with the better national rank.
+    let edges = 0;
+    for (const row of rows) {
+      const [, you, them] = within(row).getAllByRole('cell');
+      const rank = (cell: HTMLElement) => Number(/#(\d+)/.exec(cell.textContent!)![1]);
+      if (you!.classList.contains('tape-edge')) {
+        expect(rank(you!)).toBeLessThan(rank(them!));
+        edges += 1;
+      }
+      if (them!.classList.contains('tape-edge')) {
+        expect(rank(them!)).toBeLessThan(rank(you!));
+        edges += 1;
+      }
+    }
+    const [yours, theirs] = [...tape.querySelectorAll('.tape-summary strong')].map((el) => Number(el.textContent));
+    expect(yours! + theirs!).toBe(edges);
   });
 
   it('makes a playing-time promise and calls out a broken one', async () => {

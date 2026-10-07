@@ -15,6 +15,7 @@ import type { LacrosseSeason, Rivalry } from '@sports-management-sim/sport-lacro
 import { AWARD_RACE_KEYS, AWARD_RACE_LABELS, computeAwardsRace } from '../awards';
 import type { SeasonStatsMap, PlayerSeasonStats } from '../stats';
 import { formatTeamShort } from '../ui/format';
+import { TEAM_STAT_SHORT, formatTeamStat } from '../ui/team-stat-format';
 import { WEEKLY_HONOR_LABELS, weeklyHonorCounts } from '../weekly-honors';
 import type { WeeklyHonor } from '../weekly-honors';
 
@@ -329,23 +330,6 @@ function StatTable({
       </table>
     </article>
   );
-}
-
-const TEAM_STAT_SHORT: Record<TeamStatKey, string> = {
-  goalsFor: 'GF/G',
-  goalsAgainst: 'GA/G',
-  margin: 'Margin',
-  shootingPct: 'Sh%',
-  faceoffPct: 'FO%',
-  clearPct: 'Clr%',
-  turnovers: 'TO/G',
-  causedTurnovers: 'CT/G',
-};
-
-function formatTeamStat(key: TeamStatKey, value: number): string {
-  if (key === 'shootingPct' || key === 'faceoffPct' || key === 'clearPct') return `${(value * 100).toFixed(1)}%`;
-  if (key === 'margin') return `${value > 0 ? '+' : ''}${value.toFixed(1)}`;
-  return value.toFixed(1);
 }
 
 /** Every team's per-game numbers, sortable by any column, with national ranks. */

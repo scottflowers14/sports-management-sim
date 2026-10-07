@@ -7084,3 +7084,30 @@ li span {
   margin: 0 0 10px;
   color: #aab8ca;
 }
+
+/* Tale of the tape in the scouting report: both teams' national ranks. */
+.tale-of-tape .tape-summary {
+  margin: 6px 0;
+}
+
+.tape-table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  width: 100%;
+}
+
+.tape-table th,
+.tape-table td {
+  padding: 3px 6px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tape-table td.tape-edge {
+  color: #7ee2b8;
+  font-weight: 700;
+}
+
+.tape-table td span {
+  display: inline;
+}
