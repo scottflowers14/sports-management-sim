@@ -1,3 +1,8 @@
+import { legacyScore, legacyTier } from './legacy';
+import { AchievementWatchCard } from './components/AchievementWatchCard';
+import { achievementWatch } from './achievements';
+import { DIFFICULTY_LABELS } from './difficulty';
+import { seasonReport } from './season-report';
 import {
   calculateLacrosseTeamRating,
   deriveCpuGamePlan,
@@ -36,6 +41,9 @@ import { StaffScreen } from './screens/StaffScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
 import { LockerRoomScreen } from './screens/LockerRoomScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
+import { ACHIEVEMENTS, achievementPoints, profileLevel, profileTitle } from './achievements';
+import { AchievementToast } from './components/AchievementToast';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
@@ -72,6 +80,8 @@ export function App() {
     setSelectedNewTeamId,
     selectedNewCoachName,
     setSelectedNewCoachName,
+    selectedNewDifficulty,
+    setSelectedNewDifficulty,
     dynasty,
     view,
     setView,
@@ -169,6 +179,13 @@ export function App() {
     autoRecruitingAssistant,
     setAutoRecruitingAssistant,
     autoRecruitingOffers,
+    achievements,
+    achievementSnapshot,
+    challengeLog,
+    achievementToasts,
+    levelUp,
+    dismissAchievementToasts,
+    profile,
     setAutoRecruitingOffers,
     hasHomeGameThisWeek,
     offerPortalPlayer,
@@ -214,6 +231,8 @@ export function App() {
         coachName={selectedNewCoachName}
         onTeamChange={setSelectedNewTeamId}
         onCoachNameChange={setSelectedNewCoachName}
+        difficulty={selectedNewDifficulty}
+        onDifficultyChange={setSelectedNewDifficulty}
         onCreateDynasty={startNewDynasty}
         onLoadSave={(saveId) => { loadSave(saveId); setScreen('game'); }}
         onDeleteSave={deleteSave}
@@ -225,6 +244,15 @@ export function App() {
         onClearCustomTeams={customTeams ? handleClearCustomTeams : undefined}
         hasCustomTeams={customTeams !== null}
         saveStatus={saveStatus}
+        profileSummary={{
+          level: profileLevel(achievementPoints(profile.achievements)).level,
+          unlocked: Object.keys(profile.achievements).length,
+          total: ACHIEVEMENTS.length,
+          points: achievementPoints(profile.achievements),
+        }}
+        saveLegacies={Object.fromEntries(
+          Object.entries(profile.careers).map(([saveId, career]) => [saveId, legacyTier(legacyScore(career))]),
+        )}
       />
     );
   }
@@ -398,6 +426,7 @@ export function App() {
         { view: 'week-hub', label: 'Week Hub', ...(highPriorityCount > 0 ? { badge: highPriorityCount, alert: true } : {}) },
         { view: 'season', label: 'Season' },
         { view: 'news', label: 'News', ...(unreadNewsCount > 0 ? { badge: unreadNewsCount } : {}) },
+        { view: 'profile', label: 'Profile', ...(achievementToasts.length > 0 ? { badge: achievementToasts.length } : {}) },
       ],
     },
     {
@@ -489,6 +518,18 @@ export function App() {
         </div>
       )}
 
+      {achievementToasts.length > 0 && view !== 'profile' && (
+        <AchievementToast
+          ids={achievementToasts}
+          levelUp={levelUp}
+          onView={() => {
+            setView('profile');
+            dismissAchievementToasts();
+          }}
+          onDismiss={dismissAchievementToasts}
+        />
+      )}
+
       <div className="shell-body">
         <aside className="side-nav">
           <nav aria-label="Main navigation">
@@ -519,8 +560,12 @@ export function App() {
           {coachProfile && (
             <div className="coach-block">
               <span className="coach-name">HC {coachProfile.name}</span>
+              <button type="button" className="coach-title" onClick={() => setView('profile')} title="Open your profile">
+                Lv {profileLevel(achievementPoints(profile.achievements)).level} · {profileTitle(profileLevel(achievementPoints(profile.achievements)).level)}
+              </button>
               <span className="coach-tenure">
                 Year {coachProfile.tenureSeasons + 1} · {coachProfile.contractYearsRemaining}yr left
+                {dynasty.difficulty && dynasty.difficulty !== 'normal' && ` · ${DIFFICULTY_LABELS[dynasty.difficulty]}`}
               </span>
               <div className="ad-confidence-row">
                 <span className="ad-confidence-label" style={{ color: getJobSecurityColor(adConfidence) }}>
@@ -571,6 +616,12 @@ export function App() {
           onCoachGame={canCoachGame ? coachGame : undefined}
           onRushInjury={rushInjuredPlayer}
           bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          achievementCard={
+            <AchievementWatchCard
+              items={achievementWatch(achievementSnapshot, achievements, { rivalryWeek: !seasonComplete && Boolean(rivalryWeek) })}
+              onOpenProfile={() => setView('profile')}
+            />
+          }
           formCard={<FormWatchCard roster={userTeam.roster} form={userForm} onSelectPlayer={setSelectedPlayerId} />}
           teamTalkCard={
             // Hidden at halftime: a talk given then would change a first half already shown.
@@ -849,6 +900,17 @@ export function App() {
         />
       )}
 
+      {view === 'profile' && (
+        <ProfileScreen
+          profile={profile}
+          dynastyAchievements={achievements}
+          activeSaveId={activeSaveId}
+          onSeen={dismissAchievementToasts}
+          challenges={{ met: challengeLog.filter((c) => c.completed).length, faced: challengeLog.length }}
+          snapshot={achievementSnapshot}
+        />
+      )}
+
       {view === 'history' && (
         <HistoryScreen
           history={dynastyHistory}
@@ -878,6 +940,8 @@ export function App() {
           onOpenPortal={() => { setRecruitTab('portal'); setView('recruiting'); }}
           investments={{ budget: investmentBudget, plan: investmentPlan, onFund: fundInvestment, onUnfund: unfundInvestment }}
           realignment={{ conferences: dynasty.season.conferences, teams: dynasty.season.teams, onAnswer: answerRealignmentInvite }}
+          seasonReport={seasonReport(offseasonSummary.seasonYear, achievements, challengeLog)}
+          onOpenProfile={() => setView('profile')}
         />
       )}
 

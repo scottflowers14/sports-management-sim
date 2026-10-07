@@ -1,3 +1,4 @@
+import { adPenaltyScale, type Difficulty } from './difficulty';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   applyRecruitPitch,
@@ -36,6 +37,7 @@ import {
   applyRealignment,
   createLacrosseSeasonSchedule,
   dynastyRivalries,
+  rivalryFor,
   calculateLacrosseTeamRating,
   rivalryForGame,
   realignmentHeadline,
@@ -67,6 +69,9 @@ import { addCoachXp, availablePoints, seasonCoachXp, upgradeAbility, withCoachAb
 import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
+import { challengeMet, challengesCompleted, weeklyChallenge, type ChallengeResult } from './challenges';
+import { achievementXp, coachRivalryRecord, achievementPoints, newlyUnlocked, profileLevel, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
+import { careerFromHistory, loadProfile, saveProfile, type PlayerProfile } from './profile';
 import { careerMilestonesForWeek } from './career-milestones';
 import { healInjuriesOneWeek, rushInjury, runOffseason, resolveAndApplyPortal, portalScholarshipRoom, buildFinalPollRows } from './dynasty-helpers';
 import type { OffseasonSummary, InjuredPlayer, TrainingFocus } from './dynasty-helpers';
@@ -174,7 +179,8 @@ export type View =
   | 'players'
   | 'staff'
   | 'practice'
-  | 'locker-room';
+  | 'locker-room'
+  | 'profile';
 
 /** The preseason poll as week-one news. */
 /** Saves from before the staff plan kept the neutral default unless the user picked their own. */
@@ -294,7 +300,15 @@ export function useDynastyController() {
   const [teamTalk, setTeamTalk] = useState<PregameTalk | null>(() => loadedSave?.teamTalk ?? null);
   const [seasonPreview, setSeasonPreview] = useState<SeasonPreview | null>(() => loadedSave?.seasonPreview ?? null);
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
+  const [achievements, setAchievements] = useState<UnlockedAchievements>(() => loadedSave?.achievements ?? {});
+  const [challengeLog, setChallengeLog] = useState<ChallengeResult[]>(() => loadedSave?.challengeLog ?? []);
+  const [profile, setProfile] = useState<PlayerProfile>(() => loadProfile());
+  /** Achievement ids unlocked since the player last dismissed the toast. */
+  const [achievementToasts, setAchievementToasts] = useState<string[]>([]);
+  /** The profile level just reached, shown with the unlock toast. */
+  const [levelUp, setLevelUp] = useState<number | null>(null);
   const [selectedNewCoachName, setSelectedNewCoachName] = useState(() => generateCoachName(Date.now()));
+  const [selectedNewDifficulty, setSelectedNewDifficulty] = useState<Difficulty>('normal');
 
   const saveState = useCallback((): DynastySaveState => ({
     dynasty,
@@ -336,9 +350,11 @@ export function useDynastyController() {
     recruitTrends,
     autoRecruitingAssistant,
     autoRecruitingOffers,
+    achievements,
+    challengeLog,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, achievements, challengeLog]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -388,6 +404,10 @@ export function useDynastyController() {
     setAutoRecruitingAssistant(true);
     setAutoRecruitingOffers(true);
     setAssistantReport(null);
+    setAchievements({});
+    setAchievementToasts([]);
+    setLevelUp(null);
+    setChallengeLog([]);
   }, []);
 
   const persistDynasty = useCallback((status = 'Saved locally') => {
@@ -399,7 +419,10 @@ export function useDynastyController() {
   }, [activeSaveId, dynasty.seed, refreshSaves, saveState, writeSave]);
 
   const startNewDynasty = useCallback(() => {
-    const nextDynasty = createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId, ...(customTeams ? { customTeams } : {}) });
+    const nextDynasty = {
+      ...createFreshLacrosseDynasty({ userTeamId: selectedNewTeamId, ...(customTeams ? { customTeams } : {}) }),
+      difficulty: selectedNewDifficulty,
+    };
     const saveId = createDynastySaveId(nextDynasty.seed);
     const newCoach = createCoachProfile(selectedNewCoachName.trim() || generateCoachName(nextDynasty.seed));
     const userTeamForGoals = nextDynasty.season.teams.find((t) => t.id === selectedNewTeamId);
@@ -467,6 +490,8 @@ export function useDynastyController() {
       recruitTrends: {},
       autoRecruitingAssistant: true,
       autoRecruitingOffers: true,
+      achievements: {},
+      challengeLog: [],
       ...newStaff,
     };
     const saved = writeSave(saveId, state);
@@ -475,7 +500,7 @@ export function useDynastyController() {
     refreshSaves();
     if (saved) setSaveStatus('New dynasty started');
     setScreen('game');
-  }, [customTeams, refreshSaves, resetUiState, selectedNewTeamId, selectedNewCoachName, writeSave]);
+  }, [customTeams, refreshSaves, resetUiState, selectedNewTeamId, selectedNewCoachName, selectedNewDifficulty, writeSave]);
 
   const loadSave = useCallback((saveId: string) => {
     const save = loadDynastySaveSlot(saveId);
@@ -527,6 +552,9 @@ export function useDynastyController() {
     setPressAnswers(save.pressAnswers ?? {});
     setTeamTalk(save.teamTalk ?? null);
     setPendingJobOffers(save.pendingJobOffers ?? null);
+    setAchievements(save.achievements ?? {});
+    setAchievementToasts([]);
+    setChallengeLog(save.challengeLog ?? []);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
     setView(save.offseasonSummary ? 'offseason' : 'week-hub');
@@ -602,6 +630,113 @@ export function useDynastyController() {
   }, []);
 
   const userTeam = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId);
+
+  // Achievements: check the dynasty whenever something that could earn one
+  // changes. Unlocks go into this save and into the cross-dynasty profile.
+  const userRivalId = useMemo(
+    () =>
+      rivalryFor(dynastyRivalries({ rivalries: dynasty.rivalries, season: dynasty.season }), dynasty.userTeamId)?.teamIds.find(
+        (id) => id !== dynasty.userTeamId,
+      ) ?? null,
+    [dynasty.rivalries, dynasty.season, dynasty.userTeamId],
+  );
+  const achievementSnapshot = useMemo(() => {
+    // In the offseason the finished season is already in history, but the
+    // bracket stays loaded until the next season starts; counting it again
+    // doubled postseason wins (Tournament Tested unlocked in year one).
+    const games: AchievementGame[] = offseasonSummary ? [] : userSeasonGames(dynasty.season.schedule, tournament, dynasty.userTeamId);
+    // Rankings are refreshed after each week, so previousRank is the poll
+    // going into the latest game. Older games were checked when they were played.
+    const latest = games[games.length - 1];
+    if (latest) {
+      const entry = rankings.find((r) => r.teamId === latest.opponentId);
+      games[games.length - 1] = { ...latest, opponentRank: entry && entry.previousRank > 0 ? entry.previousRank : null };
+    }
+    return {
+      history: dynastyHistory,
+      current: { games },
+      hallOfFame: hallOfFame.length,
+      proPicks: dynastyHistory.reduce((n, h) => n + (h.proPicks ?? 0), 0),
+      abilityTiers: Object.values(coachProfile?.abilities ?? {}),
+      challengesCompleted: challengesCompleted(challengeLog),
+      difficulty: dynasty.difficulty ?? 'normal',
+      ...(() => {
+        // The coach's own trophy games at this program, newest first. The
+        // league-wide series would credit wins from before a job change.
+        if (!userRivalId || !userTeam) return {};
+        return { rivalry: coachRivalryRecord(userRivalId, userTeam.name, games, dynastyHistory) };
+      })(),
+      bestCommitStars: Math.max(
+        0,
+        ...dynasty.recruits
+          .filter((r) => r.committedTeamId === dynasty.userTeamId || r.signedTeamId === dynasty.userTeamId)
+          .map((r) => r.starRating),
+      ),
+    };
+  }, [
+    dynasty.season.schedule,
+    dynasty.userTeamId,
+    dynasty.recruits,
+    dynasty.difficulty,
+    offseasonSummary,
+    userRivalId,
+    userTeam,
+    tournament,
+    rankings,
+    dynastyHistory,
+    hallOfFame,
+    coachProfile?.abilities,
+    challengeLog,
+  ]);
+  const earnedAchievements = useMemo(
+    () => (screen === 'game' ? newlyUnlocked(achievementSnapshot, achievements) : []),
+    [screen, achievementSnapshot, achievements],
+  );
+  const currentCareer = useMemo(
+    () => (screen === 'game' && activeSaveId ? careerFromHistory(dynastyHistory, coachProfile?.name ?? '', dynasty.difficulty) : null),
+    [screen, activeSaveId, dynastyHistory, coachProfile?.name, dynasty.difficulty],
+  );
+  const careerChanged =
+    activeSaveId !== null && currentCareer !== null && JSON.stringify(profile.careers[activeSaveId]) !== JSON.stringify(currentCareer);
+  if (earnedAchievements.length > 0 || careerChanged) {
+    // Adjusting state while rendering (rather than in an effect) applies the
+    // unlock in the same pass; the next render finds nothing new.
+    // In the offseason the dynasty has already rolled over to next year, but
+    // what was earned belongs to the season just finished.
+    const finished = offseasonSummary ? dynastyHistory[0] : undefined;
+    const unlock: AchievementUnlock = {
+      year: finished?.year ?? dynasty.season.year,
+      ...(userTeam ? { teamName: userTeam.name } : {}),
+      coachName: coachProfile?.name ?? '',
+      at: new Date().toISOString(),
+    };
+    const added: UnlockedAchievements = Object.fromEntries(earnedAchievements.map((a) => [a.id, unlock]));
+    if (earnedAchievements.length > 0) {
+      const before = profileLevel(achievementPoints(profile.achievements)).level;
+      const after = profileLevel(achievementPoints({ ...added, ...profile.achievements })).level;
+      if (after > before) setLevelUp(after);
+      setAchievements({ ...achievements, ...added });
+      // Each dynasty pays its own unlocks in coach XP, even ones the profile already holds.
+      const xp = achievementXp(earnedAchievements);
+      if (xp > 0 && coachProfile) setCoachProfile(addCoachXp(coachProfile, xp));
+      setAchievementToasts([...achievementToasts, ...earnedAchievements.map((a) => a.id)]);
+    }
+    setProfile({
+      ...profile,
+      // The profile keeps the first time an achievement was ever earned.
+      achievements: { ...added, ...profile.achievements },
+      careers: careerChanged && activeSaveId && currentCareer ? { ...profile.careers, [activeSaveId]: currentCareer } : profile.careers,
+    });
+  }
+  const profileLoaded = useRef(profile);
+  useEffect(() => {
+    if (profile !== profileLoaded.current) saveProfile(profile);
+  }, [profile]);
+
+  const dismissAchievementToasts = useCallback(() => {
+    setAchievementToasts([]);
+    setLevelUp(null);
+  }, []);
   // The staff's plan is the one CPU programs use: tailored to the roster.
   // A playtest found the neutral default plan won about a tenth fewer
   // postseason games than the tailored plan with the same team.
@@ -710,10 +845,50 @@ export function useDynastyController() {
         };
       },
     );
+    const userId = result.dynasty.userTeamId;
+    // Weekly challenges: judge each user game that went final this sim, sized
+    // to the matchup as it stood before the game.
+    const challengeResults: ChallengeResult[] = [];
+    const finalBefore = new Set(dynasty.season.schedule.filter((g) => g.status === 'final').map((g) => g.id));
+    const ratingOf = (teamId: string) => {
+      const team = dynasty.season.teams.find((t) => t.id === teamId);
+      return team ? calculateLacrosseTeamRating(team).overall : 0;
+    };
+    for (const game of result.dynasty.season.schedule) {
+      if (game.status !== 'final' || !game.result || finalBefore.has(game.id)) continue;
+      const home = game.homeTeamId === userId;
+      if (!home && game.awayTeamId !== userId) continue;
+      const opponentId = home ? game.awayTeamId : game.homeTeamId;
+      const challenge = weeklyChallenge(ratingOf(userId) - ratingOf(opponentId), game.week);
+      const goalsFor = home ? game.result.homeScore : game.result.awayScore;
+      const goalsAgainst = home ? game.result.awayScore : game.result.homeScore;
+      challengeResults.push({
+        year: result.dynasty.season.year,
+        week: game.week,
+        opponentId,
+        text: challenge.text,
+        xp: challenge.xp,
+        completed: challengeMet(challenge, { goalsFor, goalsAgainst }),
+      });
+    }
+    const challengeNews: NewsItem[] = challengeResults
+      .filter((c) => c.completed)
+      .map((c) => ({
+        id: `challenge-${c.year}-${c.week}`,
+        week: c.week,
+        category: 'coaching' as const,
+        featured: true,
+        headline: `Weekly challenge complete: ${c.text} (+${c.xp} coach XP)`,
+      }));
+    if (challengeResults.length > 0) {
+      setChallengeLog((log) => [...log, ...challengeResults]);
+      const xp = challengeResults.reduce((n, c) => n + (c.completed ? c.xp : 0), 0);
+      if (xp > 0) setCoachProfile((coach) => (coach ? addCoachXp(coach, xp) : coach));
+    }
     setDynasty(result.dynasty);
     setRankings(result.rankings);
     setInjuries(result.injuries);
-    setNewsItems([...promiseNews, ...recordNews, ...milestoneNews, ...result.newsItems]);
+    setNewsItems([...challengeNews, ...promiseNews, ...recordNews, ...milestoneNews, ...result.newsItems]);
     setScouting(result.scouting);
     setRecruitingActivity(result.recruitingActivity);
     setRecruitTrends(result.recruitTrends);
@@ -726,14 +901,13 @@ export function useDynastyController() {
     setWeeklyHonors(result.weeklyHonors ?? []);
     setAssistantReport(null);
     // Offers the assistant made during the sim pin those recruits, as manual offers do.
-    const userId = result.dynasty.userTeamId;
     const offeredIds = result.dynasty.recruits
       .filter((r) => r.status === 'open' && r.scholarshipOffers.some((o) => o.teamId === userId))
       .map((r) => r.id);
     if (offeredIds.length > 0) {
       setShortlistIds((prev) => [...prev, ...offeredIds.filter((id) => !prev.includes(id))]);
     }
-  }, [recordBook, careerStats, seasonStats, dynasty.season.teams, lockerRoom.promises]);
+  }, [recordBook, careerStats, seasonStats, dynasty.season.teams, dynasty.season.schedule, lockerRoom.promises]);
 
   // Simming is locked while the offseason is pending; send the coach back there instead.
   const simWeek = useCallback(() => {
@@ -1298,6 +1472,7 @@ export function useDynastyController() {
         isNatChamp,
         coachProfile,
         {
+          penaltyScale: adPenaltyScale(dynasty.difficulty),
           wins: userRecord.wins,
           ...(lastSeasonHere && coachProfile.tenureSeasons > 0 ? { previousWins: lastSeasonHere.wins } : {}),
           ...(pickedFinish !== null && confRank > 0 ? { pickedFinish, confFinish: confRank } : {}),
@@ -1804,6 +1979,8 @@ export function useDynastyController() {
     setSelectedNewTeamId,
     selectedNewCoachName,
     setSelectedNewCoachName,
+    selectedNewDifficulty,
+    setSelectedNewDifficulty,
     dynasty,
     view,
     setView,
@@ -1893,6 +2070,13 @@ export function useDynastyController() {
     recruitTrends,
     runRecruitingAssistant,
     assistantReport,
+    achievements,
+    achievementSnapshot,
+    challengeLog,
+    achievementToasts,
+    levelUp,
+    dismissAchievementToasts,
+    profile,
     autoRecruitingAssistant,
     setAutoRecruitingAssistant,
     autoRecruitingOffers,

@@ -1,12 +1,15 @@
 import { useRef, useState } from 'react';
 import type { DynastySaveMetadata } from '../persistence';
 import type { DynastyTeamChoice } from '../dynasty-factory';
+import { DIFFICULTIES, DIFFICULTY_DESCRIPTIONS, DIFFICULTY_LABELS, type Difficulty } from '../difficulty';
 
 export function StartScreen({
   saves,
   teamChoices,
   selectedTeamId,
   coachName,
+  difficulty = 'normal',
+  onDifficultyChange,
   onTeamChange,
   onCoachNameChange,
   onCreateDynasty,
@@ -20,11 +23,15 @@ export function StartScreen({
   onClearCustomTeams,
   hasCustomTeams,
   saveStatus,
+  profileSummary,
+  saveLegacies = {},
 }: {
   saves: DynastySaveMetadata[];
   teamChoices: DynastyTeamChoice[];
   selectedTeamId: string;
   coachName: string;
+  difficulty?: Difficulty;
+  onDifficultyChange?: (difficulty: Difficulty) => void;
   onTeamChange: (teamId: string) => void;
   onCoachNameChange: (name: string) => void;
   onCreateDynasty: () => void;
@@ -38,6 +45,10 @@ export function StartScreen({
   onClearCustomTeams?: (() => void) | undefined;
   hasCustomTeams?: boolean | undefined;
   saveStatus?: string;
+  /** Profile level and achievement count, once the player has earned any. */
+  profileSummary?: { level: number; unlocked: number; total: number; points: number } | undefined;
+  /** Legacy tier of each save's coaching career, by save id, from the profile. */
+  saveLegacies?: Readonly<Record<string, string>>;
 }) {
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +87,12 @@ export function StartScreen({
         <p className="dim">
           Load an existing career or start a new dynasty with a fresh recruiting universe.
         </p>
+        {profileSummary && profileSummary.unlocked > 0 && (
+          <p className="start-profile-summary" aria-label="Profile summary">
+            <strong>Profile level {profileSummary.level}</strong> · {profileSummary.unlocked} of {profileSummary.total} achievements ·{' '}
+            {profileSummary.points} pts
+          </p>
+        )}
         {onContinue && (
           <button type="button" className="primary-action continue-btn" onClick={onContinue}>
             Continue
@@ -114,6 +131,27 @@ export function StartScreen({
               Start as {selectedTeam.name}
               {selectedTeam.conferenceId ? ` in ${selectedTeam.conferenceId.toUpperCase()}` : ''}.
             </p>
+          )}
+          {onDifficultyChange && (
+            <>
+              <p className="field-label" id="difficulty-label">
+                Difficulty
+              </p>
+              <div className="news-filters difficulty-picker" role="group" aria-labelledby="difficulty-label">
+                {DIFFICULTIES.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`pos-filter-btn${difficulty === d ? ' active' : ''}`}
+                    aria-pressed={difficulty === d}
+                    onClick={() => onDifficultyChange(d)}
+                  >
+                    {DIFFICULTY_LABELS[d]}
+                  </button>
+                ))}
+              </div>
+              <p className="dim">{DIFFICULTY_DESCRIPTIONS[difficulty]}</p>
+            </>
           )}
           {confirmingNewDynasty ? (
             <div className="new-dynasty-confirm">
@@ -161,10 +199,16 @@ export function StartScreen({
               {saves.map((save) => (
                 <div key={save.saveId} className="save-slot">
                   <span>
-                    <strong>{save.name}</strong>
+                    <strong>
+                      {save.name}
+                      {save.difficulty && (
+                        <span className={`difficulty-tag difficulty-${save.difficulty}`}>{DIFFICULTY_LABELS[save.difficulty]}</span>
+                      )}
+                    </strong>
                     <small>
                       {save.userTeamName} · {save.seasonYear} Week {save.currentWeek} · {save.record.wins}–
                       {save.record.losses}
+                      {saveLegacies[save.saveId] && ` · ${saveLegacies[save.saveId]} legacy`}
                     </small>
                   </span>
                   <span className="save-slot-actions">

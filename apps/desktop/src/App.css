@@ -6346,7 +6346,7 @@ li span {
 }
 
 .bracket-note {
-  margin: 4px 0 12px;
+  margin: 4px 12px 12px 0;
   font-size: 0.82rem;
 }
 
@@ -6634,4 +6634,428 @@ li span {
 
 .staff-plan-row .ghost-btn {
   margin-left: 4px;
+}
+
+/* ── Profile and achievements ─────────────────────────────── */
+
+.tier-bronze { --tier: #d0905a; }
+.tier-silver { --tier: #c3ccd8; }
+.tier-gold { --tier: #f5c84c; }
+.tier-platinum { --tier: #8fe3ff; }
+
+.profile-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(200px, 240px);
+  gap: 24px;
+  align-items: center;
+}
+
+.profile-hero h2 {
+  margin: 4px 0 10px;
+}
+
+.profile-level-badge {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #72f2c6;
+  background: radial-gradient(circle, rgba(114, 242, 198, 0.18), rgba(114, 242, 198, 0.02));
+}
+
+.profile-level-num {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.profile-level-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9fb0c8;
+}
+
+.profile-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.profile-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4f8cff, #72f2c6);
+}
+
+.profile-recent ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tier-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  background: var(--tier);
+}
+
+.profile-achievements-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.achievement-group + .achievement-group {
+  margin-top: 16px;
+}
+
+.achievement-grid {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.achievement-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.achievement-card.unlocked {
+  border-color: color-mix(in srgb, var(--tier) 55%, transparent);
+  background: color-mix(in srgb, var(--tier) 9%, transparent);
+}
+
+.achievement-card.locked {
+  opacity: 0.55;
+}
+
+.achievement-medal {
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--tier);
+}
+
+.achievement-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.achievement-desc {
+  margin: 2px 0 6px;
+  font-size: 0.88rem;
+  color: #b8c4d6;
+}
+
+.achievement-meta {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #9fb0c8;
+}
+
+.achievement-tier {
+  text-transform: capitalize;
+  color: var(--tier);
+}
+
+.achievement-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 8000;
+  width: 360px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 200, 76, 0.5);
+  background: #101d33;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  animation: modal-slide-up 0.2s ease;
+}
+
+.achievement-toast ul {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.achievement-toast li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.achievement-toast-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.start-profile-summary {
+  display: inline-block;
+  margin: 4px 12px 12px 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 200, 76, 0.45);
+  color: #f5c84c;
+  font-size: 0.88rem;
+}
+
+.profile-recent li {
+  display: block;
+}
+
+.achievement-meta + .achievement-meta {
+  margin-top: 2px;
+}
+
+.weekly-challenge {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
+.weekly-challenge-label {
+  margin-right: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 200, 76, 0.14);
+  color: #f5c84c;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.weekly-challenge-xp {
+  color: #72f2c6;
+  font-weight: 700;
+}
+
+.profile-recent li span.dim {
+  display: inline;
+  margin: 0;
+}
+
+.achievement-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+}
+
+.achievement-progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.achievement-progress-bar span {
+  display: block;
+  height: 100%;
+  margin: 0;
+  background: var(--tier);
+}
+
+.achievement-progress-text {
+  display: inline;
+  margin: 0;
+  font-size: 0.76rem;
+  color: #9fb0c8;
+}
+
+.achievement-card.locked:has(.achievement-progress) {
+  opacity: 0.8;
+}
+
+.coach-title {
+  display: block;
+  margin: 2px 0 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #f5c84c;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.coach-title:hover {
+  text-decoration: underline;
+}
+
+.achievement-levelup {
+  margin: 6px 0 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(114, 242, 198, 0.12);
+  color: #72f2c6;
+}
+
+.personal-bests {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.personal-bests li {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.personal-best-value {
+  margin: 4px 0 2px;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.personal-best-detail {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.season-report-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.season-report-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 4px 0 10px;
+}
+
+.season-report-stats p {
+  margin: 0;
+}
+
+.season-report-stats strong {
+  font-size: 1.25rem;
+}
+
+.season-report-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.season-report-list li span.dim {
+  display: inline;
+  margin-top: 0;
+}
+
+.season-report-list li span.tier-dot {
+  display: inline-block;
+  margin-top: 0;
+}
+
+.season-report-head .link-btn {
+  white-space: nowrap;
+}
+
+.season-report-list .tier-dot {
+  margin-right: 8px;
+}
+
+.difficulty-picker {
+  margin: 4px 0 6px;
+}
+
+.difficulty-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.difficulty-hard {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff8a8a;
+}
+
+.difficulty-easy {
+  background: rgba(120, 200, 255, 0.12);
+  color: #8fd0ff;
+}
+
+.profile-legacy {
+  margin: 4px 0 0;
+}
+
+.profile-legacy span.dim {
+  display: inline;
+}
+
+.legacy-cell strong {
+  font-weight: 700;
+}
+
+.achievement-watch {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  gap: 6px;
+}
+
+.achievement-watch li span.tier-dot {
+  display: inline-block;
+  margin-top: 0;
+}
+
+.achievement-watch li span.achievement-watch-left {
+  display: block;
+  margin: 2px 0 0 18px;
+  font-size: 0.8rem;
+}
+
+.achievement-group-count {
+  margin-left: 4px;
+  color: #aab8ca;
+  letter-spacing: 0;
 }

@@ -1,3 +1,4 @@
+import type { SeasonReport } from '../season-report';
 import { useState } from 'react';
 import {
   applyInvestmentPlan,
@@ -56,6 +57,8 @@ export function OffseasonScreen({
   onOpenPortal,
   investments,
   realignment,
+  seasonReport = null,
+  onOpenProfile,
 }: {
   offseasonSummary: OffseasonSummary;
   userTeam: LacrosseTeam;
@@ -78,6 +81,9 @@ export function OffseasonScreen({
     onFund: (project: InvestmentProject) => void;
     onUnfund: (project: InvestmentProject) => void;
   };
+  /** What the season added to the coach profile. */
+  seasonReport?: SeasonReport | null;
+  onOpenProfile?: () => void;
   realignment?: {
     conferences: Array<{ id: string; name: string; shortName: string; teamIds: string[] }>;
     teams: LacrosseTeam[];
@@ -169,6 +175,10 @@ export function OffseasonScreen({
       </div>
 
       <div className="offseason-right">
+        {seasonReport && (seasonReport.achievements.length > 0 || seasonReport.challengesFaced > 0) && (
+          <SeasonReportCard report={seasonReport} onOpenProfile={onOpenProfile} />
+        )}
+
         {dynastyHistory.length > 0 && (
           <article className="card prestige-card">
             <h2>Program Prestige</h2>
@@ -832,6 +842,48 @@ function RealignmentCard({
             </button>
           </div>
         </>
+      )}
+    </article>
+  );
+}
+
+function SeasonReportCard({ report, onOpenProfile }: { report: SeasonReport; onOpenProfile?: (() => void) | undefined }) {
+  return (
+    <article className="card season-report-card" aria-label="Coach report card">
+      <div className="season-report-head">
+        <h2>Coach Report Card</h2>
+        {onOpenProfile && (
+          <button type="button" className="link-btn" onClick={onOpenProfile}>
+            View profile
+          </button>
+        )}
+      </div>
+      <div className="season-report-stats">
+        <p>
+          <strong>{report.achievements.length}</strong> <span className="dim">achievements</span>
+        </p>
+        <p>
+          <strong>+{report.points}</strong> <span className="dim">profile points</span>
+        </p>
+        {report.challengesFaced > 0 && (
+          <p>
+            <strong>
+              {report.challengesMet}/{report.challengesFaced}
+            </strong>{' '}
+            <span className="dim">weekly challenges · +{report.challengeXp} XP</span>
+          </p>
+        )}
+      </div>
+      {report.achievements.length > 0 && (
+        <ul className="season-report-list">
+          {report.achievements.map((def) => (
+            <li key={def.id} className={`tier-${def.tier}`}>
+              <span className={`tier-dot tier-${def.tier}`} aria-hidden="true" />
+              <strong>{def.title}</strong>
+              <span className="dim season-report-desc"> · {def.description}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </article>
   );

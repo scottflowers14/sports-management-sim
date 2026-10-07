@@ -40,7 +40,11 @@ export interface LacrosseDynastyState {
    * Until then rivalries are rebuilt from the conferences.
    */
   rivalries?: Rivalry[];
+  /** Chosen when the dynasty starts; missing on older saves, which play as normal. */
+  difficulty?: LacrosseDifficulty;
 }
+
+export type LacrosseDifficulty = 'easy' | 'normal' | 'hard';
 
 export interface LacrosseRecruitingSummary {
   offersUsed: number;

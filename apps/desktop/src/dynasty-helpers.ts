@@ -328,9 +328,15 @@ export function autoCommitWeekly(
   currentWeek: number,
   random: () => number,
   finalWeek = 10,
+  /** Difficulty scale on CPU programs' interest gains (1 = normal). */
+  cpuInterestScale = 1,
+  /** Difficulty weight on the user's interest when a recruit makes his decision (1 = normal). */
+  userDecisionScale = 1,
+  /** Hard difficulty: CPU staffs target talent they can land (see cpuBoardForTeam). */
+  sharpCpuBoards = false,
 ): LacrosseRecruit[] {
   // CPU teams gradually extend offers week by week
-  const updated = applyCpuWeeklyOffers(recruits, teams, userTeamId, random);
+  const updated = applyCpuWeeklyOffers(recruits, teams, userTeamId, random, sharpCpuBoards);
 
   return updated.map((recruit) => {
     // Committed-but-unsigned recruits can reopen when a rival (usually a user
@@ -369,7 +375,7 @@ export function autoCommitWeekly(
       } else {
         // CPU staffs work their boards off-screen, so their drift stays stronger.
         const prestigeBonus = (team.reputation.nationalPrestige / 100) * 4;
-        const gain = Math.round((5 + recruit.starRating * 0.5 + prestigeBonus + random() * 3) * prestigeMult);
+        const gain = Math.round((5 + recruit.starRating * 0.5 + prestigeBonus + random() * 3) * prestigeMult * cpuInterestScale);
         updatedInterest[team.id] = Math.min(100, current + gain);
       }
     }
@@ -378,7 +384,7 @@ export function autoCommitWeekly(
 
     // Recruits announce on their own schedule; a runaway leader can end it early.
     const ranked = recruit.scholarshipOffers
-      .map((o) => ({ teamId: o.teamId, interest: updatedInterest[o.teamId] ?? 0 }))
+      .map((o) => ({ teamId: o.teamId, interest: (updatedInterest[o.teamId] ?? 0) * (o.teamId === userTeamId ? userDecisionScale : 1) }))
       .sort((a, b) => b.interest - a.interest);
     const leader = ranked[0];
     const runnerUp = ranked[1];
@@ -392,7 +398,13 @@ export function autoCommitWeekly(
       return { ...withInterest, status: 'committed' as const, committedTeamId: leader.teamId };
     }
     if (currentWeek >= decisionWeek) {
-      const committingTo = chooseCommitTeam(withInterest, teams, random);
+      // On harder difficulties a recruit discounts the user's pitch when he
+      // weighs his offers; the interest shown on the board doesn't change.
+      const judged =
+        userDecisionScale === 1 || updatedInterest[userTeamId] === undefined
+          ? withInterest
+          : { ...withInterest, interestByTeamId: { ...updatedInterest, [userTeamId]: updatedInterest[userTeamId]! * userDecisionScale } };
+      const committingTo = chooseCommitTeam(judged, teams, random);
       if (committingTo !== undefined) {
         return { ...withInterest, status: 'committed' as const, committedTeamId: committingTo };
       }
@@ -428,20 +440,36 @@ function cpuActiveOfferIds(recruits: LacrosseRecruit[], teamId: string): Set<str
  * how attainable each recruit is for this program, so bottom-prestige teams
  * chase 2-3★ depth they can actually land instead of the same Top 100 as
  * everyone else.
+ *
+ * Sharp boards (Hard difficulty) recruit like a good staff instead: they skip
+ * long shots and weight talent over depth, so CPU programs go after the same
+ * attainable blue-chips the user wants.
  */
 function cpuBoardForTeam(
   team: LacrosseTeam,
   candidates: LacrosseRecruit[],
   rosterTargets: Record<string, number>,
+  sharp = false,
 ): LacrosseRecruit[] {
   return sortRecruitBoardForTeam(team, candidates, rosterTargets)
-    .map((entry) => ({
-      recruit: entry.recruit,
-      score: entry.score * recruitPrestigeMultiplier(entry.recruit.starRating, team.reputation.nationalPrestige),
-    }))
+    .map((entry) => {
+      const attainability = recruitPrestigeMultiplier(entry.recruit.starRating, team.reputation.nationalPrestige);
+      return {
+        recruit: entry.recruit,
+        attainability,
+        score: sharp
+          ? (entry.score + entry.qualityScore * SHARP_QUALITY_WEIGHT) * Math.min(1, attainability)
+          : entry.score * attainability,
+      };
+    })
+    .filter((entry) => !sharp || entry.attainability >= SHARP_MIN_ATTAINABILITY)
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.recruit);
 }
+
+/** Sharp boards skip recruits below this (the recruiting assistant's bar too). */
+const SHARP_MIN_ATTAINABILITY = 0.6;
+const SHARP_QUALITY_WEIGHT = 0.35;
 
 const CPU_ROSTER_TARGETS = { ATT: 8, MID: 16, DEF: 10, GK: 4, FOGO: 3, LSM: 4 } as const;
 const ROSTER_CAP = 45;
@@ -462,6 +490,7 @@ function applyCpuWeeklyOffers(
   teams: LacrosseTeam[],
   userTeamId: string,
   _random: () => number,
+  sharp = false,
 ): LacrosseRecruit[] {
   const CPU_MAX_OFFERS = 12;
   const CPU_WEEKLY_NEW_OFFERS = 2;
@@ -482,7 +511,7 @@ function applyCpuWeeklyOffers(
     );
     const canOffer = Math.min(CPU_WEEKLY_NEW_OFFERS, CPU_MAX_OFFERS - activeOfferIds.size);
     const open = updated.filter((r) => r.status === 'open' && !everOfferedIds.has(r.id));
-    const board = cpuBoardForTeam(team, open, CPU_ROSTER_TARGETS);
+    const board = cpuBoardForTeam(team, open, CPU_ROSTER_TARGETS, sharp);
 
     let count = 0;
     for (const recruit of board) {

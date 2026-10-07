@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
+import { PROFILE_KEY } from './profile';
 import { loadActiveDynastySave, listDynastySaves } from './persistence';
 
 // These drive the whole app through many simulated weeks, each with an
@@ -125,11 +126,34 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
 
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
+    // The recap carries the season's coach report card: every game had a weekly challenge.
+    expect(screen.getByRole('article', { name: 'Coach report card' })).toHaveTextContent(/\/1[0-9] weekly challenges/);
+    // The finished season counts once in the offseason, not again from the still-loaded bracket.
+    await waitFor(() => expect(loadActiveDynastySave()?.dynastyHistory.length).toBeGreaterThan(0));
+    const finished = loadActiveDynastySave()!.dynastyHistory[0]!;
+    const postseasonWins = (finished.games ?? []).filter((g) => g.postseason && g.goalsFor > g.goalsAgainst).length;
+    await userEvent.click(screen.getByRole('button', { name: /^Profile/ }));
+    if (postseasonWins > 0) {
+      expect(screen.getByLabelText('Tournament Tested progress')).toHaveTextContent(`${postseasonWins} / 10`);
+    }
+    await userEvent.click(screen.getByRole('button', { name: /^Offseason/ }));
 
     await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
     expect(screen.getByText(/Men's College Lacrosse · Season 2029/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   }, 20000);
+
+  it('starts a dynasty on the chosen difficulty and shows it in the sidebar', async () => {
+    render(<App />);
+    expect(screen.getByRole('button', { name: 'Normal' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Hard' }));
+    expect(screen.getByText(/Recruits are harder to win/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+    await waitFor(() => expect(loadActiveDynastySave()?.dynasty.difficulty).toBe('hard'));
+    expect(screen.getByText(/yr left · Hard/)).toBeInTheDocument();
+    // The save list marks the difficulty.
+    expect(listDynastySaves()[0]?.difficulty).toBe('hard');
+  });
 
   it('shows coaching controls and persists a game plan change', async () => {
     await renderStartedApp();
@@ -340,6 +364,53 @@ describe('Desktop App', () => {
     await userEvent.click(makeAll);
     expect(within(report).queryByRole('button', { name: /^Make All/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Scholarships [1-3]\.\d\d \/ 3\.25/)).toBeInTheDocument();
+  });
+
+  it('sets a weekly challenge on the coach desk and judges it after the game', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    const challenge = screen.getByLabelText('Weekly challenge');
+    expect(challenge).toHaveTextContent(/\+\d+ XP/);
+    const text = challenge.textContent!.replace('Weekly challenge', '').replace(/\+\d+ XP/, '').trim();
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week 1/i }));
+    await waitFor(() => expect(loadActiveDynastySave()?.challengeLog).toHaveLength(1));
+    const result = loadActiveDynastySave()!.challengeLog![0]!;
+    expect(result).toMatchObject({ year: 2028, week: 1, text });
+    if (result.completed) {
+      expect(loadActiveDynastySave()!.coachProfile!.xp).toBeGreaterThan(150);
+    }
+  });
+
+  it('unlocks an achievement on the first win and shows it on the profile', async () => {
+    await renderStartedApp();
+    // Advance until the first win lands; a recruiting unlock (a 5-star commit) can come first.
+    for (let week = 1; week <= 6 && !loadActiveDynastySave()?.achievements?.['first-win']; week += 1) {
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+    }
+    const toast = screen.getByRole('status', { name: /Achievement unlocked/i });
+    // A big first win can unlock several at once; the toast lists three and counts the rest.
+    expect(toast).toHaveTextContent(/Off the Schneid|and \d+ more/);
+    // Unlocks pay coach XP toward abilities.
+    expect(toast).toHaveTextContent(/\+\d+ coach XP/);
+    await waitFor(() => expect(loadActiveDynastySave()?.achievements?.['first-win']?.year).toBe(2028));
+    expect(JSON.parse(localStorage.getItem(PROFILE_KEY)!).achievements['first-win']).toBeTruthy();
+
+    // The sidebar names the profile level, and opens the profile.
+    expect(screen.getByRole('button', { name: /^Lv \d+ · / })).toBeInTheDocument();
+    await userEvent.click(within(toast).getByRole('button', { name: 'View profile' }));
+    expect(screen.queryByRole('status', { name: /Achievement unlocked/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Profile level')).toHaveTextContent(/of \d+ achievements/);
+    const card = screen.getByRole('listitem', { name: 'Off the Schneid' });
+    expect(card).toHaveClass('unlocked');
+    expect(card).toHaveTextContent(/this dynasty/);
+    // Count-based achievements show this dynasty's progress.
+    expect(screen.getByLabelText('Fifty progress')).toHaveTextContent(/^\d+ \/ 50$/);
+    // Personal bests come from finished seasons, so none show mid-first-season.
+    expect(screen.queryByRole('article', { name: 'Personal bests' })).toBeNull();
+    // Secret achievements stay hidden until earned.
+    expect(screen.getAllByRole('listitem', { name: 'Secret achievement' }).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Locked' }));
+    expect(screen.queryByRole('listitem', { name: 'Off the Schneid' })).not.toBeInTheDocument();
   });
 
   it('shows the weekly hub and opens a player card from a player to watch', async () => {
