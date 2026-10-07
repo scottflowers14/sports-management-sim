@@ -48,7 +48,7 @@ export function CoachChecklistCard({
         </ol>
       ) : (
         <p className="dim" style={{ marginBottom: 0 }}>
-          You&apos;re set up. From here the loop is simple: check Recommended Actions, then press Advance. Win games, sign a class and meet your season goals to keep the AD happy.
+          You&apos;re set up. From here the loop is simple: check Recommended Actions, then press Continue. Win games, sign a class and meet your season goals to keep the AD happy.
         </p>
       )}
     </article>
@@ -81,7 +81,7 @@ export function WelcomeModal({
         <h2 id="welcome-title">You run {teamName} now</h2>
         <ul className="welcome-points">
           <li><strong>The job:</strong> win games, sign a recruiting class every year and meet the season goals your athletic director sets.</li>
-          <li><strong>Moving time:</strong> the blue Advance button at the top right always does the next thing, whether that&apos;s a week, the postseason or the offseason.</li>
+          <li><strong>Moving time:</strong> the blue Continue button at the top right always does the next thing and says what it is, whether that&apos;s a week, the postseason or the offseason.</li>
           <li><strong>Where to start:</strong> the Coach&apos;s Checklist on the Week Hub walks you through your first week.</li>
         </ul>
         <div className="modal-actions">
