@@ -68,6 +68,7 @@ test('plays a season through the title game and offseason into year two', async 
 
   // One click runs the offseason; the transfer portal opens with it.
   await advance.click();
+  await expect(page.getByLabel('Offseason to-do')).toContainText('Spend investment points');
   await expect(page.locator('.season-recap-card')).toBeVisible();
   await expect(advance).toContainText(/Season \d{4}/);
   const nextYear = (await advance.innerText()).match(/Season (\d{4})/)![1]!;
@@ -86,8 +87,9 @@ test('plays a season through the title game and offseason into year two', async 
   await expect(portal.locator('.portal-stats')).toContainText('1 our offers');
 
   // Starting the season settles the portal: every entry has an outcome.
-  // One click from the portal starts the season.
+  // Advance from the portal asks first while investment points sit unspent.
   await advance.click();
+  await page.getByRole('dialog', { name: /Start the \d{4} season now/ }).getByRole('button', { name: 'Start anyway' }).click();
   await expect(advance).toContainText('Week 1');
   await expect(page.locator('.top-bar')).toContainText(`Season ${nextYear}`);
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Recruiting' }).click();

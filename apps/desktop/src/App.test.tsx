@@ -157,7 +157,11 @@ describe('Desktop App', () => {
     expect(finished.games?.filter((g) => g.postseason).every((g) => g.round)).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: /^Offseason/ }));
 
+    // The offseason opens on its to-do list; starting with points unspent asks first.
+    expect(screen.getByRole('article', { name: 'Offseason to-do' })).toHaveTextContent(/Spend investment points/);
     await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
+    expect(screen.getByRole('dialog', { name: /Start the 2029 season now/ })).toHaveTextContent(/investment point/);
+    await userEvent.click(screen.getByRole('button', { name: 'Start anyway' }));
     expect(screen.getByText(/Men's College Lacrosse · Season 2029/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   }, 20000);
@@ -598,14 +602,20 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
 
-    // Simming is locked until the new season starts.
+    // The hub points to the offseason instead of a stale sim button.
     await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
-    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    expect(screen.queryByRole('button', { name: /Sim Week/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Open Offseason/i }));
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
 
-    // From any other screen the top-bar Advance starts the season in one click.
+    // From any other screen the top-bar Advance starts the season, after a warning
+    // about unspent points; "Not yet" goes back to the offseason.
     await userEvent.click(screen.getByRole('button', { name: /^Recruiting/ }));
     await userEvent.click(screen.getByRole('button', { name: /Advance: Season 2029/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Not yet' }));
+    expect(screen.getByRole('article', { name: 'Offseason to-do' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Season 2029/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start anyway' }));
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   }, 20000);
 

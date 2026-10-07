@@ -236,6 +236,8 @@ export function WeekHubScreen({
   formCard,
   achievementCard,
   guideCard,
+  offseason = false,
+  onOpenOffseason,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -278,6 +280,9 @@ export function WeekHubScreen({
   achievementCard?: ReactNode;
   /** The first-season Coach's Checklist. */
   guideCard?: ReactNode;
+  /** The season is over and the offseason screen holds the next steps. */
+  offseason?: boolean;
+  onOpenOffseason?: () => void;
 }) {
   const [showAllResults, setShowAllResults] = useState(false);
   const [showAllActions, setShowAllActions] = useState(false);
@@ -316,7 +321,7 @@ export function WeekHubScreen({
       <div className="hub-header card">
         <div className="hub-header-info">
           <span className="section-label">
-            {seasonComplete ? 'Season Complete' : `Week ${currentWeek} Briefing`}
+            {offseason ? 'Offseason' : seasonComplete ? 'Season Complete' : `Week ${currentWeek} Briefing`}
           </span>
           <div className="hub-header-stats">
             <div className="hub-stat">
@@ -369,7 +374,16 @@ export function WeekHubScreen({
             </div>
           </div>
         </div>
-        {!seasonComplete && (
+        {offseason ? (
+          <div className="hub-sim-actions">
+            <p className="dim hub-offseason-note">
+              The season is over. Spend investment points, work the transfer portal and start the new season from the Offseason screen.
+            </p>
+            <button className="hub-sim-btn" onClick={onOpenOffseason}>
+              Open Offseason →
+            </button>
+          </div>
+        ) : !seasonComplete && (
           <div className="hub-sim-actions">
             {onCoachGame && (
               <button className="hub-sim-btn hub-coach-btn" onClick={onCoachGame}>
