@@ -106,7 +106,10 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
     await userEvent.click(screen.getByRole('button', { name: /Recruiting/i }));
     await userEvent.click(screen.getAllByRole('button', { name: /Scout/i })[0]!);
-    await userEvent.click(screen.getAllByRole('button', { name: /Offer/i })[0]!);
+    // The recruiting assistant makes offers by default and can use the whole
+    // budget in week 1, leaving no Offer button; then there's nothing to add.
+    const offerButtons = screen.queryAllByRole('button', { name: /Offer/i });
+    if (offerButtons.length > 0) await userEvent.click(offerButtons[0]!);
     await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
     cleanup();
 
@@ -119,10 +122,18 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Enter Conference Tournaments/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim Conference Finals/i }));
+    // Selection day posts bracket odds for all twelve teams.
+    const oddsCard = screen.getByRole('article', { name: 'Bracket odds' });
+    expect(within(oddsCard).getAllByRole('row')).toHaveLength(13);
+    expect(oddsCard).toHaveTextContent(/Favorite: .+ at \d+%/);
     await userEvent.click(screen.getByRole('button', { name: /Sim NCAA First Round/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim NCAA Quarterfinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Semifinals/i }));
     await userEvent.click(screen.getByRole('button', { name: /Sim National Championship/i }));
+    // Once the title game is played exactly one team is left standing.
+    const titleCells = [...screen.getByRole('article', { name: 'Bracket odds' }).querySelectorAll('td.odds-title')].map((td) => td.textContent);
+    expect(titleCells.filter((t) => t === '✓')).toHaveLength(1);
+    expect(titleCells.filter((t) => t === 'Out')).toHaveLength(11);
     await userEvent.click(screen.getByRole('button', { name: /Enter Offseason/i }));
 
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
@@ -136,6 +147,11 @@ describe('Desktop App', () => {
     if (postseasonWins > 0) {
       expect(screen.getByLabelText('Tournament Tested progress')).toHaveTextContent(`${postseasonWins} / 10`);
     }
+    // History tracks the postseason run, round by round.
+    await userEvent.click(screen.getByRole('button', { name: /^History/ }));
+    const postseason = screen.getByRole('article', { name: 'Postseason history' });
+    expect(postseason).toHaveTextContent(/of 1NCAA appearances/);
+    expect(finished.games?.filter((g) => g.postseason).every((g) => g.round)).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: /^Offseason/ }));
 
     await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
@@ -805,6 +821,92 @@ describe('Desktop App', () => {
     const honors = screen.getByLabelText('Weekly honors');
     expect(within(honors).getAllByRole('row')).toHaveLength(5);
     expect(honors).toHaveTextContent(/Defensive Player of the Week/);
+  });
+
+  it('ranks every team on the Team Stats tab and re-sorts by column', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Stats/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Team Stats' }));
+    const card = screen.getByLabelText('Team stats');
+    // Every team that has played is ranked, and the user's row is marked.
+    const bodyRows = within(card).getAllByRole('row').slice(1);
+    expect(bodyRows.length).toBeGreaterThan(10);
+    expect(card.querySelectorAll('tr.user-row')).toHaveLength(1);
+    expect(screen.getByLabelText('Your team stat ranks')).toHaveTextContent(/Your best: #\d+ in .+ · Your worst: #\d+ in /);
+    // Sorting by scoring defense puts the stingiest team first.
+    await userEvent.click(within(card).getByRole('button', { name: 'GA/G' }));
+    expect(within(card).getByRole('columnheader', { name: 'GA/G' })).toHaveAttribute('aria-sort', 'ascending');
+    const goalsAgainst = within(card)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => Number(within(row).getAllByRole('cell')[4]!.textContent));
+    expect(goalsAgainst).toEqual([...goalsAgainst].sort((a, b) => a - b));
+    expect(within(within(card).getAllByRole('row')[1]!).getAllByRole('cell')[0]).toHaveTextContent('#1');
+  });
+
+  it('puts a tale of the tape in the scouting report once both teams have played', async () => {
+    await renderStartedApp();
+    // Before any games there is no tape, only the opponent's plan.
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    expect(within(screen.getByLabelText('Opponent scouting report')).queryByLabelText('Tale of the tape')).not.toBeInTheDocument();
+    // The next opponent may have had a bye, so advance until both teams have a box score.
+    for (let week = 1; week <= 4 && !screen.queryByLabelText('Tale of the tape'); week += 1) {
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+      await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    }
+    const tape = within(screen.getByLabelText('Opponent scouting report')).getByLabelText('Tale of the tape');
+    const rows = within(tape).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(8);
+    // The highlighted side in each row is the one with the better national rank.
+    let edges = 0;
+    for (const row of rows) {
+      const [, you, them] = within(row).getAllByRole('cell');
+      const rank = (cell: HTMLElement) => Number(/#(\d+)/.exec(cell.textContent!)![1]);
+      if (you!.classList.contains('tape-edge')) {
+        expect(rank(you!)).toBeLessThan(rank(them!));
+        edges += 1;
+      }
+      if (them!.classList.contains('tape-edge')) {
+        expect(rank(them!)).toBeLessThan(rank(you!));
+        edges += 1;
+      }
+    }
+    const [yours, theirs] = [...tape.querySelectorAll('.tape-summary strong')].map((el) => Number(el.textContent));
+    expect(yours! + theirs!).toBe(edges);
+  });
+
+  it('filters stat leaders and team stats to the conference or the user team', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Stats/ }));
+    const scopes = screen.getByRole('group', { name: 'Leaderboard scope' });
+    const leaders = () => screen.getByRole('heading', { name: /^Scoring Leaders/ }).closest('article')!;
+    const nationalRows = within(leaders()).getAllByRole('row').length;
+
+    // Your team: every leader plays for the user, and the heading says so.
+    await userEvent.click(within(scopes).getByRole('button', { name: 'Your team' }));
+    expect(screen.getByRole('heading', { name: 'Scoring Leaders · Your team' })).toBeInTheDocument();
+    const teamRows = within(leaders()).getAllByRole('row').slice(1);
+    expect(teamRows.length).toBeGreaterThan(0);
+    for (const row of teamRows) expect(row).toHaveClass('user-row');
+
+    // Conference: Team Stats ranks only the league's teams, and "Your team" isn't offered there.
+    const conferenceButton = within(scopes).getAllByRole('button')[1]!;
+    const conference = conferenceButton.textContent!;
+    await userEvent.click(screen.getByRole('button', { name: 'Team Stats' }));
+    expect(within(screen.getByRole('group', { name: 'Leaderboard scope' })).queryByRole('button', { name: 'Your team' })).not.toBeInTheDocument();
+    // Coming from "Your team", Team Stats shows the conference.
+    expect(screen.getByRole('heading', { name: `Team Stats · ${conference}` })).toBeInTheDocument();
+    const confTeams = within(screen.getByLabelText('Team stats')).getAllByRole('row').length - 1;
+    await userEvent.click(within(screen.getByRole('group', { name: 'Leaderboard scope' })).getByRole('button', { name: 'National' }));
+    const allTeams = within(screen.getByLabelText('Team stats')).getAllByRole('row').length - 1;
+    expect(confTeams).toBeLessThan(allTeams);
+    expect(confTeams).toBeGreaterThan(1);
+
+    // Back on scoring, national shows the full list again.
+    await userEvent.click(screen.getByRole('button', { name: 'Scoring' }));
+    expect(within(leaders()).getAllByRole('row')).toHaveLength(nationalRows);
   });
 
   it('makes a playing-time promise and calls out a broken one', async () => {

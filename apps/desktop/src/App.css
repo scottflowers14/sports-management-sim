@@ -7059,3 +7059,68 @@ li span {
   color: #aab8ca;
   letter-spacing: 0;
 }
+
+/* Team Stats: sortable column headers and the sorted column picked out. */
+.team-stats-table .sort-header {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.team-stats-table .sort-header.active {
+  color: #f0c66b;
+  text-decoration: underline;
+}
+
+.team-stats-table td.sorted {
+  color: #f0c66b;
+  font-weight: 700;
+}
+
+.team-stat-highlights {
+  margin: 0 0 10px;
+  color: #aab8ca;
+}
+
+/* Tale of the tape in the scouting report: both teams' national ranks. */
+.tale-of-tape .tape-summary {
+  margin: 6px 0;
+}
+
+.tape-table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  width: 100%;
+}
+
+.tape-table th,
+.tape-table td {
+  padding: 3px 6px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tape-table td.tape-edge {
+  color: #7ee2b8;
+  font-weight: 700;
+}
+
+.tape-table td span {
+  display: inline;
+}
+
+/* Bracket odds */
+.bracket-odds-table td.odds-title { font-weight: 700; }
+.bracket-odds-table tr.odds-out td { opacity: 0.45; }
+@media (max-width: 720px) { .bracket-odds-scroll { overflow-x: auto; } }
+
+/* Postseason history */
+.postseason-stats { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 8px 0 12px; }
+.postseason-stat { display: flex; flex-direction: column; }
+.postseason-stat-num { font-size: 1.4rem; font-weight: 800; color: #72f2c6; }
+.postseason-stat-label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: #aab8ca; }
+.ncaa-finish { white-space: nowrap; }
+.ncaa-finish.deep { color: #f5c46b; font-weight: 700; }

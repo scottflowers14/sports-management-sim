@@ -62,6 +62,8 @@ export interface DynastySeasonRecord {
   coachOfYear?: boolean;
   /** Players from the user program taken in that year's pro draft. */
   proPicks?: number;
+  /** The user's NCAA seed, when the program made the field. */
+  ncaaSeed?: number;
   /** Every game the user played that season, for head-to-head series. */
   games?: SeasonGameRecord[];
 }

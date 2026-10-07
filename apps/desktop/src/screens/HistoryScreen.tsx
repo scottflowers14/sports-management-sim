@@ -7,6 +7,7 @@ import { versusPrediction } from '../preseason';
 import type { HallOfFameEntry } from '../records';
 import { formatTeamName } from '../ui/format';
 import { formatStreak, type SeriesRecord } from '../series-history';
+import { NCAA_FINISH_LABELS, postseasonRun, postseasonSummary, type NcaaFinish } from '../postseason-history';
 
 export function HistoryScreen({
   history,
@@ -79,7 +80,7 @@ export function HistoryScreen({
               <th>Nat Rank</th>
               <th>Top Scorer</th>
               <th>Conf</th>
-              <th>Natl</th>
+              <th title="How far the program went in the NCAA tournament">NCAA</th>
               <th>Class</th>
               <th title="Players taken in the pro draft">Pros</th>
             </tr>
@@ -115,7 +116,7 @@ export function HistoryScreen({
                     : '—'}
                 </td>
                 <td>{record.confChampion ? <span className="champ-badge conf-champ">CHAMP</span> : '—'}</td>
-                <td>{record.nationalChampion ? <span className="champ-badge natl-champ">CHAMP</span> : '—'}</td>
+                <td><NcaaCell record={record} /></td>
                 <td>{record.signingClassSize}</td>
                 <td>{record.proPicks ?? '—'}</td>
               </tr>
@@ -123,6 +124,8 @@ export function HistoryScreen({
           </tbody>
         </table>
       </article>
+
+      <PostseasonCard history={history} />
 
       <HeadToHeadCard series={series} teamName={teamName} />
 
@@ -137,6 +140,51 @@ export function HistoryScreen({
       <HonorRollCard history={history} title="All-Americans" pick={(r) => r.allAmericans} firstLabel="1st" tierSuffix=" All-America" />
       <HonorRollCard history={history} title="All-Conference" pick={(r) => r.allConference} firstLabel="1st" tierSuffix=" All-Conference" />
     </div>
+  );
+}
+
+function NcaaCell({ record }: { record: DynastySeasonRecord }) {
+  if (record.nationalChampion) return <span className="champ-badge natl-champ">CHAMP</span>;
+  const run = postseasonRun(record);
+  if (!run || run.finish === 'missed') return <>—</>;
+  return (
+    <span className={run.finish === 'runner-up' || run.finish === 'final-four' ? 'ncaa-finish deep' : 'ncaa-finish'}>
+      {NCAA_FINISH_LABELS[run.finish]}
+      {run.ncaaSeed !== null && <span className="dim" style={{ display: 'inline' }}> · #{run.ncaaSeed}</span>}
+    </span>
+  );
+}
+
+const pct = (w: number, l: number) => (w + l === 0 ? '—' : (w / (w + l)).toFixed(3).replace(/^0/, ''));
+
+function PostseasonCard({ history }: { history: DynastySeasonRecord[] }) {
+  const sum = postseasonSummary(history);
+  if (sum.seasons === 0) return null;
+  const best: NcaaFinish | null = sum.best;
+  const stats: Array<[string, string]> = [
+    ['NCAA appearances', `${sum.appearances} of ${sum.seasons}`],
+    ['NCAA record', `${sum.ncaaWins}–${sum.ncaaLosses}`],
+    ['Final Fours', String(sum.finalFours)],
+    ['Title games', String(sum.titleGames)],
+    ['Conf. tournament', `${sum.confWins}–${sum.confLosses}`],
+  ];
+  return (
+    <article className="card postseason-card" aria-label="Postseason history">
+      <h2>Postseason</h2>
+      <div className="postseason-stats">
+        {stats.map(([label, value]) => (
+          <div key={label} className="postseason-stat">
+            <span className="postseason-stat-num">{value}</span>
+            <span className="postseason-stat-label">{label}</span>
+          </div>
+        ))}
+      </div>
+      <p className="dim" style={{ marginBottom: 0 }}>
+        {best && best !== 'missed' ? `Best NCAA run: ${NCAA_FINISH_LABELS[best]}.` : 'No NCAA appearance yet.'} Postseason
+        win rate {pct(sum.ncaaWins + sum.confWins, sum.ncaaLosses + sum.confLosses)}
+        {sum.seasons < history.length ? ` (${sum.seasons} of ${history.length} seasons tracked; older saves did not keep rounds).` : '.'}
+      </p>
+    </article>
   );
 }
 

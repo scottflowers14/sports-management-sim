@@ -8,6 +8,8 @@ import {
   deriveCpuGamePlan,
   leagueTendencies,
   scoutingKeys,
+  taleOfTheTape,
+  teamStatRankings,
   teamTendencies,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
@@ -219,6 +221,7 @@ export function App() {
     handleExportTeamsTemplate,
     handleImportTeams,
     handleClearCustomTeams,
+    ncaaBracketOdds,
   } = useDynastyController();
   const [viewedProgramId, setViewedProgramId] = useState<string | null>(null);
 
@@ -362,6 +365,11 @@ export function App() {
         isHome: nextUserGame.homeTeamId === dynasty.userTeamId,
         plan: deriveCpuGamePlan(nextOpponentTeam),
         rating: calculateLacrosseTeamRating(nextOpponentTeam).overall,
+        tape: taleOfTheTape(
+          teamStatRankings(dynasty.season.schedule, dynasty.season.teams.map((t) => t.id)),
+          dynasty.userTeamId,
+          nextOpponentTeam.id,
+        ),
       }
     : null;
 
@@ -814,6 +822,7 @@ export function App() {
         <TournamentScreen
           onCoachGame={canCoachGame ? coachGame : undefined}
           tournament={tournament}
+          odds={ncaaBracketOdds}
           teamMap={teamMap}
           userTeamId={dynasty.userTeamId}
           seasonComplete={seasonComplete}

@@ -118,6 +118,7 @@ import {
   postseasonRecords,
 } from './tournament';
 import type { TournamentState } from './tournament';
+import { ncaaOdds } from './bracket-odds';
 import type { DynastySeasonRecord } from './history';
 import { CONFERENCE_POY_LABEL, deriveSeasonLeader, toAllAmericaRecords, toAllConferenceRecords, toSeasonAwardRecords } from './history';
 import {
@@ -1171,6 +1172,13 @@ export function useDynastyController() {
     return dynasty.season.teams.map((team) => withoutUnavailable(team, injuredIds));
   }, [dynasty.season.teams, injuries]);
 
+  // Title odds from the current bracket, rated without injured players.
+  const ncaaBracketOdds = useMemo(() => {
+    if (!tournament?.ncaaField) return null;
+    const ratings = new Map(tournamentTeams.map((t) => [t.id, calculateLacrosseTeamRating(t).overall]));
+    return ncaaOdds(tournament, (id) => ratings.get(id) ?? 0);
+  }, [tournament, tournamentTeams]);
+
   const simTournamentSemis = useCallback(() => {
     setTournament((prev) => prev ? advanceTournamentSemis(prev, tournamentTeams, tournamentPlanFor, tournamentCoachingFor) : prev);
   }, [tournamentTeams, tournamentPlanFor, tournamentCoachingFor]);
@@ -1286,6 +1294,7 @@ export function useDynastyController() {
 
     const allAmericans = toAllAmericaRecords(summary.awards, dynasty.userTeamId);
     const allConference = toAllConferenceRecords(summary.awards, dynasty.userTeamId);
+    const userNcaaSeed = tournament?.ncaaField?.find((e) => e.teamId === dynasty.userTeamId)?.seed;
     const historyRecord: DynastySeasonRecord = {
       year: dynasty.season.year,
       wins: summary.userRecord.wins,
@@ -1307,6 +1316,7 @@ export function useDynastyController() {
         : {}),
       ...(summary.coachOfYear?.teamId === dynasty.userTeamId ? { coachOfYear: true } : {}),
       ...(userDraftPicks.length > 0 ? { proPicks: userDraftPicks.length } : {}),
+      ...(userNcaaSeed !== undefined ? { ncaaSeed: userNcaaSeed } : {}),
       games: userSeasonGames(dynasty.season.schedule, tournament, dynasty.userTeamId),
     };
 
@@ -1950,6 +1960,7 @@ export function useDynastyController() {
 
   return {
     screen,
+    ncaaBracketOdds,
     setScreen,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
