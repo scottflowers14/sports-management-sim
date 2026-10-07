@@ -221,6 +221,7 @@ export function App() {
     handleExportTeamsTemplate,
     handleImportTeams,
     handleClearCustomTeams,
+    ncaaBracketOdds,
   } = useDynastyController();
   const [viewedProgramId, setViewedProgramId] = useState<string | null>(null);
 
@@ -821,6 +822,7 @@ export function App() {
         <TournamentScreen
           onCoachGame={canCoachGame ? coachGame : undefined}
           tournament={tournament}
+          odds={ncaaBracketOdds}
           teamMap={teamMap}
           userTeamId={dynasty.userTeamId}
           seasonComplete={seasonComplete}

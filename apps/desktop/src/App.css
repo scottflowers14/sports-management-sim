@@ -7111,3 +7111,8 @@ li span {
 .tape-table td span {
   display: inline;
 }
+
+/* Bracket odds */
+.bracket-odds-table td.odds-title { font-weight: 700; }
+.bracket-odds-table tr.odds-out td { opacity: 0.45; }
+@media (max-width: 720px) { .bracket-odds-scroll { overflow-x: auto; } }

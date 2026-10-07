@@ -1,9 +1,11 @@
 import type { TournamentState, TournamentGame, ConferenceBracket, NcaaEntry } from '../tournament';
 import type { BoxScoreData } from '../ui/types';
 import { formatTeamName } from '../ui/format';
+import { formatOdds, type NcaaOdds } from '../bracket-odds';
 
 export function TournamentScreen({
   tournament,
+  odds = null,
   teamMap,
   userTeamId,
   seasonComplete,
@@ -19,6 +21,8 @@ export function TournamentScreen({
   onBoxScore,
 }: {
   tournament: TournamentState | null;
+  /** Bracket odds once the NCAA field is set. */
+  odds?: NcaaOdds[] | null;
   teamMap: Map<string, string>;
   userTeamId: string;
   seasonComplete: boolean;
@@ -102,6 +106,7 @@ export function TournamentScreen({
       <div className="tournament-layout">
         {controls}
         <NcaaSection tournament={tournament} field={tournament.ncaaField} teamMap={teamMap} userTeamId={userTeamId} onBoxScore={onBoxScore} />
+        {odds && <BracketOddsCard odds={odds} teamMap={teamMap} userTeamId={userTeamId} complete={phase === 'complete'} />}
         <h2 className="tournament-section-title">Conference Tournaments</h2>
         {conferenceCards}
       </div>
@@ -157,6 +162,77 @@ export function TournamentScreen({
         </article>
       )}
     </div>
+  );
+}
+
+function BracketOddsCard({
+  odds,
+  teamMap,
+  userTeamId,
+  complete,
+}: {
+  odds: NcaaOdds[];
+  teamMap: Map<string, string>;
+  userTeamId: string;
+  complete: boolean;
+}) {
+  const name = (id: string) => formatTeamName(teamMap.get(id) ?? id);
+  const user = odds.find((o) => o.teamId === userTeamId);
+  const hasQuarters = odds.some((o) => o.quarterfinal !== null);
+  const favorite = [...odds].sort((a, b) => b.champion - a.champion)[0]!;
+  const userLine = !user
+    ? null
+    : user.champion === 1
+      ? `${name(userTeamId)} won it all.`
+      : user.champion === 0
+        ? `${name(userTeamId)} is out.`
+        : user.titleGame === 1
+          ? `${name(userTeamId)} plays for the title: ${formatOdds(user.champion)} to win it.`
+          : user.finalFour === 1
+            ? `${name(userTeamId)} is in the Final Four: ${formatOdds(user.champion)} to win the title.`
+            : `${name(userTeamId)}: ${formatOdds(user.champion)} to win the title, ${formatOdds(user.finalFour)} to reach the Final Four.`;
+  return (
+    <article className="card bracket-odds-card" aria-label="Bracket odds">
+      <div className="ncaa-header">
+        <div>
+          <p className="eyebrow">{complete ? 'Final' : 'Updated every round'}</p>
+          <h2>Bracket Odds</h2>
+        </div>
+        {userLine && <p className="ncaa-user-line in">{userLine}</p>}
+      </div>
+      {!complete && (
+        <p className="dim" style={{ marginTop: 0 }}>
+          Favorite: {name(favorite.teamId)} at {formatOdds(favorite.champion)}. Odds come from team ratings with injured players out,
+          home field for the higher seed through the quarterfinals and neutral sites after that.
+        </p>
+      )}
+      <div className="bracket-odds-scroll">
+      <table className="data-grid bracket-odds-table">
+        <thead>
+          <tr>
+            <th>Seed</th>
+            <th>Team</th>
+            {hasQuarters && <th title="Reach the quarterfinals">QF</th>}
+            <th title="Reach the Final Four">Final Four</th>
+            <th title="Reach the national championship game">Title game</th>
+            <th title="Win the national championship">Champion</th>
+          </tr>
+        </thead>
+        <tbody>
+          {odds.map((o) => (
+            <tr key={o.teamId} className={[o.teamId === userTeamId ? 'user-row' : '', o.champion === 0 ? 'odds-out' : ''].join(' ').trim()}>
+              <td className="num">{o.seed}</td>
+              <td>{name(o.teamId)}</td>
+              {hasQuarters && <td className="num">{formatOdds(o.quarterfinal)}</td>}
+              <td className="num">{formatOdds(o.finalFour)}</td>
+              <td className="num">{formatOdds(o.titleGame)}</td>
+              <td className="num odds-title">{formatOdds(o.champion)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
+    </article>
   );
 }
 
