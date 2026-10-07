@@ -7116,3 +7116,11 @@ li span {
 .bracket-odds-table td.odds-title { font-weight: 700; }
 .bracket-odds-table tr.odds-out td { opacity: 0.45; }
 @media (max-width: 720px) { .bracket-odds-scroll { overflow-x: auto; } }
+
+/* Postseason history */
+.postseason-stats { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 8px 0 12px; }
+.postseason-stat { display: flex; flex-direction: column; }
+.postseason-stat-num { font-size: 1.4rem; font-weight: 800; color: #72f2c6; }
+.postseason-stat-label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: #aab8ca; }
+.ncaa-finish { white-space: nowrap; }
+.ncaa-finish.deep { color: #f5c46b; font-weight: 700; }

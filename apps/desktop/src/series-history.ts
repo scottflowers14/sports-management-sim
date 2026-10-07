@@ -3,11 +3,32 @@ import type { DynastySeasonRecord } from './history';
 import { tournamentGames, type TournamentState } from './tournament';
 
 /** One of the user's games, kept in season history for head-to-head series. */
+export type PostseasonRound =
+  | 'conf_semi'
+  | 'conf_final'
+  | 'ncaa_first_round'
+  | 'ncaa_quarterfinal'
+  | 'national_semi'
+  | 'national_final';
+
 export interface SeasonGameRecord {
   opponentId: string;
   goalsFor: number;
   goalsAgainst: number;
   postseason?: true;
+  /** Which postseason round; missing on saves from before rounds were kept. */
+  round?: PostseasonRound;
+}
+
+/** The round a tournament game belongs to, read from its id. */
+export function postseasonRoundOf(gameId: string): PostseasonRound | null {
+  if (gameId.startsWith('ncaa-r1-')) return 'ncaa_first_round';
+  if (gameId.startsWith('ncaa-qf-')) return 'ncaa_quarterfinal';
+  if (gameId.startsWith('national-semi-')) return 'national_semi';
+  if (gameId === 'national-championship') return 'national_final';
+  if (/-sf[12]$/.test(gameId)) return 'conf_semi';
+  if (gameId.endsWith('-final')) return 'conf_final';
+  return null;
 }
 
 export interface SeriesRecord {
@@ -44,11 +65,13 @@ export function userSeasonGames(
         .filter((g) => g.result && (g.homeTeamId === teamId || g.awayTeamId === teamId))
         .map((g): SeasonGameRecord => {
           const won = g.result!.winnerId === teamId;
+          const round = postseasonRoundOf(g.id);
           return {
             opponentId: g.homeTeamId === teamId ? g.awayTeamId : g.homeTeamId,
             goalsFor: won ? g.result!.winnerScore : g.result!.loserScore,
             goalsAgainst: won ? g.result!.loserScore : g.result!.winnerScore,
             postseason: true,
+            ...(round ? { round } : {}),
           };
         })
     : [];
