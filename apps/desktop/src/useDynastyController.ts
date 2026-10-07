@@ -242,6 +242,7 @@ export function useDynastyController() {
   const [autoRecruitingOffers, setAutoRecruitingOffers] = useState<boolean>(
     () => loadedSave?.autoRecruitingOffers ?? false,
   );
+  const [staffHandlesMedia, setStaffHandlesMedia] = useState<boolean>(() => loadedSave?.staffHandlesMedia ?? false);
   const [staffState, setStaffState] = useState<ProgramStaffState>(() =>
     loadedSave?.staff
       ? { staff: loadedSave.staff, staffCandidates: loadedSave.staffCandidates ?? [] }
@@ -357,12 +358,13 @@ export function useDynastyController() {
     recruitTrends,
     autoRecruitingAssistant,
     autoRecruitingOffers,
+    staffHandlesMedia,
     achievements,
     coachGuide,
     challengeLog,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, achievements, challengeLog, coachGuide]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, staffHandlesMedia, achievements, challengeLog, coachGuide]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -411,6 +413,7 @@ export function useDynastyController() {
     // coach who only sims games still signs a class. Either can be turned off.
     setAutoRecruitingAssistant(true);
     setAutoRecruitingOffers(true);
+    setStaffHandlesMedia(false);
     setAssistantReport(null);
     setAchievements({});
     setAchievementToasts([]);
@@ -500,6 +503,7 @@ export function useDynastyController() {
       recruitTrends: {},
       autoRecruitingAssistant: true,
       autoRecruitingOffers: true,
+      staffHandlesMedia: false,
       achievements: {},
       challengeLog: [],
       coachGuide: NEW_COACH_GUIDE,
@@ -538,6 +542,7 @@ export function useDynastyController() {
     setRecruitTrends(save.recruitTrends ?? {});
     setAutoRecruitingAssistant(save.autoRecruitingAssistant ?? false);
     setAutoRecruitingOffers(save.autoRecruitingOffers ?? false);
+    setStaffHandlesMedia(save.staffHandlesMedia ?? false);
     setAssistantReport(null);
     setSeasonStats(save.seasonStats);
     setCareerStats(save.careerStats ?? emptyCareerStats());
@@ -591,13 +596,15 @@ export function useDynastyController() {
   }, [activeSaveId, refreshSaves]);
 
   const resetDynasty = useCallback(() => {
+    // Main Menu keeps the career: save first so no pending change is lost.
+    persistDynasty();
     // Clear from localStorage too so the stale active key doesn't trigger autosave on revisit.
     window.localStorage.removeItem(ACTIVE_DYNASTY_SAVE_KEY);
     setActiveSaveId(null);
     setSaveStatus('Choose or create a dynasty');
     refreshSaves();
     setScreen('start');
-  }, [refreshSaves]);
+  }, [refreshSaves, persistDynasty]);
 
   // Don't autosave while on the start screen — prevents stale state from overwriting
   // an existing save before the user has actually started or loaded a dynasty.
@@ -780,8 +787,13 @@ export function useDynastyController() {
     practiceGains,
     rivalrySeries,
     weeklyHonors,
-    teamTalk,
-  }), [teamTalk, playingStaff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+    // With the staff handling the room, they give a composed talk: a small
+    // defensive lift that never backfires. The coach can always do better.
+    teamTalk:
+      staffHandlesMedia && !isCurrentTalk(teamTalk, dynasty.season)
+        ? { year: dynasty.season.year, week: dynasty.season.currentWeek, tone: 'calm', result: teamTalkResult('calm', { winProbability: 50, rivalry: false }) }
+        : teamTalk,
+  }), [staffHandlesMedia, teamTalk, playingStaff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((simResult: WeekSimState) => {
     // Promises that came due are judged against the depth chart after the week.
@@ -1751,6 +1763,14 @@ export function useDynastyController() {
     setSaveStatus(`Press conference: ${answer.label.toLowerCase()}`);
   }, [pressConference, updateUserRoster, shortlistIds, coachProfile]);
 
+  // With the staff handling the media, they credit the players after a win and
+  // the opponent after a loss: small, safe morale, no gambles with the AD.
+  useEffect(() => {
+    if (!staffHandlesMedia || !pressConference) return;
+    const timer = window.setTimeout(() => answerPressConference('credit'), 0);
+    return () => window.clearTimeout(timer);
+  }, [staffHandlesMedia, pressConference, answerPressConference]);
+
   const setTeamCaptain = useCallback((playerId: string, captain: boolean) => {
     const player = userTeam?.roster.find((p) => p.id === playerId);
     if (!player) return;
@@ -2146,6 +2166,8 @@ export function useDynastyController() {
     setAutoRecruitingAssistant,
     autoRecruitingOffers,
     setAutoRecruitingOffers,
+    staffHandlesMedia,
+    setStaffHandlesMedia,
     hasHomeGameThisWeek,
     offerPortalPlayer,
     withdrawPortalOffer,

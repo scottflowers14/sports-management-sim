@@ -60,9 +60,10 @@ import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
 import { recruitingPipelines } from './pipelines';
 import { playerGameLog } from './player-game-log';
-import { TeamTalkCard } from './components/TeamTalkCard';
+import { StaffMediaCard, TeamTalkCard } from './components/TeamTalkCard';
 import { allSeries, userSeasonGames } from './series-history';
 import { playerHonors } from './history';
+import { BRACKET_NEWS_FIRST_WEEK } from './week-sim';
 import { TOURNAMENT_ROUND_LABELS, opponentThisRound, projectNcaaField, projectionStatus, stillAlive } from './tournament';
 import type { OpponentScout } from './components/GamePlanPanel';
 import { PregameModal } from './components/PregameModal';
@@ -82,6 +83,9 @@ import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
 
 const CLASS_NEED_POSITIONS = ['ATT', 'MID', 'DEF', 'LSM', 'FOGO', 'GK'] as const;
+
+/** localStorage key for the sidebar groups the coach has folded away. */
+const NAV_COLLAPSED_KEY = 'sms.navCollapsed';
 
 export function App() {
   const {
@@ -219,6 +223,8 @@ export function App() {
     rushInjuredPlayer,
     teamTalk,
     giveTeamTalk,
+    staffHandlesMedia,
+    setStaffHandlesMedia,
     signNilDeal,
     enterTournament,
     simTournamentSemis,
@@ -252,6 +258,27 @@ export function App() {
   const [confirmStart, setConfirmStart] = useState(false);
   /** Coach the Game opens on the pregame plan before the first half. */
   const [pregameOpen, setPregameOpen] = useState(false);
+  /** Sidebar groups the coach has folded away, remembered on this device. */
+  const [collapsedNav, setCollapsedNav] = useState<string[]>(() => {
+    try {
+      const raw = window.localStorage.getItem(NAV_COLLAPSED_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
+  const toggleNavGroup = (id: string) => {
+    setCollapsedNav((prev) => {
+      const next = prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id];
+      try {
+        window.localStorage.setItem(NAV_COLLAPSED_KEY, JSON.stringify(next));
+      } catch {
+        // Private windows can refuse storage; the fold still works for this visit.
+      }
+      return next;
+    });
+  };
 
   if (screen === 'start') {
     return (
@@ -531,8 +558,9 @@ export function App() {
   };
 
   type NavItem = { view: View; label: string; badge?: number | string; alert?: boolean };
-  const navGroups: Array<{ title: string; items: NavItem[] }> = [
+  const navGroups: Array<{ id: string; title: string; items: NavItem[] }> = [
     {
+      id: 'office',
       title: 'Office',
       items: [
         ...(offseasonSummary ? [{ view: 'offseason' as const, label: 'Offseason' }] : []),
@@ -544,6 +572,7 @@ export function App() {
       ],
     },
     {
+      id: 'team',
       title: formatTeamName(userTeam.shortName || userTeam.name),
       items: [
         { view: 'team', label: 'Team' },
@@ -555,6 +584,7 @@ export function App() {
       ],
     },
     {
+      id: 'league',
       title: 'League',
       items: [
         { view: 'standings', label: 'Standings' },
@@ -569,6 +599,10 @@ export function App() {
       ],
     },
   ];
+
+  // A folded group still shows while you're on one of its screens.
+  const navFolded = (group: (typeof navGroups)[number]) =>
+    collapsedNav.includes(group.id) && !group.items.some((i) => i.view === view);
 
   return (
     <OpenHelpContext.Provider value={openHelp}>
@@ -627,8 +661,8 @@ export function App() {
           <button type="button" onClick={() => persistDynasty()}>
             Save Now
           </button>
-          <button type="button" onClick={resetDynasty}>
-            New Dynasty
+          <button type="button" onClick={resetDynasty} title="Back to the main menu. This dynasty stays saved.">
+            Main Menu
           </button>
           <span className={saveError ? 'save-status save-status-failed' : 'save-status'} title={saveStatus}>
             {saveStatus}
@@ -696,9 +730,22 @@ export function App() {
         <aside className="side-nav">
           <nav aria-label="Main navigation">
             {navGroups.map((group) => (
-              <div key={group.title} className="nav-group">
-                <span className="nav-group-title">{group.title}</span>
-                {group.items.map((item) => (
+              <div key={group.id} className="nav-group">
+                <button
+                  type="button"
+                  className="nav-group-title nav-group-toggle"
+                  aria-expanded={!navFolded(group)}
+                  aria-label={navFolded(group) ? `Show ${group.title}` : `Fold ${group.title}`}
+                  title={navFolded(group) ? `Show ${group.title}` : `Fold ${group.title} away`}
+                  onClick={() => toggleNavGroup(group.id)}
+                >
+                  {group.title}
+                  <span className="nav-group-caret" aria-hidden="true">{navFolded(group) ? '▸' : '▾'}</span>
+                  {navFolded(group) && group.items.some((i) => i.badge !== undefined) && (
+                    <span className="tab-badge nav-folded-dot" aria-label="Updates inside">•</span>
+                  )}
+                </button>
+                {!navFolded(group) && group.items.map((item) => (
                   <button
                     key={item.view}
                     type="button"
@@ -777,7 +824,11 @@ export function App() {
         <WeekHubScreen
           onCoachGame={canCoachGame ? () => setPregameOpen(true) : undefined}
           onRushInjury={rushInjuredPlayer}
-          bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          bracketStatus={
+            ncaaProjection && dynasty.season.currentWeek > BRACKET_NEWS_FIRST_WEEK
+              ? projectionStatus(ncaaProjection, dynasty.userTeamId)
+              : undefined
+          }
           guideCard={
             guideActive ? (
               <CoachChecklistCard
@@ -801,8 +852,11 @@ export function App() {
           formCard={<FormWatchCard roster={userTeam.roster} form={userForm} onSelectPlayer={setSelectedPlayerId} />}
           teamTalkCard={
             // Hidden at halftime: a talk given then would change a first half already shown.
-            weeklyHub && !seasonComplete && !tournament && !halftime ? (
+            weeklyHub && !seasonComplete && !tournament && !halftime && staffHandlesMedia ? (
+              <StaffMediaCard onTakeBack={() => setStaffHandlesMedia(false)} />
+            ) : weeklyHub && !seasonComplete && !tournament && !halftime ? (
               <TeamTalkCard
+                onDelegate={() => setStaffHandlesMedia(true)}
                 opponentName={formatTeamName(weeklyHub.opponentName)}
                 talk={teamTalk}
                 onTalk={(tone) =>

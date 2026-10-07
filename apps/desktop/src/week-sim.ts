@@ -69,7 +69,8 @@ import { pickWeeklyHonors, weeklyHonorNews } from './weekly-honors';
 import type { WeeklyHonor } from './weekly-honors';
 import type { SeasonStatsMap } from './stats';
 
-const BRACKET_NEWS_FIRST_WEEK = 3;
+/** Bracket talk (news and the hub chip) waits until a few weeks of results mean something. */
+export const BRACKET_NEWS_FIRST_WEEK = 3;
 
 // About ten items a week, so this keeps the whole regular season.
 const MAX_NEWS_ITEMS = 120;

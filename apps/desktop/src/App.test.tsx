@@ -284,7 +284,7 @@ describe('Desktop App', () => {
     await renderStartedApp();
     const firstSave = loadActiveDynastySave();
 
-    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Main Menu$/i }));
 
     expect(screen.getByLabelText(/Dynasty start screen/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Load Maryland State 2028/i })).toBeInTheDocument();
@@ -295,12 +295,12 @@ describe('Desktop App', () => {
     expect(loadActiveDynastySave()?.dynasty.id).toBe(firstSave?.dynasty.id);
   });
 
-  it('starts a fresh generated dynasty when New Dynasty creates another career', async () => {
+  it('starts a fresh generated dynasty from the main menu', async () => {
     await renderStartedApp();
     const firstSave = loadActiveDynastySave();
     const firstRecruitId = firstSave?.dynasty.recruits[0]?.id;
 
-    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Main Menu$/i }));
     await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
     await userEvent.click(screen.getByRole('button', { name: /Yes, Start New/i }));
     const secondSave = loadActiveDynastySave();
@@ -316,13 +316,13 @@ describe('Desktop App', () => {
     await renderStartedApp();
     const firstSaveId = loadActiveDynastySave()?.saveId;
 
-    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Main Menu$/i }));
     await userEvent.selectOptions(screen.getByLabelText(/^Team$/i), 'virginia-lakes');
     await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
     await userEvent.click(screen.getByRole('button', { name: /Yes, Start New/i }));
     const secondSaveId = loadActiveDynastySave()?.saveId;
 
-    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Main Menu$/i }));
 
     expect(listDynastySaves()).toHaveLength(2);
     await userEvent.click(screen.getByRole('button', { name: /Delete Maryland State 2028/i }));
@@ -456,6 +456,9 @@ describe('Desktop App', () => {
     await userEvent.click(within(hub).getAllByTitle(/^View /i)[0]!);
     const panel = screen.getByLabelText(/Close player panel/i).closest('aside') as HTMLElement;
     expect(panel).toHaveTextContent(/Overall/i);
+    // Escape closes it, like every other overlay.
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByLabelText(/Close player panel/i)).not.toBeInTheDocument();
   });
 
   it('opens a reusable player card when a recruit name is clicked', async () => {
@@ -794,6 +797,39 @@ describe('Desktop App', () => {
       expect(save.newsItems.some((n) => n.headline.includes('after the game'))).toBe(true);
     });
     expect(label.length).toBeGreaterThan(0);
+  });
+
+  it('lets the staff handle team talks and press conferences until taken back', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Let the staff handle talks/i }));
+    expect(screen.getByRole('button', { name: 'Take them back' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Week Hub/ }));
+    // The staff answered for us: no press card waits, and the answer is on record.
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Press conference')).not.toBeInTheDocument();
+      const save = loadActiveDynastySave()!;
+      expect(save.staffHandlesMedia).toBe(true);
+      expect(Object.values(save.pressAnswers ?? {})).toHaveLength(1);
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Take them back' }));
+    expect(screen.getByRole('button', { name: /Let the staff handle talks/i })).toBeInTheDocument();
+  });
+
+  it('folds sidebar groups away and remembers it', async () => {
+    await renderStartedApp();
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    const league = within(nav).getByRole('button', { name: 'Fold League' });
+    expect(league).toHaveAttribute('aria-expanded', 'true');
+    expect(within(nav).getByRole('button', { name: /^Standings/ })).toBeInTheDocument();
+    await userEvent.click(league);
+    expect(within(nav).getByRole('button', { name: 'Show League' })).toHaveAttribute('aria-expanded', 'false');
+    expect(within(nav).queryByRole('button', { name: /^Standings/ })).not.toBeInTheDocument();
+    cleanup();
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    const navAgain = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(within(navAgain).getByRole('button', { name: 'Show League' })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('sets practice intensity and development plans on the Practice screen', async () => {

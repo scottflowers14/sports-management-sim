@@ -92,6 +92,8 @@ export interface DynastySaveState {
   autoRecruitingAssistant?: boolean;
   /** When on, the assistant also makes its suggested scholarship offers. */
   autoRecruitingOffers?: boolean;
+  /** The staff gives the pregame talk and answers the press each week. */
+  staffHandlesMedia?: boolean;
   /** The staff sets the game plan from the roster; off once the user picks their own. */
   autoGamePlan?: boolean;
   /** Achievements this dynasty has unlocked. */
