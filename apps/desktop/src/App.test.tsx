@@ -252,6 +252,9 @@ describe('Desktop App', () => {
 
   it('saves the current dynasty to an active save slot', async () => {
     await renderStartedApp();
+    // Let the debounced autosave from starting the dynasty land first, so it
+    // can't overwrite the manual save's status on a slow machine.
+    await waitFor(() => expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Autosaved/i));
 
     await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
 
