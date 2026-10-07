@@ -1,7 +1,8 @@
 import { legacyScore, legacyTier } from './legacy';
 import { AchievementWatchCard } from './components/AchievementWatchCard';
 import { achievementWatch } from './achievements';
-import { DIFFICULTY_LABELS } from './difficulty';
+import { cpuRecruitingScale, DIFFICULTY_LABELS, userDecisionScale } from './difficulty';
+import { landChance, landChances } from './recruit-odds';
 import { seasonReport } from './season-report';
 import {
   calculateLacrosseTeamRating,
@@ -456,6 +457,18 @@ export function App() {
     ? dynasty.season.teams.flatMap((t) => t.roster).find((p) => p.id === selectedPlayerId)
     : null;
   const selectedRecruit = selectedRecruitId ? dynasty.recruits.find((r) => r.id === selectedRecruitId) : null;
+  // Chance to land each open recruit; only worked out where it's shown.
+  const landContext = {
+    userTeam,
+    teams: dynasty.season.teams,
+    currentWeek: dynasty.season.currentWeek,
+    finalWeek: dynasty.season.schedule.reduce((max, g) => Math.max(max, g.week), 0) || 10,
+    decisionScale: userDecisionScale(dynasty.difficulty),
+    cpuInterestScale: cpuRecruitingScale(dynasty.difficulty),
+    teamName: (id: string) => formatTeamShort(teamMap.get(id) ?? id),
+  };
+  const recruitLandChances = view === 'recruiting' ? landChances(dynasty.recruits, landContext) : undefined;
+  const selectedRecruitChance = selectedRecruit ? landChance(selectedRecruit, landContext) : undefined;
 
   const advance = (() => {
     if (offseasonSummary) {
@@ -913,6 +926,7 @@ export function App() {
           onMakeOffers={offerScholarships}
           autoOffers={autoRecruitingOffers}
           onAutoOffersChange={setAutoRecruitingOffers}
+          landChances={recruitLandChances}
         />
       )}
 
@@ -1127,6 +1141,7 @@ export function App() {
           scouting={scouting}
           userTeamId={dynasty.userTeamId}
           teamMap={teamMap}
+          chance={selectedRecruitChance}
           onScout={doScoutRecruit}
           onClose={() => setSelectedRecruitId(null)}
         />

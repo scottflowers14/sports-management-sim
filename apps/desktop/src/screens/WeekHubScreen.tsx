@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import type { GameLog, LacrosseTeam, LacrossePortalEntry, LacrossePosition, LacrossePlayerTraits } from '@sports-management-sim/sport-lacrosse';
 import type { PositionNeed, RecruitBoardEntry, ScheduledGame } from '@sports-management-sim/engine-core';
+import { classScholarshipBudgetUsed } from '@sports-management-sim/engine-core';
+import { LACROSSE_CLASS_SCHOLARSHIP_BUDGET } from '@sports-management-sim/sport-lacrosse';
 import type { InjuredPlayer } from '../dynasty-helpers';
 import type { RankingEntry } from '../rankings';
 import type { NewsItem } from '../news-feed';
@@ -13,6 +15,9 @@ import { RushBackButton } from '../components/RushBackButton';
 import { formatTeamName } from '../ui/format';
 import { RankMove, TickerNumber } from '../ui/Ticker';
 
+/** The smallest offer worth making (a quarter scholarship). */
+const MIN_OFFER_SHARE = 0.25;
+
 interface ActionItem {
   id: string;
   priority: 'high' | 'medium' | 'low';
@@ -21,7 +26,7 @@ interface ActionItem {
   nav?: string;
 }
 
-function computeActionItems({
+export function computeActionItems({
   injuries,
   userTeam,
   scouting,
@@ -37,8 +42,11 @@ function computeActionItems({
   redshirtSuggestions = 0,
   captainCount,
   rivalryWeek,
+  scholarshipBudgetLeft,
 }: {
   currentWeek: number;
+  /** Scholarship equivalencies still free; when it's spent, the class-needs nudge says so. */
+  scholarshipBudgetLeft?: number;
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
   openPlanSlots?: number;
@@ -79,13 +87,16 @@ function computeActionItems({
   const short = classNeeds.filter((n) => n.open > n.offersOut);
   if (!seasonComplete && short.length > 0) {
     const openSpots = short.reduce((sum, n) => sum + n.open, 0);
+    const spots = short.map((n) => `${n.position} ${n.open}`).join(', ');
+    // With the budget spent there's nothing to offer: say how to make room instead.
+    const budgetFull = scholarshipBudgetLeft !== undefined && scholarshipBudgetLeft < MIN_OFFER_SHARE;
     items.push({
       id: 'class-needs',
-      priority: currentWeek >= 4 ? 'high' : 'medium',
+      priority: budgetFull ? 'medium' : currentWeek >= 4 ? 'high' : 'medium',
       icon: '🎓',
-      text: `${openSpots} spot${openSpots > 1 ? 's' : ''} open in next year's class without enough offers out: ${short
-        .map((n) => `${n.position} ${n.open}`)
-        .join(', ')}`,
+      text: budgetFull
+        ? `Scholarship budget is full with spots still open (${spots}). Drop a long-shot offer to make room.`
+        : `${openSpots} spot${openSpots > 1 ? 's' : ''} open in next year's class without enough offers out: ${spots}`,
       nav: 'recruiting',
     });
   }
@@ -307,6 +318,8 @@ export function WeekHubScreen({
     ...(redshirtSuggestions !== undefined ? { redshirtSuggestions } : {}),
     ...(captainCount !== undefined ? { captainCount } : {}),
     ...(rivalryWeek !== undefined ? { rivalryWeek } : {}),
+    scholarshipBudgetLeft:
+      LACROSSE_CLASS_SCHOLARSHIP_BUDGET - classScholarshipBudgetUsed(recruitBoard.map((e) => e.recruit), userTeamId),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
   // The alert banner carries the urgent items; the card lists the rest, most useful first.

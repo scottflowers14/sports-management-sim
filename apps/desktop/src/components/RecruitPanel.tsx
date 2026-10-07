@@ -5,6 +5,8 @@ import { getDisplayOvr, getScoutTier } from '../scouting';
 import { cardFromRecruit } from '../player-card-model';
 import { PlayerCardPanel } from './PlayerCard';
 import { formatTeamShort } from '../ui/format';
+import type { LandChance } from '../recruit-odds';
+import { LandChip } from './LandChip';
 
 /** 4★+ recruits are nationally ranked — their star tier is public knowledge. */
 const PUBLIC_STAR_FLOOR = 4;
@@ -22,6 +24,7 @@ export function RecruitPanel({
   scouting,
   userTeamId,
   teamMap,
+  chance,
   onScout,
   onClose,
 }: {
@@ -29,6 +32,8 @@ export function RecruitPanel({
   scouting: ScoutingState;
   userTeamId: string;
   teamMap: Map<string, string>;
+  /** Chance to land him; hidden until he's scouted or nationally ranked. */
+  chance?: LandChance | undefined;
   onScout: (recruitId: string, trueOvr: number) => void;
   onClose: () => void;
 }) {
@@ -67,6 +72,12 @@ export function RecruitPanel({
             <span className="interest-label">Your interest {userInterest}/100</span>
             {userOffer && <span className="badge badge-offered">Offered {userOffer.scholarshipPercent}%</span>}
           </div>
+          {chance && (tier !== 'none' || starsPublic) && (
+            <div className="recruit-land-row" aria-label="Chance to land">
+              <span className="dim">Chance to land</span> <LandChip chance={chance} />
+              <span className="dim recruit-land-detail">{chance.detail}</span>
+            </div>
+          )}
         </>
       )}
 

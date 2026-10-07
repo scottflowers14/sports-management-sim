@@ -18,17 +18,31 @@ function star(recruit: Recruit<Pos>, starRating: Recruit<Pos>['starRating']): Re
   return { ...recruit, starRating };
 }
 
-function suggest(recruits: Recruit<Pos>[], opts: { budget?: number; known?: (id: string) => boolean; team?: ReturnType<typeof makeTeam> } = {}) {
+function suggest(
+  recruits: Recruit<Pos>[],
+  opts: { budget?: number; known?: (id: string) => boolean; winnable?: (id: string) => boolean; team?: ReturnType<typeof makeTeam> } = {},
+) {
   const team = opts.team ?? graduatingTeam();
   return suggestScholarshipOffers({
     team,
     board: sortRecruitBoardForTeam(team, recruits, TARGETS),
     budgetRemaining: opts.budget ?? 3.25,
     isKnown: opts.known ?? (() => true),
+    ...(opts.winnable ? { isWinnable: opts.winnable } : {}),
   });
 }
 
 describe('suggestScholarshipOffers', () => {
+  it('passes over recruits the staff judges unwinnable and offers the next best fit', () => {
+    const recruits = Array.from({ length: 6 }, (_, i) => makeRecruit(`att-${i}`, 'ATT', 70 - i));
+    const ids = suggest(recruits, { winnable: (id) => id !== 'att-0' && id !== 'att-1' })
+      .filter((s) => s.position === 'ATT')
+      .map((s) => s.recruitId);
+    expect(ids).not.toContain('att-0');
+    expect(ids).not.toContain('att-1');
+    expect(ids).toHaveLength(3);
+  });
+
   it('replaces graduates by position, about 1.5 offers per spot', () => {
     const recruits = [
       ...Array.from({ length: 6 }, (_, i) => makeRecruit(`att-${i}`, 'ATT', 70 - i)),
