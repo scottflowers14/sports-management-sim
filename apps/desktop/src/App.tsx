@@ -23,6 +23,7 @@ import {
   seasonAttendance,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
+import type { LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { classNeedsByPosition } from '@sports-management-sim/engine-core';
 
 import { getJobSecurityLabel, getJobSecurityColor } from './coach-profile';
@@ -47,6 +48,9 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { ACHIEVEMENTS, achievementPoints, profileLevel, profileTitle } from './achievements';
 import { AchievementToast } from './components/AchievementToast';
 import { CoachChecklistCard, WelcomeModal } from './components/CoachChecklist';
+import { GameRevealModal } from './components/GameRevealModal';
+import { buildGameReveal } from './game-reveal';
+import { TickerNumber, RankMove } from './ui/Ticker';
 import { coachGuideSteps, showCoachGuide } from './coach-guide';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
@@ -228,6 +232,8 @@ export function App() {
     markGuideVisited,
     dismissCoachGuide,
     acknowledgeWelcome,
+    pendingReveal,
+    dismissReveal,
   } = useDynastyController();
 
   useEffect(() => {
@@ -319,6 +325,32 @@ export function App() {
 
   const userRankEntry = rankings.find((r) => r.teamId === dynasty.userTeamId);
   const guideActive = showCoachGuide(coachGuide, dynastyHistory.length);
+  const revealGame = pendingReveal ? dynasty.season.schedule.find((g) => g.id === pendingReveal.gameId) : undefined;
+  const revealData = (() => {
+    if (!pendingReveal || !revealGame?.result) return null;
+    const reveal = buildGameReveal(revealGame, gameLogs.get(revealGame.id), dynasty.userTeamId, {
+      userRank: pendingReveal.userRank,
+      opponentRank: pendingReveal.opponentRank,
+      trophy: rivalryForGame(dynastyRivalries(dynasty), revealGame)?.trophy ?? null,
+    });
+    if (!reveal) return null;
+    const { result } = revealGame;
+    const log = gameLogs.get(revealGame.id);
+    const boxScore = result.teamStats
+      ? {
+          title: `Week ${revealGame.week}`,
+          homeTeamName: teamMap.get(revealGame.homeTeamId) ?? revealGame.homeTeamId,
+          awayTeamName: teamMap.get(revealGame.awayTeamId) ?? revealGame.awayTeamId,
+          homeScore: result.homeScore,
+          awayScore: result.awayScore,
+          overtime: result.overtime,
+          homeStats: result.teamStats.home as LacrosseTeamStats,
+          awayStats: result.teamStats.away as LacrosseTeamStats,
+          ...(log ? { log } : {}),
+        }
+      : null;
+    return { reveal, boxScore };
+  })();
   // Badge the stories about our program from the latest simulated week.
   const latestNewsWeek = newsItems[0]?.week;
   const unreadNewsCount = newsItems.filter((n) => n.week === latestNewsWeek && n.featured).length;
@@ -488,12 +520,14 @@ export function App() {
         <section className="top-team" aria-label="User team summary">
           <strong className="top-team-name">{formatTeamName(userTeam.name)}</strong>
           <span className="top-record">
-            {offseasonSummary
-              ? `${offseasonSummary.userRecord.wins}–${offseasonSummary.userRecord.losses}`
-              : `${userTeam.record.wins}–${userTeam.record.losses}`}
+            <TickerNumber value={offseasonSummary ? offseasonSummary.userRecord.wins : userTeam.record.wins} />–
+            <TickerNumber value={offseasonSummary ? offseasonSummary.userRecord.losses : userTeam.record.losses} />
           </span>
           {userRankEntry && (
-            <span className="national-rank">#{userRankEntry.rank} Nationally</span>
+            <span className="national-rank">
+              #<TickerNumber value={userRankEntry.rank} /> Nationally
+              <RankMove rank={userRankEntry.rank} />
+            </span>
           )}
           <span className="top-phase">
             {offseasonSummary
@@ -535,6 +569,16 @@ export function App() {
             Manage saves
           </button>
         </div>
+      )}
+
+      {revealData && (
+        <GameRevealModal
+          reveal={revealData.reveal}
+          userName={formatTeamName(userTeam.name)}
+          opponentName={formatTeamName(teamMap.get(revealData.reveal.opponentId) ?? revealData.reveal.opponentId)}
+          onBoxScore={revealData.boxScore ? () => setSelectedBoxScore(revealData.boxScore!) : undefined}
+          onClose={dismissReveal}
+        />
       )}
 
       {guideActive && !coachGuide.welcomed && (

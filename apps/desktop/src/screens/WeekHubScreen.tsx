@@ -11,6 +11,7 @@ import { ResultRow } from '../components/ResultRow';
 import { featuredResults } from '../weekly-hub';
 import { RushBackButton } from '../components/RushBackButton';
 import { formatTeamName } from '../ui/format';
+import { RankMove, TickerNumber } from '../ui/Ticker';
 
 interface ActionItem {
   id: string;
@@ -320,19 +321,19 @@ export function WeekHubScreen({
           <div className="hub-header-stats">
             <div className="hub-stat">
               <span className="hub-stat-value">
-                {userTeam.record.wins}–{userTeam.record.losses}
+                <TickerNumber value={userTeam.record.wins} />–<TickerNumber value={userTeam.record.losses} />
               </span>
               <span className="hub-stat-label">Record</span>
             </div>
             {userRankEntry && (
               <div className="hub-stat">
-                <span className="hub-stat-value hub-stat-rank">#{userRankEntry.rank}</span>
+                <span className="hub-stat-value hub-stat-rank">#<TickerNumber value={userRankEntry.rank} /><RankMove rank={userRankEntry.rank} /></span>
                 <span className="hub-stat-label">National Rank</span>
               </div>
             )}
             {weeklyHub && (
               <div className="hub-stat">
-                <span className="hub-stat-value hub-stat-prob">{weeklyHub.winProbability}%</span>
+                <span className="hub-stat-value hub-stat-prob"><TickerNumber value={weeklyHub.winProbability} />%</span>
                 <span className="hub-stat-label">Win Prob</span>
               </div>
             )}
