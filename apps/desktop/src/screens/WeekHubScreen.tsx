@@ -74,6 +74,21 @@ function computeActionItems({
     });
   }
 
+  // Graduates not yet replaced, where fewer live offers are out than spots to fill.
+  const short = classNeeds.filter((n) => n.open > n.offersOut);
+  if (!seasonComplete && short.length > 0) {
+    const openSpots = short.reduce((sum, n) => sum + n.open, 0);
+    items.push({
+      id: 'class-needs',
+      priority: currentWeek >= 4 ? 'high' : 'medium',
+      icon: '🎓',
+      text: `${openSpots} spot${openSpots > 1 ? 's' : ''} open in next year's class without enough offers out: ${short
+        .map((n) => `${n.position} ${n.open}`)
+        .join(', ')}`,
+      nav: 'recruiting',
+    });
+  }
+
   if (scouting.pointsAvailable > 0 && recruitBoard.length > 0) {
     const topUnscouted = recruitBoard.find(
       (e) => !scouting.fullIds.includes(e.recruit.id) && !(e.recruit.id in scouting.partialIds),
@@ -171,21 +186,6 @@ function computeActionItems({
     });
   }
 
-  // Graduates not yet replaced, where fewer live offers are out than spots to fill.
-  const short = classNeeds.filter((n) => n.open > n.offersOut);
-  if (!seasonComplete && short.length > 0) {
-    const openSpots = short.reduce((sum, n) => sum + n.open, 0);
-    items.push({
-      id: 'class-needs',
-      priority: currentWeek >= 4 ? 'high' : 'medium',
-      icon: '🎓',
-      text: `${openSpots} spot${openSpots > 1 ? 's' : ''} open in next year's class without enough offers out: ${short
-        .map((n) => `${n.position} ${n.open}`)
-        .join(', ')}`,
-      nav: 'recruiting',
-    });
-  }
-
   if (items.length === 0) {
     items.push({
       id: 'all-good',
@@ -234,6 +234,7 @@ export function WeekHubScreen({
   teamTalkCard,
   formCard,
   achievementCard,
+  guideCard,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -274,8 +275,11 @@ export function WeekHubScreen({
   /** Hot and cold streaks on the roster. */
   formCard?: ReactNode;
   achievementCard?: ReactNode;
+  /** The first-season Coach's Checklist. */
+  guideCard?: ReactNode;
 }) {
   const [showAllResults, setShowAllResults] = useState(false);
+  const [showAllActions, setShowAllActions] = useState(false);
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
     (e) => e.status === 'committed' && e.committedTeamId === userTeamId,
@@ -299,6 +303,11 @@ export function WeekHubScreen({
     ...(rivalryWeek !== undefined ? { rivalryWeek } : {}),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
+  // The alert banner carries the urgent items; the card lists the rest, most useful first.
+  const otherActions = actionItems
+    .filter((a) => a.priority !== 'high')
+    .sort((a, b) => (a.priority === b.priority ? 0 : a.priority === 'medium' ? -1 : 1));
+  const shownActions = showAllActions ? otherActions : otherActions.slice(0, 3);
 
   return (
     <div className="week-hub-layout">
@@ -388,6 +397,33 @@ export function WeekHubScreen({
             </div>
           ))}
         </div>
+      )}
+
+      {guideCard}
+
+      {/* ── Action Items ──────────────────────────────── */}
+      {otherActions.length > 0 && (
+        <article className="card hub-actions-card" aria-label="Recommended actions">
+          <h3 className="hub-card-title">Recommended Actions</h3>
+          <ul className="hub-actions-list">
+            {shownActions.map((item) => (
+              <li key={item.id} className={`hub-action-row hub-action-${item.priority}`}>
+                <span className="hub-action-icon">{item.icon}</span>
+                <span className="hub-action-text">{item.text}</span>
+                {item.nav && (
+                  <button className="hub-action-nav" onClick={() => onNavigate(item.nav!)}>
+                    Go →
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {otherActions.length > 3 && (
+            <button type="button" className="ghost-btn hub-actions-more" onClick={() => setShowAllActions((v) => !v)}>
+              {showAllActions ? 'Show fewer' : `Show all ${otherActions.length}`}
+            </button>
+          )}
+        </article>
       )}
 
       {teamTalkCard}
@@ -608,23 +644,6 @@ export function WeekHubScreen({
         </article>
       </div>
 
-      {/* ── Action Items ──────────────────────────────── */}
-      <article className="card hub-actions-card">
-        <h3 className="hub-card-title">Recommended Actions</h3>
-        <ul className="hub-actions-list">
-          {actionItems.map((item) => (
-            <li key={item.id} className={`hub-action-row hub-action-${item.priority}`}>
-              <span className="hub-action-icon">{item.icon}</span>
-              <span className="hub-action-text">{item.text}</span>
-              {item.nav && (
-                <button className="hub-action-nav" onClick={() => onNavigate(item.nav!)}>
-                  Go →
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </article>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { compactGameLog, normalizeGamePlan } from '@sports-management-sim/sport-lacrosse';
 import type { UnlockedAchievements } from './achievements';
+import type { CoachGuideState } from './coach-guide';
 import type { ChallengeResult } from './challenges';
 import { sortRecruitBoardForTeam } from '@sports-management-sim/engine-core';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePlayer, LacrossePortalEntry, LacrossePracticePlan, LacrosseStaff, RivalrySeriesMap, StaffMember } from '@sports-management-sim/sport-lacrosse';
@@ -95,6 +96,8 @@ export interface DynastySaveState {
   autoGamePlan?: boolean;
   /** Achievements this dynasty has unlocked. */
   achievements?: UnlockedAchievements;
+  /** The first-season Coach's Checklist. Missing on older saves. */
+  coachGuide?: CoachGuideState;
   /** Every weekly challenge the coach has faced. */
   challengeLog?: ChallengeResult[];
   /** The user's assistant coaches. Older saves get a starting staff on load. */

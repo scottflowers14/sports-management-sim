@@ -70,6 +70,7 @@ import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
 import { challengeMet, challengesCompleted, weeklyChallenge, type ChallengeResult } from './challenges';
+import { NEW_COACH_GUIDE, VETERAN_COACH_GUIDE, markGuideVisit, type CoachGuideState } from './coach-guide';
 import { achievementXp, coachRivalryRecord, achievementPoints, newlyUnlocked, profileLevel, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
 import { careerFromHistory, loadProfile, saveProfile, type PlayerProfile } from './profile';
 import { careerMilestonesForWeek } from './career-milestones';
@@ -303,6 +304,7 @@ export function useDynastyController() {
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [achievements, setAchievements] = useState<UnlockedAchievements>(() => loadedSave?.achievements ?? {});
   const [challengeLog, setChallengeLog] = useState<ChallengeResult[]>(() => loadedSave?.challengeLog ?? []);
+  const [coachGuide, setCoachGuide] = useState<CoachGuideState>(() => (loadedSave ? loadedSave.coachGuide ?? VETERAN_COACH_GUIDE : NEW_COACH_GUIDE));
   const [profile, setProfile] = useState<PlayerProfile>(() => loadProfile());
   /** Achievement ids unlocked since the player last dismissed the toast. */
   const [achievementToasts, setAchievementToasts] = useState<string[]>([]);
@@ -352,10 +354,11 @@ export function useDynastyController() {
     autoRecruitingAssistant,
     autoRecruitingOffers,
     achievements,
+    coachGuide,
     challengeLog,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, achievements, challengeLog]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, achievements, challengeLog, coachGuide]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -409,6 +412,7 @@ export function useDynastyController() {
     setAchievementToasts([]);
     setLevelUp(null);
     setChallengeLog([]);
+    setCoachGuide(NEW_COACH_GUIDE);
   }, []);
 
   const persistDynasty = useCallback((status = 'Saved locally') => {
@@ -493,6 +497,7 @@ export function useDynastyController() {
       autoRecruitingOffers: true,
       achievements: {},
       challengeLog: [],
+      coachGuide: NEW_COACH_GUIDE,
       ...newStaff,
     };
     const saved = writeSave(saveId, state);
@@ -556,6 +561,7 @@ export function useDynastyController() {
     setAchievements(save.achievements ?? {});
     setAchievementToasts([]);
     setChallengeLog(save.challengeLog ?? []);
+    setCoachGuide(save.coachGuide ?? VETERAN_COACH_GUIDE);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
     setView(save.offseasonSummary ? 'offseason' : 'week-hub');
@@ -1958,8 +1964,16 @@ export function useDynastyController() {
   }, []);
 
 
+  const markGuideVisited = useCallback((view: string) => setCoachGuide((g) => markGuideVisit(g, view)), []);
+  const dismissCoachGuide = useCallback(() => setCoachGuide((g) => ({ ...g, welcomed: true, dismissed: true })), []);
+  const acknowledgeWelcome = useCallback(() => setCoachGuide((g) => ({ ...g, welcomed: true })), []);
+
   return {
     screen,
+    coachGuide,
+    markGuideVisited,
+    dismissCoachGuide,
+    acknowledgeWelcome,
     ncaaBracketOdds,
     setScreen,
     staff: staffState.staff,

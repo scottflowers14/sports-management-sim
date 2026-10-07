@@ -19,6 +19,9 @@ test('plays a season through the title game and offseason into year two', async 
   await page.reload();
 
   await page.getByRole('button', { name: 'Start New Dynasty' }).click();
+  // A new coach is welcomed once, then the first-season checklist takes over.
+  await page.getByRole('button', { name: 'Got it' }).click();
+  await expect(page.getByLabel("Coach's checklist")).toContainText('0/5 done');
   const advance = page.locator('.advance-btn');
   await expect(advance).toContainText('Week 1');
 

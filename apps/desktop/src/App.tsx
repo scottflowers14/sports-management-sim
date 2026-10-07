@@ -46,6 +46,8 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { ACHIEVEMENTS, achievementPoints, profileLevel, profileTitle } from './achievements';
 import { AchievementToast } from './components/AchievementToast';
+import { CoachChecklistCard, WelcomeModal } from './components/CoachChecklist';
+import { coachGuideSteps, showCoachGuide } from './coach-guide';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
@@ -60,7 +62,7 @@ import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
 import { PlayersScreen } from './screens/PlayersScreen';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FormWatchCard } from './components/FormWatchCard';
 import { rosterForm } from './player-form';
 import { powerRankingBlurbs } from './power-rankings';
@@ -222,7 +224,15 @@ export function App() {
     handleImportTeams,
     handleClearCustomTeams,
     ncaaBracketOdds,
+    coachGuide,
+    markGuideVisited,
+    dismissCoachGuide,
+    acknowledgeWelcome,
   } = useDynastyController();
+
+  useEffect(() => {
+    if (screen === 'game') markGuideVisited(view);
+  }, [screen, view, markGuideVisited]);
   const [viewedProgramId, setViewedProgramId] = useState<string | null>(null);
 
   if (screen === 'start') {
@@ -308,6 +318,7 @@ export function App() {
   ).length;
 
   const userRankEntry = rankings.find((r) => r.teamId === dynasty.userTeamId);
+  const guideActive = showCoachGuide(coachGuide, dynastyHistory.length);
   // Badge the stories about our program from the latest simulated week.
   const latestNewsWeek = newsItems[0]?.week;
   const unreadNewsCount = newsItems.filter((n) => n.week === latestNewsWeek && n.featured).length;
@@ -526,6 +537,14 @@ export function App() {
         </div>
       )}
 
+      {guideActive && !coachGuide.welcomed && (
+        <WelcomeModal
+          coachName={coachProfile?.name ?? 'Coach'}
+          teamName={formatTeamName(userTeam.name)}
+          onClose={acknowledgeWelcome}
+        />
+      )}
+
       {achievementToasts.length > 0 && view !== 'profile' && (
         <AchievementToast
           ids={achievementToasts}
@@ -624,6 +643,20 @@ export function App() {
           onCoachGame={canCoachGame ? coachGame : undefined}
           onRushInjury={rushInjuredPlayer}
           bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          guideCard={
+            guideActive ? (
+              <CoachChecklistCard
+                steps={coachGuideSteps({
+                  captainCount: teamCaptains(userTeam).length,
+                  offersOut: dynasty.recruits.filter((r) => r.scholarshipOffers.some((o) => o.teamId === dynasty.userTeamId)).length,
+                  gamesPlayed: userTeam.record.wins + userTeam.record.losses,
+                  visited: coachGuide.visited,
+                })}
+                onNavigate={(v) => setView(v as Parameters<typeof setView>[0])}
+                onDismiss={dismissCoachGuide}
+              />
+            ) : undefined
+          }
           achievementCard={
             <AchievementWatchCard
               items={achievementWatch(achievementSnapshot, achievements, { rivalryWeek: !seasonComplete && Boolean(rivalryWeek) })}

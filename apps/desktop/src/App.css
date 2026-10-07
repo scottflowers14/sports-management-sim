@@ -7124,3 +7124,22 @@ li span {
 .postseason-stat-label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: #aab8ca; }
 .ncaa-finish { white-space: nowrap; }
 .ncaa-finish.deep { color: #f5c46b; font-weight: 700; }
+
+/* Coach's Checklist */
+.coach-checklist { border: 1px solid rgba(114, 242, 198, 0.35); }
+.coach-checklist-head { display: flex; align-items: center; gap: 16px; }
+.coach-checklist-head > div { flex: 1; }
+.coach-checklist-head .hub-card-title { margin: 2px 0 0; }
+.coach-checklist-count { font-weight: 700; color: #72f2c6; }
+.coach-checklist-track { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); margin: 10px 0 12px; overflow: hidden; }
+.coach-checklist-fill { height: 100%; background: linear-gradient(90deg, #45d6a8, #72f2c6); transition: width 0.4s ease; }
+.coach-checklist-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.coach-checklist-steps li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+.coach-checklist-steps li.step-next { background: rgba(114, 242, 198, 0.08); box-shadow: inset 3px 0 0 #72f2c6; }
+.coach-checklist-steps li.step-done { opacity: 0.6; }
+.coach-checklist-steps .step-text { flex: 1; }
+.coach-checklist-steps .step-mark { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25); display: grid; place-items: center; font-size: 0.8rem; color: #0b1626; }
+.coach-checklist-steps li.step-done .step-mark { background: #72f2c6; border-color: #72f2c6; }
+.welcome-panel { max-width: 520px; }
+.welcome-points { margin: 12px 0 18px; padding-left: 18px; display: grid; gap: 8px; line-height: 1.45; }
+.hub-actions-more { margin-top: 8px; }

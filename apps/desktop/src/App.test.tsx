@@ -38,6 +38,9 @@ function installMockLocalStorage() {
 async function renderStartedApp() {
   render(<App />);
   await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+  // New coaches get a one-time welcome first.
+  const welcome = screen.queryByRole('button', { name: 'Got it' });
+  if (welcome) await userEvent.click(welcome);
 }
 
 beforeEach(() => {
@@ -664,6 +667,37 @@ describe('Desktop App', () => {
     expect(screen.getByText(/slate is locked/)).toBeInTheDocument();
   });
 
+  it('welcomes a new coach and walks the first week with a checklist', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+    expect(screen.getByRole('dialog', { name: /You run/ })).toHaveTextContent(/Advance button/);
+    await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(loadActiveDynastySave()?.coachGuide?.welcomed).toBe(true));
+
+    const checklist = screen.getByRole('article', { name: "Coach's checklist" });
+    expect(checklist).toHaveTextContent('0/5 done');
+    // Recommended Actions sit right under the checklist, ahead of the rest of the hub.
+    const order = [...document.querySelectorAll('article')].map((a) => a.getAttribute('aria-label'));
+    expect(order.indexOf('Recommended actions')).toBe(order.indexOf("Coach's checklist") + 1);
+
+    // Visiting a screen ticks its step off.
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    await userEvent.click(within(nav).getByRole('button', { name: /^Team/ }));
+    await userEvent.click(within(nav).getByRole('button', { name: /^Week Hub/ }));
+    expect(screen.getByRole('article', { name: "Coach's checklist" })).toHaveTextContent('1/5 done');
+
+    // Closing it is for good, and survives a reload.
+    await userEvent.click(screen.getByRole('button', { name: 'Hide checklist' }));
+    expect(screen.queryByRole('article', { name: "Coach's checklist" })).not.toBeInTheDocument();
+    await waitFor(() => expect(loadActiveDynastySave()?.coachGuide?.dismissed).toBe(true));
+    cleanup();
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    expect(screen.queryByRole('article', { name: "Coach's checklist" })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('coaches a game through halftime, and a reload returns to the locker room', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: 'Coach the Game' }));
@@ -750,6 +784,9 @@ describe('Desktop App', () => {
   it('suggests redshirts before the opener and redshirts a player from the Team screen', async () => {
     await renderStartedApp();
     const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
+    // The card shows the top three; the rest are a click away.
+    const more = within(actions).queryByRole('button', { name: /Show all/ });
+    if (more) await userEvent.click(more);
     expect(actions).toHaveTextContent(/buried on the depth chart\. Redshirt them/);
     await userEvent.click(screen.getByRole('button', { name: /^Team/ }));
     const card = screen.getByLabelText('Redshirts');
