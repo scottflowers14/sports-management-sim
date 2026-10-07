@@ -182,7 +182,7 @@ describe('Desktop App', () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
 
-    expect(screen.getByRole('heading', { name: /^Coaching$/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Coaching/i })).toBeInTheDocument();
     // New dynasties start on the staff's roster-built plan.
     expect(screen.getByLabelText(/Game plan source/i)).toHaveTextContent(/Staff plan/i);
 
@@ -519,6 +519,18 @@ describe('Desktop App', () => {
 
     expect(screen.getByText(/Scholarships 0\.50 \/ 3\.25/i)).toBeInTheDocument();
     expect(screen.getByText(/Offered 50%/i)).toBeInTheDocument();
+  });
+
+  it('explains jargon with "?" tips that lead to a searchable Help page', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: 'What is Win Prob?' }));
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/chance to win the next game/);
+    await userEvent.click(screen.getByRole('button', { name: /All terms/ }));
+    const glossary = screen.getByLabelText('Glossary');
+    expect(glossary).toHaveTextContent(/RPI/);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search terms' }), 'scholarship');
+    expect(glossary).toHaveTextContent(/3\.25 scholarship equivalents/);
+    expect(glossary).not.toHaveTextContent(/Rating Percentage Index/);
   });
 
   it('switches to standings and shows national rankings and conference sections', async () => {

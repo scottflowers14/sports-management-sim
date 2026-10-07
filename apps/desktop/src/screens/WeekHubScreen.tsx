@@ -14,6 +14,8 @@ import { featuredResults } from '../weekly-hub';
 import { RushBackButton } from '../components/RushBackButton';
 import { formatTeamName } from '../ui/format';
 import { RankMove, TickerNumber } from '../ui/Ticker';
+import { EdgeChips } from '../components/EdgeChips';
+import { HelpTip } from '../components/HelpTip';
 
 /** The smallest offer worth making (a quarter scholarship). */
 const MIN_OFFER_SHARE = 0.25;
@@ -352,7 +354,7 @@ export function WeekHubScreen({
             {weeklyHub && (
               <div className="hub-stat">
                 <span className="hub-stat-value hub-stat-prob"><TickerNumber value={weeklyHub.winProbability} />%</span>
-                <span className="hub-stat-label">Win Prob</span>
+                <span className="hub-stat-label">Win Prob <HelpTip term="win-prob" /></span>
               </div>
             )}
             {weeklyHub && weeklyHub.recentForm.length > 0 && (
@@ -372,18 +374,18 @@ export function WeekHubScreen({
                 <span className="hub-stat-value">
                   {weeklyHub.series ? `${weeklyHub.series.wins}–${weeklyHub.series.losses}` : 'New'}
                 </span>
-                <span className="hub-stat-label">Series</span>
+                <span className="hub-stat-label">Series <HelpTip term="series" /></span>
               </div>
             )}
             {bracketStatus && (
               <div className="hub-stat" title={bracketStatus}>
                 <span className="hub-stat-value">{shortBracketStatus(bracketStatus)}</span>
-                <span className="hub-stat-label">Bracket</span>
+                <span className="hub-stat-label">Bracket <HelpTip term="bracket" /></span>
               </div>
             )}
             <div className="hub-stat">
               <span className="hub-stat-value">{scouting.pointsAvailable}</span>
-              <span className="hub-stat-label">Recruit Hrs</span>
+              <span className="hub-stat-label">Recruit Hrs <HelpTip term="recruit-hours" /></span>
             </div>
           </div>
         </div>
@@ -503,20 +505,7 @@ export function WeekHubScreen({
                 {weeklyHub.opponentRecord.wins}–{weeklyHub.opponentRecord.losses}
               </div>
               <p className="hub-matchup-note">{weeklyHub.preview.matchupNote}</p>
-              <div className="hub-edges">
-                {[
-                  { label: 'OVR', val: weeklyHub.preview.ratingEdge },
-                  { label: 'OFF', val: weeklyHub.preview.offenseEdge },
-                  { label: 'DEF', val: weeklyHub.preview.defenseEdge },
-                  { label: 'GK', val: weeklyHub.preview.goalieEdge },
-                  { label: 'FO', val: weeklyHub.preview.faceoffEdge },
-                ].map(({ label, val }) => (
-                  <div key={label} className={`hub-edge ${val >= 0 ? 'edge-pos' : 'edge-neg'}`}>
-                    <span className="hub-edge-label">{label}</span>
-                    <span className="hub-edge-val">{val >= 0 ? '+' : ''}{val}</span>
-                  </div>
-                ))}
-              </div>
+              <EdgeChips preview={weeklyHub.preview} />
               {weeklyHub.keyPlayers.length > 0 && (
                 <div className="hub-key-players">
                   {weeklyHub.keyPlayers.map((kp) => (
