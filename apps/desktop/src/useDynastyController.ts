@@ -1289,7 +1289,9 @@ export function useDynastyController() {
     applyWeekSimResult(simulateOneWeek(start, effectiveGamePlan, Math.random, { seed: halftime.seed, secondHalfPlan }));
   }, [halftime, tournament, playTournamentRound, dynasty.userTeamId, applyWeekSimResult, buildWeekSimState, effectiveGamePlan, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds, stageReveal]);
 
-  const enterOffseason = useCallback(() => {
+  // Runs the offseason against a given final bracket, so Sim to Offseason can
+  // finish the postseason and roll straight into it.
+  const enterOffseasonWith = useCallback((tournament: TournamentState | null) => {
     const tournamentChampion = tournament?.nationalChampion;
     const userConfId = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId)?.conferenceId;
     const userBracket = tournament?.conferenceBrackets.find(b => b.conferenceId === userConfId);
@@ -1588,7 +1590,18 @@ export function useDynastyController() {
     }
 
     setView('offseason');
-  }, [tournament, dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, seasonPreview, recordBook, hallOfFame, dynastyHistory, staffState.staff, playingStaff, coachAbilities]);
+  }, [dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, seasonPreview, recordBook, hallOfFame, dynastyHistory, staffState.staff, playingStaff, coachAbilities]);
+
+  const enterOffseason = useCallback(() => enterOffseasonWith(tournament), [enterOffseasonWith, tournament]);
+
+  // Out of the postseason: play every remaining round, then run the offseason.
+  const simToOffseason = useCallback(() => {
+    if (!tournament) return;
+    let final = tournament;
+    for (let round = 0; round < 8 && final.phase !== 'complete'; round += 1) final = playTournamentRound(final);
+    setTournament(final);
+    enterOffseasonWith(final);
+  }, [tournament, playTournamentRound, enterOffseasonWith]);
 
   const acceptJobOffer = useCallback((teamId: string) => {
     const newTeam = dynasty.season.teams.find((t) => t.id === teamId);
@@ -2013,6 +2026,7 @@ export function useDynastyController() {
     answerPressConference,
     canCoachGame,
     coachGame,
+    simToOffseason,
     halftime,
     playSecondHalf,
     nil,

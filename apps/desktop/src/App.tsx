@@ -24,7 +24,7 @@ import {
   seasonAttendance,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
-import type { LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
+import type { LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { classNeedsByPosition } from '@sports-management-sim/engine-core';
 
 import { getJobSecurityLabel, getJobSecurityColor } from './coach-profile';
@@ -63,7 +63,9 @@ import { playerGameLog } from './player-game-log';
 import { TeamTalkCard } from './components/TeamTalkCard';
 import { allSeries, userSeasonGames } from './series-history';
 import { playerHonors } from './history';
-import { TOURNAMENT_ROUND_LABELS, projectNcaaField, projectionStatus } from './tournament';
+import { TOURNAMENT_ROUND_LABELS, opponentThisRound, projectNcaaField, projectionStatus, stillAlive } from './tournament';
+import type { OpponentScout } from './components/GamePlanPanel';
+import { PregameModal } from './components/PregameModal';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
@@ -207,6 +209,7 @@ export function App() {
     answerPressConference,
     canCoachGame,
     coachGame,
+    simToOffseason,
     halftime,
     playSecondHalf,
     nil,
@@ -245,6 +248,8 @@ export function App() {
   const [viewedProgramId, setViewedProgramId] = useState<string | null>(null);
   /** Asking before a season starts with offseason decisions left undone. */
   const [confirmStart, setConfirmStart] = useState(false);
+  /** Coach the Game opens on the pregame plan before the first half. */
+  const [pregameOpen, setPregameOpen] = useState(false);
 
   if (screen === 'start') {
     return (
@@ -419,23 +424,32 @@ export function App() {
     : undefined;
   const userForm = rosterForm(userTeam.roster, dynasty.season.schedule, gameLogs);
   const league = leagueTendencies(dynasty.season.schedule);
-  const opponentTendencies = nextOpponentTeam ? teamTendencies(dynasty.season.schedule, nextOpponentTeam.id) : null;
-  const nextOpponentScout = nextUserGame && nextOpponentTeam
-    ? {
-        tendencies: opponentTendencies,
-        keys: opponentTendencies && league ? scoutingKeys(opponentTendencies, league) : [],
-        week: nextUserGame.week,
-        name: formatTeamName(nextOpponentTeam.name),
-        isHome: nextUserGame.homeTeamId === dynasty.userTeamId,
-        plan: deriveCpuGamePlan(nextOpponentTeam),
-        rating: calculateLacrosseTeamRating(nextOpponentTeam).overall,
-        tape: taleOfTheTape(
-          teamStatRankings(dynasty.season.schedule, dynasty.season.teams.map((t) => t.id)),
-          dynasty.userTeamId,
-          nextOpponentTeam.id,
-        ),
-      }
-    : null;
+  const statRanks = teamStatRankings(dynasty.season.schedule, dynasty.season.teams.map((t) => t.id));
+  const scoutFor = (opponent: LacrosseTeam, isHome: boolean, week: number, label?: string): OpponentScout => {
+    const tendencies = teamTendencies(dynasty.season.schedule, opponent.id);
+    return {
+      tendencies,
+      keys: tendencies && league ? scoutingKeys(tendencies, league) : [],
+      week,
+      ...(label ? { label } : {}),
+      name: formatTeamName(opponent.name),
+      isHome,
+      plan: deriveCpuGamePlan(opponent),
+      rating: calculateLacrosseTeamRating(opponent).overall,
+      tape: taleOfTheTape(statRanks, dynasty.userTeamId, opponent.id),
+    };
+  };
+  const nextOpponentScout =
+    nextUserGame && nextOpponentTeam
+      ? scoutFor(nextOpponentTeam, nextUserGame.homeTeamId === dynasty.userTeamId, nextUserGame.week)
+      : null;
+  // In the postseason the scout covers this round's opponent.
+  const roundOpponent = tournament ? opponentThisRound(tournament, dynasty.userTeamId) : null;
+  const roundOpponentTeam = roundOpponent ? dynasty.season.teams.find((t) => t.id === roundOpponent.opponentId) : undefined;
+  const pregameScout =
+    tournament && roundOpponent && roundOpponentTeam
+      ? scoutFor(roundOpponentTeam, roundOpponent.isHome, dynasty.season.currentWeek, TOURNAMENT_ROUND_LABELS[tournament.phase])
+      : nextOpponentScout;
 
   const seriesByOpponent = allSeries(dynastyHistory, {
     year: dynasty.season.year,
@@ -470,20 +484,31 @@ export function App() {
   const recruitLandChances = view === 'recruiting' ? landChances(dynasty.recruits, landContext) : undefined;
   const selectedRecruitChance = selectedRecruit ? landChance(selectedRecruit, landContext) : undefined;
 
+  // Once the user can't play again this postseason, the rest is one click.
+  const userOutOfPostseason =
+    !offseasonSummary && tournament !== null && tournament.phase !== 'complete' && !stillAlive(tournament, dynasty.userTeamId);
   const advance = (() => {
     if (offseasonSummary) {
       // A fired coach has to pick a new job first; that choice lives on the offseason screen.
       if (pendingJobOffers) {
         if (view === 'offseason') return null;
-        return { label: 'Offseason', title: 'Pick your next job to start the new season', run: () => setView('offseason') };
+        return { label: 'Pick a Job', title: 'Pick your next job to start the new season', run: () => setView('offseason') };
       }
       // The offseason already rolled the dynasty over to next year's season.
-      return { label: `Season ${dynasty.season.year}`, title: 'Start the new season', run: guardedStartSeason };
+      return { label: `Start Season ${dynasty.season.year}`, title: 'Start the new season', run: guardedStartSeason };
     }
     if (hasScheduledGames) {
-      return { label: `Week ${dynasty.season.currentWeek}`, title: `Sim week ${dynasty.season.currentWeek}`, run: simWeek };
+      const week = dynasty.season.currentWeek;
+      const game = dynasty.season.schedule.find(
+        (g) => g.week === week && g.status === 'scheduled' && (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
+      );
+      const opponentId = game ? (game.homeTeamId === dynasty.userTeamId ? game.awayTeamId : game.homeTeamId) : null;
+      const matchup = opponentId
+        ? ` ${game!.homeTeamId === dynasty.userTeamId ? 'vs' : 'at'} ${formatTeamShort(teamMap.get(opponentId) ?? opponentId)}`
+        : ' (bye)';
+      return { label: `Week ${week}${matchup}`, title: `Sim week ${week}: every game plays, recruiting moves, then the result`, run: simWeek };
     }
-    if (!tournament) return { label: 'Postseason', title: 'Start the conference tournaments', run: enterTournament };
+    if (!tournament) return { label: 'Start Postseason', title: 'Start the conference tournaments', run: enterTournament };
     const phaseActions = {
       conf_semis: { label: 'Conf Semis', title: 'Sim the conference semifinals', run: simTournamentSemis },
       conf_finals: { label: 'Conf Finals', title: 'Sim the conference finals, then the NCAA field is selected', run: simTournamentFinals },
@@ -491,7 +516,7 @@ export function App() {
       ncaa_quarterfinals: { label: 'NCAA Quarters', title: 'Sim the NCAA quarterfinals', run: simNcaaQuarterfinals },
       national_semis: { label: 'Final Four', title: 'Sim the national semifinals', run: simTournamentNationalSemis },
       national_final: { label: 'Title Game', title: 'Sim the national championship', run: simTournamentNational },
-      complete: { label: 'Offseason', title: 'Run the offseason: graduation, development and signing day', run: enterOffseason },
+      complete: { label: 'Run Offseason', title: 'Run the offseason: graduation, development and signing day', run: enterOffseason },
     } as const;
     return phaseActions[tournament.phase];
   })();
@@ -580,7 +605,17 @@ export function App() {
         <div className="top-actions save-actions" aria-label="Save controls">
           {advance && (
             <button type="button" className="advance-btn" title={advance.title} onClick={advance.run}>
-              ▶ Advance: {advance.label}
+              ▶ Continue: {advance.label}
+            </button>
+          )}
+          {userOutOfPostseason && (
+            <button
+              type="button"
+              className="advance-skip"
+              title="You're out of the postseason: play the remaining rounds and go straight to the offseason"
+              onClick={simToOffseason}
+            >
+              ⏭ Sim to Offseason
             </button>
           )}
           <button type="button" onClick={() => persistDynasty()}>
@@ -734,7 +769,7 @@ export function App() {
         <section className="screen-area">
       {view === 'week-hub' && (
         <WeekHubScreen
-          onCoachGame={canCoachGame ? coachGame : undefined}
+          onCoachGame={canCoachGame ? () => setPregameOpen(true) : undefined}
           onRushInjury={rushInjuredPlayer}
           bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
           guideCard={
@@ -819,7 +854,7 @@ export function App() {
 
       {view === 'season' && (
         <SeasonScreen
-          onCoachGame={canCoachGame ? coachGame : undefined}
+          onCoachGame={canCoachGame ? () => setPregameOpen(true) : undefined}
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           tournament={tournament}
@@ -950,7 +985,7 @@ export function App() {
 
       {view === 'tournament' && (
         <TournamentScreen
-          onCoachGame={canCoachGame ? coachGame : undefined}
+          onCoachGame={canCoachGame ? () => setPregameOpen(true) : undefined}
           tournament={tournament}
           odds={ncaaBracketOdds}
           teamMap={teamMap}
@@ -1144,6 +1179,22 @@ export function App() {
           chance={selectedRecruitChance}
           onScout={doScoutRecruit}
           onClose={() => setSelectedRecruitId(null)}
+        />
+      )}
+
+      {pregameOpen && canCoachGame && !halftime && (
+        <PregameModal
+          label={tournament ? TOURNAMENT_ROUND_LABELS[tournament.phase] : `Week ${dynasty.season.currentWeek}`}
+          scout={pregameScout}
+          gamePlan={gamePlan}
+          onGamePlanChange={setGamePlan}
+          autoGamePlan={autoGamePlan}
+          onUseStaffPlan={restoreStaffGamePlan}
+          onPlayFirstHalf={() => {
+            setPregameOpen(false);
+            coachGame();
+          }}
+          onCancel={() => setPregameOpen(false)}
         />
       )}
 

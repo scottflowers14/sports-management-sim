@@ -4112,6 +4112,39 @@ li span {
   filter: brightness(1.1);
 }
 
+.save-actions .advance-btn {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-actions .advance-skip {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #9cc2ff;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  font-weight: 700;
+}
+
+.pregame-panel {
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.pregame-intro {
+  margin: 4px 0 12px;
+}
+
+.pregame-plan {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
 .shell-body {
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr);
@@ -7307,4 +7340,11 @@ button:active:not(:disabled) { transform: scale(0.97); }
   .recruit-list-head {
     display: none;
   }
+}
+
+/* Long Continue labels squeeze the team summary: let the phase text trail off. */
+.top-team .top-phase {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
