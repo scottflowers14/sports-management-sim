@@ -807,6 +807,28 @@ describe('Desktop App', () => {
     expect(honors).toHaveTextContent(/Defensive Player of the Week/);
   });
 
+  it('ranks every team on the Team Stats tab and re-sorts by column', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Stats/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Team Stats' }));
+    const card = screen.getByLabelText('Team stats');
+    // Every team that has played is ranked, and the user's row is marked.
+    const bodyRows = within(card).getAllByRole('row').slice(1);
+    expect(bodyRows.length).toBeGreaterThan(10);
+    expect(card.querySelectorAll('tr.user-row')).toHaveLength(1);
+    expect(screen.getByLabelText('Your team stat ranks')).toHaveTextContent(/Your best: #\d+ in .+ · Your worst: #\d+ in /);
+    // Sorting by scoring defense puts the stingiest team first.
+    await userEvent.click(within(card).getByRole('button', { name: 'GA/G' }));
+    expect(within(card).getByRole('columnheader', { name: 'GA/G' })).toHaveAttribute('aria-sort', 'ascending');
+    const goalsAgainst = within(card)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => Number(within(row).getAllByRole('cell')[4]!.textContent));
+    expect(goalsAgainst).toEqual([...goalsAgainst].sort((a, b) => a - b));
+    expect(within(within(card).getAllByRole('row')[1]!).getAllByRole('cell')[0]).toHaveTextContent('#1');
+  });
+
   it('makes a playing-time promise and calls out a broken one', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Team/ }));

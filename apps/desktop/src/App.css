@@ -7059,3 +7059,28 @@ li span {
   color: #aab8ca;
   letter-spacing: 0;
 }
+
+/* Team Stats: sortable column headers and the sorted column picked out. */
+.team-stats-table .sort-header {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.team-stats-table .sort-header.active {
+  color: #f0c66b;
+  text-decoration: underline;
+}
+
+.team-stats-table td.sorted {
+  color: #f0c66b;
+  font-weight: 700;
+}
+
+.team-stat-highlights {
+  margin: 0 0 10px;
+  color: #aab8ca;
+}

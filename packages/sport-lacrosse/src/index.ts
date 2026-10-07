@@ -28,6 +28,7 @@ export * from './nonconference-scheduling';
 export * from './nil';
 export * from './realignment';
 export * from './team-splits';
+export * from './team-stats';
 export * from './team-talk';
 export * from './three-stars';
 export * from './scouting-report';

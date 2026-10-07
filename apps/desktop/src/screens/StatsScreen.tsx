@@ -1,5 +1,16 @@
 import { useMemo, useState } from 'react';
-import { splitGames, splitWinPct, teamSplits } from '@sports-management-sim/sport-lacrosse';
+import {
+  TEAM_STAT_KEYS,
+  TEAM_STAT_LABELS,
+  lowerIsBetter,
+  sortTeamStats,
+  splitGames,
+  splitWinPct,
+  teamSplits,
+  teamStatHighlights,
+  teamStatRankings,
+} from '@sports-management-sim/sport-lacrosse';
+import type { TeamStatKey } from '@sports-management-sim/sport-lacrosse';
 import type { LacrosseSeason, Rivalry } from '@sports-management-sim/sport-lacrosse';
 import { AWARD_RACE_KEYS, AWARD_RACE_LABELS, computeAwardsRace } from '../awards';
 import type { SeasonStatsMap, PlayerSeasonStats } from '../stats';
@@ -7,7 +18,7 @@ import { formatTeamShort } from '../ui/format';
 import { WEEKLY_HONOR_LABELS, weeklyHonorCounts } from '../weekly-honors';
 import type { WeeklyHonor } from '../weekly-honors';
 
-type StatCategory = 'scoring' | 'goalkeeping' | 'faceoffs' | 'defense' | 'awards' | 'splits';
+type StatCategory = 'scoring' | 'goalkeeping' | 'faceoffs' | 'defense' | 'awards' | 'team' | 'splits';
 
 const CATEGORY_LABELS: Record<StatCategory, string> = {
   scoring: 'Scoring',
@@ -15,6 +26,7 @@ const CATEGORY_LABELS: Record<StatCategory, string> = {
   faceoffs: 'Faceoffs',
   defense: 'Defense',
   awards: 'Awards Race',
+  team: 'Team Stats',
   splits: 'Team Splits',
 };
 
@@ -51,7 +63,7 @@ export function StatsScreen({
   }
 
   const categories: StatCategory[] = season
-    ? ['scoring', 'goalkeeping', 'faceoffs', 'defense', 'awards', 'splits']
+    ? ['scoring', 'goalkeeping', 'faceoffs', 'defense', 'awards', 'team', 'splits']
     : ['scoring', 'goalkeeping', 'faceoffs', 'defense'];
 
   return (
@@ -159,6 +171,8 @@ export function StatsScreen({
           userTeamId={userTeamId}
         />
       )}
+
+      {category === 'team' && season && <TeamStatsPanel season={season} userTeamId={userTeamId} />}
 
       {category === 'splits' && season && (
         <TeamSplitsPanel season={season} userTeamId={userTeamId} rivalries={rivalries} />
@@ -313,6 +327,88 @@ function StatTable({
           })}
         </tbody>
       </table>
+    </article>
+  );
+}
+
+const TEAM_STAT_SHORT: Record<TeamStatKey, string> = {
+  goalsFor: 'GF/G',
+  goalsAgainst: 'GA/G',
+  margin: 'Margin',
+  shootingPct: 'Sh%',
+  faceoffPct: 'FO%',
+  clearPct: 'Clr%',
+  turnovers: 'TO/G',
+  causedTurnovers: 'CT/G',
+};
+
+function formatTeamStat(key: TeamStatKey, value: number): string {
+  if (key === 'shootingPct' || key === 'faceoffPct' || key === 'clearPct') return `${(value * 100).toFixed(1)}%`;
+  if (key === 'margin') return `${value > 0 ? '+' : ''}${value.toFixed(1)}`;
+  return value.toFixed(1);
+}
+
+/** Every team's per-game numbers, sortable by any column, with national ranks. */
+function TeamStatsPanel({ season, userTeamId }: { season: LacrosseSeason; userTeamId: string }) {
+  const [sortKey, setSortKey] = useState<TeamStatKey>('margin');
+  const rows = useMemo(
+    () => teamStatRankings(season.schedule, season.teams.map((t) => t.id)),
+    [season.schedule, season.teams],
+  );
+  const names = useMemo(() => new Map(season.teams.map((t) => [t.id, t.name])), [season.teams]);
+  const highlights = teamStatHighlights(rows, userTeamId);
+  const sorted = sortTeamStats(rows, sortKey);
+
+  return (
+    <article className="card" aria-label="Team stats">
+      <h2>Team Stats</h2>
+      {rows.length === 0 ? (
+        <p className="dim">No games played yet this season.</p>
+      ) : (
+        <>
+          {highlights && (
+            <p className="team-stat-highlights" aria-label="Your team stat ranks">
+              Your best: <strong>#{highlights.best.rank}</strong> in {TEAM_STAT_LABELS[highlights.best.key]} · Your worst:{' '}
+              <strong>#{highlights.worst.rank}</strong> in {TEAM_STAT_LABELS[highlights.worst.key]}
+            </p>
+          )}
+          <table className="standings-table stats-table team-stats-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Team</th>
+                <th>GP</th>
+                {TEAM_STAT_KEYS.map((key) => (
+                  <th key={key} aria-sort={sortKey === key ? (lowerIsBetter(key) ? 'ascending' : 'descending') : 'none'}>
+                    <button
+                      type="button"
+                      className={sortKey === key ? 'sort-header active' : 'sort-header'}
+                      title={`Sort by ${TEAM_STAT_LABELS[key]}`}
+                      onClick={() => setSortKey(key)}
+                    >
+                      {TEAM_STAT_SHORT[key]}
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((row) => (
+                <tr key={row.teamId} className={row.teamId === userTeamId ? 'user-row' : ''}>
+                  <td className="rank">#{row.ranks[sortKey]}</td>
+                  <td className="stats-team">{formatTeamShort(names.get(row.teamId) ?? row.teamId)}</td>
+                  <td>{row.games}</td>
+                  {TEAM_STAT_KEYS.map((key) => (
+                    <td key={key} className={key === sortKey ? 'stat-val sorted' : 'stat-val'}>
+                      {formatTeamStat(key, row.values[key])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
     </article>
   );
 }
