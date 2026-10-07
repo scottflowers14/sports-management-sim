@@ -1,3 +1,4 @@
+import type { OffseasonTodo } from '../offseason-todo';
 import type { SeasonReport } from '../season-report';
 import { useState } from 'react';
 import {
@@ -59,6 +60,8 @@ export function OffseasonScreen({
   realignment,
   seasonReport = null,
   onOpenProfile,
+  todos,
+  onOpenStaff,
 }: {
   offseasonSummary: OffseasonSummary;
   userTeam: LacrosseTeam;
@@ -84,6 +87,9 @@ export function OffseasonScreen({
   /** What the season added to the coach profile. */
   seasonReport?: SeasonReport | null;
   onOpenProfile?: () => void;
+  /** The offseason to-do list; the top card. */
+  todos?: OffseasonTodo[] | undefined;
+  onOpenStaff?: () => void;
   realignment?: {
     conferences: Array<{ id: string; name: string; shortName: string; teamIds: string[] }>;
     teams: LacrosseTeam[];
@@ -100,7 +106,125 @@ export function OffseasonScreen({
     .slice(0, 8);
   const teamShort = (id: string) => formatTeamShort(teamMap.get(id) ?? id);
 
+  const fired = Boolean(jobOffers && jobOffers.length > 0);
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   return (
+    <div className="offseason-page">
+      {!fired && todos && (
+        <OffseasonTodoCard
+          todos={todos}
+          seasonYear={seasonYear}
+          onGo={(id) => (id === 'staff' ? onOpenStaff?.() : jump(`offseason-${id}`))}
+          onStart={onStartNewSeason}
+        />
+      )}
+
+      <div className="offseason-decisions">
+        {fired ? (
+          <article className="card fired-card">
+            <h2>You&apos;ve Been Fired</h2>
+            <p className="fired-note">
+              The athletic director has relieved {coachName ?? 'you'} of head coaching duties at{' '}
+              {formatTeamName(teamMap.get(userTeamId) ?? userTeamId)}. Other programs are calling —
+              pick where the next chapter starts.
+            </p>
+            <div className="job-offer-list">
+              {(jobOffers ?? []).map((offer) => (
+                <div key={offer.teamId} className="job-offer-row">
+                  <div className="job-offer-info">
+                    <strong>{formatTeamName(offer.teamName)}</strong>
+                    <span className="job-offer-meta">
+                      Prestige {offer.prestige} · {offer.contractYears}-year deal
+                    </span>
+                  </div>
+                  <button className="offer-btn" onClick={() => onAcceptJobOffer(offer.teamId)}>
+                    Accept Job
+                  </button>
+                </div>
+              ))}
+            </div>
+          </article>
+        ) : null}
+        {realignment && (offseasonSummary.realignmentInvite || offseasonSummary.realignment) && (
+          <RealignmentCard
+            move={(offseasonSummary.realignmentInvite ?? offseasonSummary.realignment)!}
+            invite={Boolean(offseasonSummary.realignmentInvite)}
+            userTeamId={userTeam.id}
+            teamShort={teamShort}
+            {...realignment}
+          />
+        )}
+        {!(jobOffers && jobOffers.length > 0) && investments && (
+          <InvestmentsCard team={userTeam} gate={offseasonSummary.gate} {...investments} />
+        )}
+        {(availablePortal.length > 0 || departures.length > 0) && (
+          <article className="card portal-offseason-card" id="offseason-portal" aria-label="Transfer portal summary">
+            <h2>Transfer Portal · {availablePortal.length} in the portal</h2>
+            <p className="portal-hint">
+              {ourOffers > 0 ? `${ourOffers} offer${ourOffers === 1 ? '' : 's'} out · ` : ''}
+              {portalScholarshipRoom.toFixed(2)} scholarships free · everyone picks a school when the season starts.
+            </p>
+            {departures.length > 0 && (
+              <div className="portal-departures">
+                <p className="section-label">Left our program · {departures.length}</p>
+                <ul className="player-list">
+                  {departures.map((d) => {
+                    const entry = portalEntries.find((e) => e.id === d.entryId);
+                    const reRecruited = entry?.offersByTeamId[userTeamId] !== undefined;
+                    return (
+                      <li key={d.entryId}>
+                        <strong>{d.name}</strong>
+                        <span>
+                          {d.classYear} {d.position} · {d.overall} OVR · {PORTAL_REASON_LABELS[d.reason]}
+                          {reRecruited ? ' · re-recruiting' : ''}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {targets.length > 0 && (
+              <div className="portal-mini-list">
+                <p className="section-label">Top available</p>
+                {targets.map((entry) => {
+                  const ourOffer = entry.offersByTeamId[userTeamId];
+                  const standing = portalStanding(entry, portalTeams, userTeamId);
+                  const rivals = Object.keys(entry.offersByTeamId).filter((id) => id !== userTeamId).length;
+                  return (
+                    <div key={entry.id} className="portal-mini-row">
+                      <span className="portal-mini-name">
+                        {entry.name.first} {entry.name.last}
+                      </span>
+                      <span className="portal-mini-meta">
+                        {entry.classYear} {entry.position} · {entry.ratings.overall} OVR · from {teamShort(entry.sourceTeamId)}
+                        {rivals > 0 ? ` · ${rivals} rival offer${rivals === 1 ? '' : 's'}` : ''}
+                      </span>
+                      {ourOffer !== undefined ? (
+                        <span className={`badge ${standing.ourRank === 1 ? 'badge-committed' : 'badge-offered'}`}>
+                          {standing.ourRank === 1 ? 'Leading' : 'Behind'} · {ourOffer}%
+                        </span>
+                      ) : (
+                        <OfferControl
+                          recruitId={entry.id}
+                          recruitName={`${entry.name.first} ${entry.name.last}`}
+                          budgetRemaining={portalScholarshipRoom}
+                          onOffer={onOfferPortalPlayer}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button className="hub-nav-link" onClick={onOpenPortal}>
+              Open the full portal →
+            </button>
+          </article>
+        )}
+      </div>
+
+      <h2 className="offseason-section-title">Season in review</h2>
     <div className="offseason-layout">
       <div className="offseason-left">
         <article className="card season-recap-card">
@@ -186,9 +310,6 @@ export function OffseasonScreen({
           </article>
         )}
 
-        {!(jobOffers && jobOffers.length > 0) && investments && (
-          <InvestmentsCard team={userTeam} gate={offseasonSummary.gate} {...investments} />
-        )}
 
         <article className="card">
           <h2>Graduating Seniors</h2>
@@ -238,15 +359,6 @@ export function OffseasonScreen({
           )}
         </article>
 
-        {realignment && (offseasonSummary.realignmentInvite || offseasonSummary.realignment) && (
-          <RealignmentCard
-            move={(offseasonSummary.realignmentInvite ?? offseasonSummary.realignment)!}
-            invite={Boolean(offseasonSummary.realignmentInvite)}
-            userTeamId={userTeam.id}
-            teamShort={teamShort}
-            {...realignment}
-          />
-        )}
 
         {(offseasonSummary.proDraft?.length ?? 0) > 0 && (
           <ProDraftCard picks={offseasonSummary.proDraft!} userTeamId={userTeam.id} teamShort={teamShort} />
@@ -256,103 +368,64 @@ export function OffseasonScreen({
           <CoachingCarouselCard changes={offseasonSummary.coachingCarousel!} teamShort={teamShort} />
         )}
 
-        {(availablePortal.length > 0 || departures.length > 0) && (
-          <article className="card portal-offseason-card" aria-label="Transfer portal summary">
-            <h2>Transfer Portal · {availablePortal.length} in the portal</h2>
-            <p className="portal-hint">
-              {ourOffers > 0 ? `${ourOffers} offer${ourOffers === 1 ? '' : 's'} out · ` : ''}
-              {portalScholarshipRoom.toFixed(2)} scholarships free · everyone picks a school when the season starts.
-            </p>
-            {departures.length > 0 && (
-              <div className="portal-departures">
-                <p className="section-label">Left our program · {departures.length}</p>
-                <ul className="player-list">
-                  {departures.map((d) => {
-                    const entry = portalEntries.find((e) => e.id === d.entryId);
-                    const reRecruited = entry?.offersByTeamId[userTeamId] !== undefined;
-                    return (
-                      <li key={d.entryId}>
-                        <strong>{d.name}</strong>
-                        <span>
-                          {d.classYear} {d.position} · {d.overall} OVR · {PORTAL_REASON_LABELS[d.reason]}
-                          {reRecruited ? ' · re-recruiting' : ''}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-            {targets.length > 0 && (
-              <div className="portal-mini-list">
-                <p className="section-label">Top available</p>
-                {targets.map((entry) => {
-                  const ourOffer = entry.offersByTeamId[userTeamId];
-                  const standing = portalStanding(entry, portalTeams, userTeamId);
-                  const rivals = Object.keys(entry.offersByTeamId).filter((id) => id !== userTeamId).length;
-                  return (
-                    <div key={entry.id} className="portal-mini-row">
-                      <span className="portal-mini-name">
-                        {entry.name.first} {entry.name.last}
-                      </span>
-                      <span className="portal-mini-meta">
-                        {entry.classYear} {entry.position} · {entry.ratings.overall} OVR · from {teamShort(entry.sourceTeamId)}
-                        {rivals > 0 ? ` · ${rivals} rival offer${rivals === 1 ? '' : 's'}` : ''}
-                      </span>
-                      {ourOffer !== undefined ? (
-                        <span className={`badge ${standing.ourRank === 1 ? 'badge-committed' : 'badge-offered'}`}>
-                          {standing.ourRank === 1 ? 'Leading' : 'Behind'} · {ourOffer}%
-                        </span>
-                      ) : (
-                        <OfferControl
-                          recruitId={entry.id}
-                          recruitName={`${entry.name.first} ${entry.name.last}`}
-                          budgetRemaining={portalScholarshipRoom}
-                          onOffer={onOfferPortalPlayer}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <button className="hub-nav-link" onClick={onOpenPortal}>
-              Open the full portal →
-            </button>
-          </article>
-        )}
 
-        {jobOffers && jobOffers.length > 0 ? (
-          <article className="card fired-card">
-            <h2>You&apos;ve Been Fired</h2>
-            <p className="fired-note">
-              The athletic director has relieved {coachName ?? 'you'} of head coaching duties at{' '}
-              {formatTeamName(teamMap.get(userTeamId) ?? userTeamId)}. Other programs are calling —
-              pick where the next chapter starts.
-            </p>
-            <div className="job-offer-list">
-              {jobOffers.map((offer) => (
-                <div key={offer.teamId} className="job-offer-row">
-                  <div className="job-offer-info">
-                    <strong>{formatTeamName(offer.teamName)}</strong>
-                    <span className="job-offer-meta">
-                      Prestige {offer.prestige} · {offer.contractYears}-year deal
-                    </span>
-                  </div>
-                  <button className="offer-btn" onClick={() => onAcceptJobOffer(offer.teamId)}>
-                    Accept Job
-                  </button>
-                </div>
-              ))}
-            </div>
-          </article>
-        ) : (
-          <button className="sim-btn new-season-btn" onClick={onStartNewSeason}>
-            Start {seasonYear} Season →
-          </button>
-        )}
       </div>
     </div>
+      {!fired && !todos && (
+        <button className="sim-btn new-season-btn" onClick={onStartNewSeason}>
+          Start {seasonYear} Season →
+        </button>
+      )}
+    </div>
+  );
+}
+
+function OffseasonTodoCard({
+  todos,
+  seasonYear,
+  onGo,
+  onStart,
+}: {
+  todos: OffseasonTodo[];
+  seasonYear: number;
+  onGo: (id: OffseasonTodo['id']) => void;
+  onStart: () => void;
+}) {
+  const open = todos.filter((t) => !t.done && !t.optional).length;
+  return (
+    <article className="card offseason-todo-card" aria-label="Offseason to-do">
+      <div className="offseason-todo-head">
+        <div>
+          <p className="eyebrow">Before the {seasonYear} season</p>
+          <h2>Offseason To-Do</h2>
+        </div>
+        <button className="sim-btn" onClick={onStart}>
+          Start {seasonYear} Season →
+        </button>
+      </div>
+      <p className="dim" style={{ marginTop: 0 }}>
+        {open > 0
+          ? `${open} thing${open === 1 ? '' : 's'} to settle before the season starts. The season recap is further down.`
+          : 'Everything that matters is settled. Start the season when you are ready; the season recap is further down.'}
+      </p>
+      <ul className="offseason-todo-list">
+        {todos.map((t) => (
+          <li key={t.id} className={t.done ? 'todo-done' : t.optional ? 'todo-optional' : 'todo-open'}>
+            <span className="step-mark" aria-hidden="true">{t.done ? '✓' : ''}</span>
+            <span className="todo-text">
+              <strong>{t.label}</strong>
+              {t.optional && !t.done && <span className="todo-tag">optional</span>}
+              <span className="dim" style={{ display: 'block' }}>{t.status}</span>
+            </span>
+            {!t.done && (
+              <button type="button" className="hub-action-nav" onClick={() => onGo(t.id)}>
+                Go →
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </article>
   );
 }
 
@@ -729,7 +802,7 @@ function InvestmentsCard({
   const spent = planCost(plan);
   const after = applyInvestmentPlan(team, plan);
   return (
-    <article className="card investments-card" aria-label="Program investments">
+    <article className="card investments-card" id="offseason-investments" aria-label="Program investments">
       <h2>Program Investments</h2>
       <p className="dim">
         The athletic department has {budget} points for the program this year. Spend them before the season starts; unspent
@@ -811,7 +884,7 @@ function RealignmentCard({
   const to = move.toConferenceId;
   const pair = (ids: readonly string[]) => ids.map((id) => (id === userTeamId ? <strong key={id}>{teamShort(id)}</strong> : <span key={id}>{teamShort(id)}</span>));
   return (
-    <article className="card realignment-card" aria-label="Conference realignment">
+    <article className="card realignment-card" id="offseason-realignment" aria-label="Conference realignment">
       <p className="eyebrow">Conference Realignment</p>
       <h2>{invite ? `The ${name(to)} wants you` : `${teamShort(move.risingTeamIds[0])} and ${teamShort(move.risingTeamIds[1])} move up`}</h2>
       <div className="realignment-swap">

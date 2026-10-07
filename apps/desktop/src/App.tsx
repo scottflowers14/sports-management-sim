@@ -50,6 +50,8 @@ import { AchievementToast } from './components/AchievementToast';
 import { CoachChecklistCard, WelcomeModal } from './components/CoachChecklist';
 import { GameRevealModal } from './components/GameRevealModal';
 import { buildGameReveal } from './game-reveal';
+import { offseasonTodos, spendableInvestmentPoints, startSeasonWarning } from './offseason-todo';
+import { ConfirmModal } from './components/ConfirmModal';
 import { TickerNumber, RankMove } from './ui/Ticker';
 import { coachGuideSteps, showCoachGuide } from './coach-guide';
 import { RecordsScreen } from './screens/RecordsScreen';
@@ -240,6 +242,8 @@ export function App() {
     if (screen === 'game') markGuideVisited(view);
   }, [screen, view, markGuideVisited]);
   const [viewedProgramId, setViewedProgramId] = useState<string | null>(null);
+  /** Asking before a season starts with offseason decisions left undone. */
+  const [confirmStart, setConfirmStart] = useState(false);
 
   if (screen === 'start') {
     return (
@@ -325,6 +329,22 @@ export function App() {
 
   const userRankEntry = rankings.find((r) => r.teamId === dynasty.userTeamId);
   const guideActive = showCoachGuide(coachGuide, dynastyHistory.length);
+  const vacantStaffRoles = STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase());
+  const spendablePoints = spendableInvestmentPoints(investmentBudget, investmentPlan);
+  const todos =
+    offseasonSummary && !pendingJobOffers
+      ? offseasonTodos({
+          investmentBudget,
+          investmentPlan,
+          portalAvailable: dynasty.portalEntries.filter((e) => e.status === 'available').length,
+          portalOffers: dynasty.portalEntries.filter((e) => e.status === 'available' && e.offersByTeamId[dynasty.userTeamId] !== undefined).length,
+          scholarshipRoom: portalScholarshipRoom,
+          vacantStaffRoles,
+          realignmentPending: Boolean(offseasonSummary.realignmentInvite),
+        })
+      : null;
+  const startWarning = todos ? startSeasonWarning(todos, spendablePoints) : null;
+  const guardedStartSeason = () => (startWarning ? setConfirmStart(true) : startNewSeason());
   const revealGame = pendingReveal ? dynasty.season.schedule.find((g) => g.id === pendingReveal.gameId) : undefined;
   const revealData = (() => {
     if (!pendingReveal || !revealGame?.result) return null;
@@ -445,7 +465,7 @@ export function App() {
         return { label: 'Offseason', title: 'Pick your next job to start the new season', run: () => setView('offseason') };
       }
       // The offseason already rolled the dynasty over to next year's season.
-      return { label: `Season ${dynasty.season.year}`, title: 'Start the new season', run: startNewSeason };
+      return { label: `Season ${dynasty.season.year}`, title: 'Start the new season', run: guardedStartSeason };
     }
     if (hasScheduledGames) {
       return { label: `Week ${dynasty.season.currentWeek}`, title: `Sim week ${dynasty.season.currentWeek}`, run: simWeek };
@@ -569,6 +589,23 @@ export function App() {
             Manage saves
           </button>
         </div>
+      )}
+
+      {confirmStart && startWarning && (
+        <ConfirmModal
+          title={`Start the ${dynasty.season.year} season now?`}
+          message={startWarning}
+          confirmLabel="Start anyway"
+          cancelLabel="Not yet"
+          onConfirm={() => {
+            setConfirmStart(false);
+            startNewSeason();
+          }}
+          onCancel={() => {
+            setConfirmStart(false);
+            setView('offseason');
+          }}
+        />
       )}
 
       {revealData && (
@@ -740,10 +777,12 @@ export function App() {
           rankOf={rankOf}
           gameLogs={gameLogs}
           onSimWeek={simWeek}
+          offseason={Boolean(offseasonSummary)}
+          onOpenOffseason={() => setView('offseason')}
           onBoxScore={setSelectedBoxScore}
           onNavigate={(v) => setView(v as Parameters<typeof setView>[0])}
           classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
-          vacantStaffRoles={STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase())}
+          vacantStaffRoles={vacantStaffRoles}
           openPlanSlots={Math.max(0, MAX_DEVELOPMENT_PLANS - practicePlan.developmentPlans.length)}
           unhappyCount={unhappyCount}
           redshirtSuggestions={redshirtSuggestions}
@@ -1019,7 +1058,9 @@ export function App() {
           jobOffers={pendingJobOffers}
           coachName={coachProfile?.name ?? null}
           onAcceptJobOffer={acceptJobOffer}
-          onStartNewSeason={startNewSeason}
+          onStartNewSeason={guardedStartSeason}
+          todos={todos ?? undefined}
+          onOpenStaff={() => setView('staff')}
           onOfferPortalPlayer={offerPortalPlayer}
           portalTeams={dynasty.season.teams}
           portalScholarshipRoom={portalScholarshipRoom}

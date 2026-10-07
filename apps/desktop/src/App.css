@@ -7188,3 +7188,22 @@ button:active:not(:disabled) { transform: scale(0.97); }
   .rank-move { opacity: 1; }
   button:active:not(:disabled) { transform: none; }
 }
+
+/* Offseason: to-do first, decisions, then the season in review */
+.offseason-page { display: flex; flex-direction: column; gap: 20px; }
+.offseason-decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; align-items: start; }
+.offseason-decisions:empty { display: none; }
+.offseason-section-title { margin: 8px 0 -4px; font-size: 1.1rem; letter-spacing: 0.06em; text-transform: uppercase; color: #aab8ca; }
+.offseason-todo-card { border: 1px solid rgba(242, 162, 51, 0.45); }
+.offseason-todo-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.offseason-todo-head h2 { margin: 2px 0 6px; }
+.offseason-todo-head .sim-btn { width: auto; background: linear-gradient(135deg, #f2a233 0%, #d4620e 100%); }
+.offseason-todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.offseason-todo-list li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+.offseason-todo-list li.todo-open { box-shadow: inset 3px 0 0 #f2a233; background: rgba(242, 162, 51, 0.07); }
+.offseason-todo-list li.todo-done { opacity: 0.6; }
+.offseason-todo-list .todo-text { flex: 1; }
+.offseason-todo-list .step-mark { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25); display: grid; place-items: center; font-size: 0.8rem; color: #0b1626; }
+.offseason-todo-list li.todo-done .step-mark { background: #72f2c6; border-color: #72f2c6; }
+.todo-tag { margin-left: 8px; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8d99ab; border: 1px solid rgba(141, 153, 171, 0.4); border-radius: 999px; padding: 1px 7px; }
+.hub-offseason-note { max-width: 520px; margin: 6px 0 0; }
