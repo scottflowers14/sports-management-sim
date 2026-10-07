@@ -365,11 +365,15 @@ describe('Desktop App', () => {
     await userEvent.click(within(pager).getByRole('button', { name: /Next/i }));
     expect(screen.getAllByRole('navigation', { name: /Recruit pages/i })[0]!).toHaveTextContent(/26–50 of/);
 
-    // New dynasties let the assistant make offers; turn that off to review them.
-    const autoOffers = screen.getByRole('checkbox', { name: /Assistant makes offers/i });
-    expect(autoOffers).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /Auto each week/i })).toBeChecked();
-    await userEvent.click(autoOffers);
+    // New dynasties hand the staff full control; step down to scout-and-pitch to review offers.
+    const staff = screen.getByRole('combobox', { name: /Recruiting staff each week/i });
+    expect(staff).toHaveValue('full');
+    await userEvent.selectOptions(staff, 'pitch');
+    expect(staff).toHaveValue('pitch');
+
+    // The list has column headers and says how likely each scouted recruit is to land.
+    expect(screen.getAllByText('Chance to land').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('.land-chip').length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: /^Run Assistant$/i }));
     const report = screen.getByLabelText(/Recruiting assistant report/i);
     expect(report).toHaveTextContent(/Scouting \(\d+\)/);

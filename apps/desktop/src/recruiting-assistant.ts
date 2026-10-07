@@ -14,6 +14,8 @@ import { LACROSSE_CLASS_SCHOLARSHIP_BUDGET } from '@sports-management-sim/sport-
 import type { LacrossePlayerTraits, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import type { RecruitingActivity } from './recruiting-activity';
 import type { WeekSimState } from './week-sim';
+import { cpuRecruitingScale, userDecisionScale } from './difficulty';
+import { landChance, TOSS_UP_AT } from './recruit-odds';
 import { getScoutTier, HOURS_COST, scoutRecruit, spendRecruitingHours, type ScoutingState } from './scouting';
 
 type BoardEntry = RecruitBoardEntry<LacrossePosition, LacrossePlayerTraits>;
@@ -48,6 +50,8 @@ export interface AssistantInput {
   random: () => number;
   /** Scholarship equivalencies still free in this class; omit to skip offer suggestions. */
   budgetRemaining?: number;
+  /** Skip offers to recruits we're unlikely to land (see recruit-odds.ts); defaults to every recruit. */
+  isWinnable?: (recruitId: string) => boolean;
 }
 
 export interface AssistantResult {
@@ -145,6 +149,7 @@ export function runRecruitingAssistant(input: AssistantInput): AssistantResult {
           board: input.recruitBoard.map((e) => ({ ...e, recruit: updatedById.get(e.recruit.id) ?? e.recruit })),
           budgetRemaining: input.budgetRemaining,
           isKnown: (id) => getScoutTier(id, scouting) !== 'none' || (updatedById.get(id)?.starRating ?? 0) >= 4,
+          ...(input.isWinnable ? { isWinnable: input.isWinnable } : {}),
         }).map((s) => {
           const r = updatedById.get(s.recruitId)!;
           return { ...s, name: nameOf(r), starRating: r.starRating };
@@ -208,7 +213,10 @@ export function applyAssistantToWeekState<S extends WeekSimState>(
     userTeam,
     random,
     ...(planOffers
-      ? { budgetRemaining: LACROSSE_CLASS_SCHOLARSHIP_BUDGET - classScholarshipBudgetUsed(dynasty.recruits, userTeam.id) }
+      ? {
+          budgetRemaining: LACROSSE_CLASS_SCHOLARSHIP_BUDGET - classScholarshipBudgetUsed(dynasty.recruits, userTeam.id),
+          isWinnable: winnableFor(dynasty, userTeam),
+        }
       : {}),
   });
 
@@ -239,5 +247,26 @@ export function applyAssistantToWeekState<S extends WeekSimState>(
       recruitingActivity: result.activity,
     },
     report,
+  };
+}
+
+/**
+ * The coordinator only spends money on races we can win: a recruit three
+ * rival offers deep at a program above ours is a Long shot, not a target.
+ */
+function winnableFor(dynasty: WeekSimState['dynasty'], userTeam: LacrosseTeam): (recruitId: string) => boolean {
+  const byId = new Map(dynasty.recruits.map((r) => [r.id, r]));
+  const ctx = {
+    userTeam,
+    teams: dynasty.season.teams,
+    currentWeek: dynasty.season.currentWeek,
+    finalWeek: dynasty.season.schedule.reduce((max, g) => Math.max(max, g.week), 0) || 10,
+    decisionScale: userDecisionScale(dynasty.difficulty),
+    cpuInterestScale: cpuRecruitingScale(dynasty.difficulty),
+  };
+  return (id) => {
+    const recruit = byId.get(id);
+    if (!recruit) return false;
+    return (landChance(recruit, ctx)?.probability ?? 0) >= TOSS_UP_AT;
   };
 }
