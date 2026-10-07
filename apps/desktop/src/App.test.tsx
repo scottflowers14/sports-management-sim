@@ -829,6 +829,36 @@ describe('Desktop App', () => {
     expect(within(within(card).getAllByRole('row')[1]!).getAllByRole('cell')[0]).toHaveTextContent('#1');
   });
 
+  it('puts a tale of the tape in the scouting report once both teams have played', async () => {
+    await renderStartedApp();
+    // Before any games there is no tape, only the opponent's plan.
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    expect(within(screen.getByLabelText('Opponent scouting report')).queryByLabelText('Tale of the tape')).not.toBeInTheDocument();
+    for (let week = 1; week <= 2; week += 1) {
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+    }
+    await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
+    const tape = within(screen.getByLabelText('Opponent scouting report')).getByLabelText('Tale of the tape');
+    const rows = within(tape).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(8);
+    // The highlighted side in each row is the one with the better national rank.
+    let edges = 0;
+    for (const row of rows) {
+      const [, you, them] = within(row).getAllByRole('cell');
+      const rank = (cell: HTMLElement) => Number(/#(\d+)/.exec(cell.textContent!)![1]);
+      if (you!.classList.contains('tape-edge')) {
+        expect(rank(you!)).toBeLessThan(rank(them!));
+        edges += 1;
+      }
+      if (them!.classList.contains('tape-edge')) {
+        expect(rank(them!)).toBeLessThan(rank(you!));
+        edges += 1;
+      }
+    }
+    const [yours, theirs] = [...tape.querySelectorAll('.tape-summary strong')].map((el) => Number(el.textContent));
+    expect(yours! + theirs!).toBe(edges);
+  });
+
   it('makes a playing-time promise and calls out a broken one', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Team/ }));

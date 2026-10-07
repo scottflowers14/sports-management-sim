@@ -8,6 +8,8 @@ import {
   deriveCpuGamePlan,
   leagueTendencies,
   scoutingKeys,
+  taleOfTheTape,
+  teamStatRankings,
   teamTendencies,
   STAFF_ROLE_LABELS,
   MAX_DEVELOPMENT_PLANS,
@@ -362,6 +364,11 @@ export function App() {
         isHome: nextUserGame.homeTeamId === dynasty.userTeamId,
         plan: deriveCpuGamePlan(nextOpponentTeam),
         rating: calculateLacrosseTeamRating(nextOpponentTeam).overall,
+        tape: taleOfTheTape(
+          teamStatRankings(dynasty.season.schedule, dynasty.season.teams.map((t) => t.id)),
+          dynasty.userTeamId,
+          nextOpponentTeam.id,
+        ),
       }
     : null;
 

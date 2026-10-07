@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import type { LacrosseTeamStats } from './models';
-import { sortTeamStats, teamStatHighlights, teamStatRankings } from './team-stats';
+import { sortTeamStats, taleOfTheTape, teamStatHighlights, teamStatRankings } from './team-stats';
 
 function box(goals: number, over: Partial<LacrosseTeamStats> = {}): LacrosseTeamStats {
   return {
@@ -82,5 +82,17 @@ describe('teamStatRankings', () => {
     const b = teamStatHighlights(rows, 'b')!;
     expect(b.worst.rank).toBe(4);
     expect(teamStatHighlights(rows, 'e')).toBeNull();
+  });
+
+  it('builds a tale of the tape once both teams have played', () => {
+    const rows = teamStatRankings(schedule, ['a', 'b', 'c', 'd']);
+    const tape = taleOfTheTape(rows, 'a', 'b')!;
+    expect(tape).toHaveLength(8);
+    const scoring = tape.find((l) => l.key === 'goalsFor')!;
+    expect(scoring).toMatchObject({ user: { value: 15, rank: 1 }, opponent: { value: 5, rank: 4 }, edge: 'user' });
+    // Same shooting on the same shots and clears: ranks tie, nobody has the edge.
+    expect(taleOfTheTape(rows, 'c', 'd')!.find((l) => l.key === 'clearPct')!.edge).toBe('even');
+    expect(taleOfTheTape(rows, 'd', 'c')!.find((l) => l.key === 'turnovers')!.edge).toBe('opponent');
+    expect(taleOfTheTape(rows, 'a', 'e')).toBeNull();
   });
 });

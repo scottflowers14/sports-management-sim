@@ -5,7 +5,9 @@ import {
   TEMPO_LABELS,
   describeGamePlan,
   scoutedGamePlan,
+  TEAM_STAT_LABELS,
   type ScoutKey,
+  type TapeLine,
   type TeamTendencies,
   type DefensiveStyle,
   type GameLog,
@@ -27,11 +29,14 @@ export interface OpponentScout {
   tendencies: TeamTendencies | null;
   /** The scout's keys to the game, strongest first. */
   keys: ScoutKey[];
+  /** Both teams' national ranks side by side; null until both have played. */
+  tape?: TapeLine[] | null;
 }
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { DepthChart } from '../components/DepthChart';
 import { ResultRow } from '../components/ResultRow';
 import { WeeklyHub } from '../components/WeeklyHub';
+import { TEAM_STAT_SHORT, formatTeamStat } from '../ui/team-stat-format';
 import type { WeeklyHubData } from '../weekly-hub';
 import type { TournamentState } from '../tournament';
 import type { NewsItem } from '../news-feed';
@@ -191,7 +196,11 @@ export function SeasonScreen({
                 <span className="scout-ovr"> · {nextOpponentScout.rating} OVR</span>
               </p>
               <p className="scout-tendencies">Tendencies: {describeGamePlan(nextOpponentScout.plan)}</p>
-              {nextOpponentScout.tendencies && <ScoutNumbers t={nextOpponentScout.tendencies} />}
+              {nextOpponentScout.tape ? (
+                <TaleOfTheTape tape={nextOpponentScout.tape} opponent={nextOpponentScout.name} />
+              ) : (
+                nextOpponentScout.tendencies && <ScoutNumbers t={nextOpponentScout.tendencies} />
+              )}
               {nextOpponentScout.keys.length > 0 ? (
                 <>
                   <ul className="scout-keys" aria-label="Keys to the game">
@@ -361,6 +370,42 @@ export function SeasonScreen({
           )}
         </article>
       </div>
+    </div>
+  );
+}
+
+function TaleOfTheTape({ tape, opponent }: { tape: TapeLine[]; opponent: string }) {
+  const yours = tape.filter((l) => l.edge === 'user').length;
+  const theirs = tape.filter((l) => l.edge === 'opponent').length;
+  const rankCell = (value: string, rank: number, edge: boolean) => (
+    <td className={edge ? 'tape-edge' : ''}>
+      {value} <span className="dim">#{rank}</span>
+    </td>
+  );
+  return (
+    <div className="tale-of-tape" aria-label="Tale of the tape">
+      <p className="tape-summary">
+        Tale of the tape: you hold the edge in <strong>{yours}</strong> of {tape.length}, {opponent} in{' '}
+        <strong>{theirs}</strong>.
+      </p>
+      <table className="tape-table">
+        <thead>
+          <tr>
+            <th>Stat</th>
+            <th>You</th>
+            <th>Them</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tape.map((l) => (
+            <tr key={l.key} title={TEAM_STAT_LABELS[l.key]}>
+              <td>{TEAM_STAT_SHORT[l.key]}</td>
+              {rankCell(formatTeamStat(l.key, l.user.value), l.user.rank, l.edge === 'user')}
+              {rankCell(formatTeamStat(l.key, l.opponent.value), l.opponent.rank, l.edge === 'opponent')}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
