@@ -183,7 +183,8 @@ export type View =
   | 'staff'
   | 'practice'
   | 'locker-room'
-  | 'profile';
+  | 'profile'
+  | 'help';
 
 /** The preseason poll as week-one news. */
 /** Saves from before the staff plan kept the neutral default unless the user picked their own. */

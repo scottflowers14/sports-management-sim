@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { LacrosseGamePlan } from '@sports-management-sim/sport-lacrosse';
 import { GamePlanPanel, type OpponentScout } from './GamePlanPanel';
+import { HelpTip } from './HelpTip';
 
 /**
  * The first step of Coach the Game: read the scout, set the plan, then play
@@ -42,7 +43,7 @@ export function PregameModal({
           {scout ? `Game plan ${scout.isHome ? 'vs' : 'at'} ${scout.name}` : 'Game plan'}
         </h2>
         <p className="dim pregame-intro">
-          Set your plan, then play the first half. You can adjust again at halftime.
+          Set your plan, then play the first half. You can adjust again at halftime. <HelpTip term="game-plan" />
         </p>
         <div className="gameplan-card pregame-plan">
           <GamePlanPanel

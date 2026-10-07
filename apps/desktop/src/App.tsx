@@ -66,6 +66,8 @@ import { playerHonors } from './history';
 import { TOURNAMENT_ROUND_LABELS, opponentThisRound, projectNcaaField, projectionStatus, stillAlive } from './tournament';
 import type { OpponentScout } from './components/GamePlanPanel';
 import { PregameModal } from './components/PregameModal';
+import { OpenHelpContext } from './components/HelpTip';
+import { HelpScreen } from './screens/HelpScreen';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
@@ -484,6 +486,8 @@ export function App() {
   const recruitLandChances = view === 'recruiting' ? landChances(dynasty.recruits, landContext) : undefined;
   const selectedRecruitChance = selectedRecruit ? landChance(selectedRecruit, landContext) : undefined;
 
+  const openHelp = () => setView('help');
+
   // Once the user can't play again this postseason, the rest is one click.
   const userOutOfPostseason =
     !offseasonSummary && tournament !== null && tournament.phase !== 'complete' && !stillAlive(tournament, dynasty.userTeamId);
@@ -536,6 +540,7 @@ export function App() {
         { view: 'season', label: 'Season' },
         { view: 'news', label: 'News', ...(unreadNewsCount > 0 ? { badge: unreadNewsCount } : {}) },
         { view: 'profile', label: 'Profile', ...(achievementToasts.length > 0 ? { badge: achievementToasts.length } : {}) },
+        { view: 'help', label: 'Help' },
       ],
     },
     {
@@ -566,6 +571,7 @@ export function App() {
   ];
 
   return (
+    <OpenHelpContext.Provider value={openHelp}>
     <main className="app-shell">
       <header className="top-bar">
         <div className="brand">
@@ -1061,6 +1067,8 @@ export function App() {
         />
       )}
 
+      {view === 'help' && <HelpScreen />}
+
       {view === 'records' && (
         <RecordsScreen
           archive={recordBook}
@@ -1218,6 +1226,7 @@ export function App() {
         />
       )}
     </main>
+    </OpenHelpContext.Provider>
   );
 }
 

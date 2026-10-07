@@ -7,6 +7,7 @@ import { PlayerCardPanel } from './PlayerCard';
 import { formatTeamShort } from '../ui/format';
 import type { LandChance } from '../recruit-odds';
 import { LandChip } from './LandChip';
+import { HelpTip } from './HelpTip';
 
 /** 4★+ recruits are nationally ranked — their star tier is public knowledge. */
 const PUBLIC_STAR_FLOOR = 4;
@@ -69,12 +70,12 @@ export function RecruitPanel({
             <div className="interest-bar" style={{ width: `${userInterest}%` }} />
           </div>
           <div className="recruit-interest-row">
-            <span className="interest-label">Your interest {userInterest}/100</span>
+            <span className="interest-label">Your interest {userInterest}/100 <HelpTip term="interest" /></span>
             {userOffer && <span className="badge badge-offered">Offered {userOffer.scholarshipPercent}%</span>}
           </div>
           {chance && (tier !== 'none' || starsPublic) && (
             <div className="recruit-land-row" aria-label="Chance to land">
-              <span className="dim">Chance to land</span> <LandChip chance={chance} />
+              <span className="dim">Chance to land</span> <LandChip chance={chance} /> <HelpTip term="chance-to-land" />
               <span className="dim recruit-land-detail">{chance.detail}</span>
             </div>
           )}

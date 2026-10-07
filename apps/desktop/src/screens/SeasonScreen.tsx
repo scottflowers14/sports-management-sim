@@ -7,6 +7,7 @@ import type {
 
 export type { OpponentScout } from '../components/GamePlanPanel';
 import { GamePlanPanel, type OpponentScout } from '../components/GamePlanPanel';
+import { HelpTip } from '../components/HelpTip';
 import type { ScheduledGame } from '@sports-management-sim/engine-core';
 import { DepthChart } from '../components/DepthChart';
 import { ResultRow } from '../components/ResultRow';
@@ -161,7 +162,9 @@ export function SeasonScreen({
 
       <div className="season-sidebar">
         <article className="card gameplan-card">
-          <h2>Coaching</h2>
+          <h2>
+            Coaching <HelpTip term="game-plan" />
+          </h2>
           <GamePlanPanel
             scout={nextOpponentScout}
             gamePlan={gamePlan}

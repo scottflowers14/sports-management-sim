@@ -19,6 +19,7 @@ import type { AssistantReport as AssistantReportData } from '../recruiting-assis
 import { formatTeamName, formatTeamShort } from '../ui/format';
 import { attainableBoardScore, type LandChance } from '../recruit-odds';
 import { LandChip } from '../components/LandChip';
+import { HelpTip } from '../components/HelpTip';
 
 type LacrosseBoardEntry = RecruitBoardEntry<LacrossePosition, LacrossePlayerTraits>;
 
@@ -382,6 +383,7 @@ export function RecruitingScreen({
           <div className="scout-header-inline">
             <span className="scout-pts-num">{scouting.pointsAvailable}</span>
             <span className="scout-pts-label">Recruiting Hours</span>
+            <HelpTip term="recruit-hours" />
             <span className="scout-pts-hint">
               (+{scouting.pointsPerWeek}/wk · scout {HOURS_COST.scout}h · pitch {HOURS_COST.pitch}h · visit {HOURS_COST.visit}h)
             </span>
@@ -400,6 +402,7 @@ export function RecruitingScreen({
                   title="Off: nothing happens unless you click Run Assistant. Scout and pitch: each week the staff spends your hours pitching recruits you've offered or pinned and scouting good fits. Full control: the staff also offers scholarships, only to recruits you can realistically land."
                 >
                   Staff each week
+                  <HelpTip term="staff-mode" />
                   <select
                     aria-label="Recruiting staff each week"
                     value={staffModeOf(autoAssistant ?? false, autoOffers ?? false)}
@@ -453,6 +456,7 @@ export function RecruitingScreen({
               >
                 Scholarships {scholarshipBudget.used.toFixed(2)} / {scholarshipBudget.total.toFixed(2)}
               </span>
+              <HelpTip term="scholarships" />
             </div>
 
             {boardView === 'all' && (
@@ -770,11 +774,15 @@ function AllRecruitsList({
   return (
     <div className="recruit-list">
       {pager}
-      <div className="recruit-row recruit-list-head" aria-hidden="true">
+      <div className="recruit-row recruit-list-head">
         <span className="pin-btn-spacer" />
         <span className="recruit-row-main">Recruit</span>
         <span className="recruit-row-ovr">OVR</span>
-        <span className="recruit-row-status" title="Chance to land: where the race for him stands, counting rival offers and the weeks left">Chance to land</span>
+        <span className="recruit-row-status">
+          <span>
+            Chance to land <HelpTip term="chance-to-land" />
+          </span>
+        </span>
         <span className="recruit-row-actions">Actions</span>
       </div>
       {pageEntries.map((entry) => {
