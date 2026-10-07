@@ -698,6 +698,29 @@ describe('Desktop App', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('reveals the user result after a sim, and can be turned off', async () => {
+    // jsdom has no matchMedia; a browser with motion allowed gets the reveal.
+    window.matchMedia = ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      await renderStartedApp();
+      await userEvent.click(screen.getByRole('button', { name: /Sim Week 1/ }));
+      const card = screen.getByRole('dialog', { name: 'Game result' });
+      // Clicking skips the quarter-by-quarter tick straight to the final.
+      await userEvent.click(within(card).getByText('Click to skip'));
+      expect(within(card).getByText(/^(WIN|LOSS|UPSET!|TROPHY WIN)/)).toBeInTheDocument();
+      expect(card.querySelectorAll('.reveal-score')).toHaveLength(2);
+      await userEvent.click(within(card).getByRole('checkbox', { name: /Skip result reveals/ }));
+      await userEvent.click(within(card).getByRole('button', { name: 'Continue' }));
+      expect(screen.queryByRole('dialog', { name: 'Game result' })).not.toBeInTheDocument();
+      expect(localStorage.getItem('sms.skipReveals')).toBe('1');
+      // Off for good: the next week goes straight to the hub.
+      await userEvent.click(screen.getByRole('button', { name: /Sim Week 2/ }));
+      expect(screen.queryByRole('dialog', { name: 'Game result' })).not.toBeInTheDocument();
+    } finally {
+      delete (window as { matchMedia?: unknown }).matchMedia;
+    }
+  });
+
   it('coaches a game through halftime, and a reload returns to the locker room', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: 'Coach the Game' }));

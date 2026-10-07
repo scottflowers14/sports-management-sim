@@ -42,6 +42,11 @@ test('plays a season through the title game and offseason into year two', async 
 
   // One week by hand, then the recruiting assistant.
   await advance.click();
+  // The result card ticks the score up, then stamps the result.
+  const reveal = page.getByRole('dialog', { name: 'Game result' });
+  await expect(reveal.locator('.reveal-stamp')).toHaveText(/WIN|LOSS|UPSET|TROPHY/, { timeout: 5000 });
+  await reveal.getByRole('button', { name: 'Continue' }).click();
+  await expect(reveal).toHaveCount(0);
   await expect(advance).toContainText('Week 2');
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Recruiting' }).click();
   await page.getByRole('button', { name: 'Run Assistant' }).click();
