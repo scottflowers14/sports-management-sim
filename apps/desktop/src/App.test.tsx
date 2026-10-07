@@ -147,6 +147,11 @@ describe('Desktop App', () => {
     if (postseasonWins > 0) {
       expect(screen.getByLabelText('Tournament Tested progress')).toHaveTextContent(`${postseasonWins} / 10`);
     }
+    // History tracks the postseason run, round by round.
+    await userEvent.click(screen.getByRole('button', { name: /^History/ }));
+    const postseason = screen.getByRole('article', { name: 'Postseason history' });
+    expect(postseason).toHaveTextContent(/of 1NCAA appearances/);
+    expect(finished.games?.filter((g) => g.postseason).every((g) => g.round)).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: /^Offseason/ }));
 
     await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
