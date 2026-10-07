@@ -3062,6 +3062,9 @@ li span {
 .start-hero h1 {
   font-size: clamp(2.4rem, 6vw, 5rem);
   margin-top: 10px;
+  /* Room below the baseline so the gradient clip keeps the g's descender. */
+  line-height: 1.15;
+  padding-bottom: 0.12em;
   background: linear-gradient(135deg, #e6edf3 30%, #72f2c6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -7486,4 +7489,91 @@ button:active:not(:disabled) { transform: scale(0.97); }
 
 .hub-edge.even {
   color: #aab8ca;
+}
+
+/* Sidebar groups fold away; the title is the toggle. */
+.nav-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-group-toggle:hover {
+  color: #a6ffe0;
+}
+
+.nav-group-caret {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.nav-folded-dot {
+  margin-left: auto;
+  padding: 0 6px;
+}
+
+/* Wide tables (the depth chart) scroll inside their card instead of the page. */
+.depth-chart-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.team-pick-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
+.team-pick-note p {
+  margin: 0;
+}
+
+.tier-tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tier-blue-blood {
+  color: #9cc2ff;
+  border-color: rgba(156, 194, 255, 0.5);
+}
+
+.tier-contender {
+  color: #7be0a6;
+  border-color: rgba(123, 224, 166, 0.5);
+}
+
+.tier-rising {
+  color: #f2c472;
+  border-color: rgba(242, 196, 114, 0.5);
+}
+
+.tier-rebuild {
+  color: #ff8f8f;
+  border-color: rgba(255, 143, 143, 0.45);
+}
+
+.team-pick-suggest {
+  margin-top: 6px;
+}
+
+.delegate-link {
+  margin-top: 8px;
+  font-size: 0.8rem;
+}
+
+.staff-media-card .ghost-btn {
+  margin-top: 10px;
 }

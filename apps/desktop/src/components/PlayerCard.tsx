@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import type { CardRatingRow, PlayerCardData } from '../player-card-model';
 
 function RatingRows({ rows }: { rows: CardRatingRow[] }) {
@@ -80,6 +80,15 @@ export function PlayerCardPanel({
   footer?: ReactNode;
   onClose: () => void;
 }) {
+  // Escape closes the panel, like every other overlay.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
     <div className="player-panel-backdrop" onClick={onClose}>
       <aside className="player-panel card" onClick={(e) => e.stopPropagation()}>

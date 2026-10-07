@@ -30,6 +30,15 @@ describe('national poll', () => {
     expect(lacrossePollScore(team('strong', 85, 8, 2))).toBeGreaterThan(lacrossePollScore(team('weak', 45, 8, 2)));
   });
 
+  it('lets one early loss nudge a contender rather than sink it', () => {
+    const contender = lacrossePollScore(team('power', 88));
+    const afterLoss = lacrossePollScore(team('power', 88, 0, 1));
+    const midAfterWin = lacrossePollScore(team('mid', 60, 1, 0));
+    expect(contender - afterLoss).toBeLessThan(6);
+    // A good mid-major win doesn't vault it past the contender after one week.
+    expect(afterLoss).toBeGreaterThan(midAfterWin);
+  });
+
   it('stays on a 0 to 100 scale', () => {
     for (const t of [team('a', 99, 16, 0), team('b', 40, 0, 16)]) {
       expect(lacrossePollScore(t)).toBeGreaterThanOrEqual(0);

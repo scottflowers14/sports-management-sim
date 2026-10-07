@@ -19,22 +19,50 @@ export interface DynastyTeamChoice {
   id: string;
   name: string;
   conferenceId?: string;
+  conferenceName?: string;
   prestige: number;
+}
+
+export type ProgramTier = 'Blue blood' | 'Contender' | 'Rising' | 'Rebuild';
+
+/** What the job is like, in a word, from the program's prestige. */
+export function programTier(prestige: number): ProgramTier {
+  return prestige >= 80 ? 'Blue blood' : prestige >= 66 ? 'Contender' : prestige >= 54 ? 'Rising' : 'Rebuild';
+}
+
+export const PROGRAM_TIER_NOTES: Record<ProgramTier, string> = {
+  'Blue blood': 'Title or bust. Elite recruits listen, and the AD expects a deep NCAA run every year.',
+  Contender: 'Good enough to win now with room to grow. The friendliest start for a new coach.',
+  Rising: 'A solid base. Win your conference games and the top recruits start calling back.',
+  Rebuild: 'Short on talent and name. Recruit to your level and build it up over several seasons.',
+};
+
+/** A beginner-friendly program: the strongest Contender, else the closest tier to it. */
+export function recommendedStarterTeam(choices: readonly DynastyTeamChoice[]): DynastyTeamChoice | undefined {
+  const contenders = choices.filter((c) => programTier(c.prestige) === 'Contender');
+  const pool = contenders.length > 0 ? contenders : [...choices];
+  return [...pool].sort((a, b) => (contenders.length > 0 ? b.prestige - a.prestige : Math.abs(a.prestige - 72) - Math.abs(b.prestige - 72)))[0];
 }
 
 export function getLacrosseDynastyTeamChoices(customTeams?: CustomTeamsFile): DynastyTeamChoice[] {
   const firstTeamId = customTeams?.teams[0]?.id ?? DEFAULT_USER_TEAM_ID;
-  return createNewLacrosseDynasty({
+  const { season } = createNewLacrosseDynasty({
     seed: 1,
     userTeamId: firstTeamId,
     seasonYear: DEFAULT_SEASON_YEAR,
     ...(customTeams ? { customTeams } : {}),
-  }).season.teams.map((team) => ({
-    id: team.id,
-    name: formatTeamName(team.name),
-    conferenceId: team.conferenceId,
-    prestige: team.reputation.nationalPrestige,
-  }));
+  });
+  const conferenceNames = new Map(season.conferences.map((c) => [c.id, c.name]));
+  return season.teams.map((team) => {
+    const conferenceName = conferenceNames.get(team.conferenceId);
+    return {
+      id: team.id,
+      name: formatTeamName(team.name),
+      conferenceId: team.conferenceId,
+      ...(conferenceName ? { conferenceName } : {}),
+      prestige: team.reputation.nationalPrestige,
+    };
+  });
 }
 
 export function createFreshLacrosseDynasty({
