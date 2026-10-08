@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import type { GameLog, LacrosseTeam, LacrossePortalEntry, LacrossePosition, LacrossePlayerTraits } from '@sports-management-sim/sport-lacrosse';
 import type { PositionNeed, RecruitBoardEntry, ScheduledGame } from '@sports-management-sim/engine-core';
+import { classScholarshipBudgetUsed } from '@sports-management-sim/engine-core';
+import { LACROSSE_CLASS_SCHOLARSHIP_BUDGET } from '@sports-management-sim/sport-lacrosse';
 import type { InjuredPlayer } from '../dynasty-helpers';
 import type { RankingEntry } from '../rankings';
 import type { NewsItem } from '../news-feed';
@@ -11,6 +13,12 @@ import { ResultRow } from '../components/ResultRow';
 import { featuredResults } from '../weekly-hub';
 import { RushBackButton } from '../components/RushBackButton';
 import { formatTeamName } from '../ui/format';
+import { RankMove, TickerNumber } from '../ui/Ticker';
+import { EdgeChips } from '../components/EdgeChips';
+import { HelpTip } from '../components/HelpTip';
+
+/** The smallest offer worth making (a quarter scholarship). */
+const MIN_OFFER_SHARE = 0.25;
 
 interface ActionItem {
   id: string;
@@ -20,7 +28,7 @@ interface ActionItem {
   nav?: string;
 }
 
-function computeActionItems({
+export function computeActionItems({
   injuries,
   userTeam,
   scouting,
@@ -36,8 +44,11 @@ function computeActionItems({
   redshirtSuggestions = 0,
   captainCount,
   rivalryWeek,
+  scholarshipBudgetLeft,
 }: {
   currentWeek: number;
+  /** Scholarship equivalencies still free; when it's spent, the class-needs nudge says so. */
+  scholarshipBudgetLeft?: number;
   classNeeds?: PositionNeed[];
   vacantStaffRoles?: string[];
   openPlanSlots?: number;
@@ -71,6 +82,24 @@ function computeActionItems({
       icon: '🚨',
       text: `Key player${keyInjured.length > 1 ? 's' : ''} injured — adjust depth chart: ${names.join(', ')}`,
       nav: 'team',
+    });
+  }
+
+  // Graduates not yet replaced, where fewer live offers are out than spots to fill.
+  const short = classNeeds.filter((n) => n.open > n.offersOut);
+  if (!seasonComplete && short.length > 0) {
+    const openSpots = short.reduce((sum, n) => sum + n.open, 0);
+    const spots = short.map((n) => `${n.position} ${n.open}`).join(', ');
+    // With the budget spent there's nothing to offer: say how to make room instead.
+    const budgetFull = scholarshipBudgetLeft !== undefined && scholarshipBudgetLeft < MIN_OFFER_SHARE;
+    items.push({
+      id: 'class-needs',
+      priority: budgetFull ? 'medium' : currentWeek >= 4 ? 'high' : 'medium',
+      icon: '🎓',
+      text: budgetFull
+        ? `Scholarship budget is full with spots still open (${spots}). Drop a long-shot offer to make room.`
+        : `${openSpots} spot${openSpots > 1 ? 's' : ''} open in next year's class without enough offers out: ${spots}`,
+      nav: 'recruiting',
     });
   }
 
@@ -171,21 +200,6 @@ function computeActionItems({
     });
   }
 
-  // Graduates not yet replaced, where fewer live offers are out than spots to fill.
-  const short = classNeeds.filter((n) => n.open > n.offersOut);
-  if (!seasonComplete && short.length > 0) {
-    const openSpots = short.reduce((sum, n) => sum + n.open, 0);
-    items.push({
-      id: 'class-needs',
-      priority: currentWeek >= 4 ? 'high' : 'medium',
-      icon: '🎓',
-      text: `${openSpots} spot${openSpots > 1 ? 's' : ''} open in next year's class without enough offers out: ${short
-        .map((n) => `${n.position} ${n.open}`)
-        .join(', ')}`,
-      nav: 'recruiting',
-    });
-  }
-
   if (items.length === 0) {
     items.push({
       id: 'all-good',
@@ -234,6 +248,9 @@ export function WeekHubScreen({
   teamTalkCard,
   formCard,
   achievementCard,
+  guideCard,
+  offseason = false,
+  onOpenOffseason,
 }: {
   currentWeek: number;
   seasonComplete: boolean;
@@ -274,8 +291,14 @@ export function WeekHubScreen({
   /** Hot and cold streaks on the roster. */
   formCard?: ReactNode;
   achievementCard?: ReactNode;
+  /** The first-season Coach's Checklist. */
+  guideCard?: ReactNode;
+  /** The season is over and the offseason screen holds the next steps. */
+  offseason?: boolean;
+  onOpenOffseason?: () => void;
 }) {
   const [showAllResults, setShowAllResults] = useState(false);
+  const [showAllActions, setShowAllActions] = useState(false);
   const recentRecruitNews = newsItems.filter((n) => n.category === 'recruiting' && !n.summary).slice(0, 3);
   const committedToUs = portalEntries.filter(
     (e) => e.status === 'committed' && e.committedTeamId === userTeamId,
@@ -297,8 +320,15 @@ export function WeekHubScreen({
     ...(redshirtSuggestions !== undefined ? { redshirtSuggestions } : {}),
     ...(captainCount !== undefined ? { captainCount } : {}),
     ...(rivalryWeek !== undefined ? { rivalryWeek } : {}),
+    scholarshipBudgetLeft:
+      LACROSSE_CLASS_SCHOLARSHIP_BUDGET - classScholarshipBudgetUsed(recruitBoard.map((e) => e.recruit), userTeamId),
   });
   const highPriority = actionItems.filter((a) => a.priority === 'high');
+  // The alert banner carries the urgent items; the card lists the rest, most useful first.
+  const otherActions = actionItems
+    .filter((a) => a.priority !== 'high')
+    .sort((a, b) => (a.priority === b.priority ? 0 : a.priority === 'medium' ? -1 : 1));
+  const shownActions = showAllActions ? otherActions : otherActions.slice(0, 3);
 
   return (
     <div className="week-hub-layout">
@@ -306,25 +336,25 @@ export function WeekHubScreen({
       <div className="hub-header card">
         <div className="hub-header-info">
           <span className="section-label">
-            {seasonComplete ? 'Season Complete' : `Week ${currentWeek} Briefing`}
+            {offseason ? 'Offseason' : seasonComplete ? 'Season Complete' : `Week ${currentWeek} Briefing`}
           </span>
           <div className="hub-header-stats">
             <div className="hub-stat">
               <span className="hub-stat-value">
-                {userTeam.record.wins}–{userTeam.record.losses}
+                <TickerNumber value={userTeam.record.wins} />–<TickerNumber value={userTeam.record.losses} />
               </span>
               <span className="hub-stat-label">Record</span>
             </div>
             {userRankEntry && (
               <div className="hub-stat">
-                <span className="hub-stat-value hub-stat-rank">#{userRankEntry.rank}</span>
+                <span className="hub-stat-value hub-stat-rank">#<TickerNumber value={userRankEntry.rank} /><RankMove rank={userRankEntry.rank} /></span>
                 <span className="hub-stat-label">National Rank</span>
               </div>
             )}
             {weeklyHub && (
               <div className="hub-stat">
-                <span className="hub-stat-value hub-stat-prob">{weeklyHub.winProbability}%</span>
-                <span className="hub-stat-label">Win Prob</span>
+                <span className="hub-stat-value hub-stat-prob"><TickerNumber value={weeklyHub.winProbability} />%</span>
+                <span className="hub-stat-label">Win Prob <HelpTip term="win-prob" /></span>
               </div>
             )}
             {weeklyHub && weeklyHub.recentForm.length > 0 && (
@@ -344,22 +374,31 @@ export function WeekHubScreen({
                 <span className="hub-stat-value">
                   {weeklyHub.series ? `${weeklyHub.series.wins}–${weeklyHub.series.losses}` : 'New'}
                 </span>
-                <span className="hub-stat-label">Series</span>
+                <span className="hub-stat-label">Series <HelpTip term="series" /></span>
               </div>
             )}
             {bracketStatus && (
               <div className="hub-stat" title={bracketStatus}>
                 <span className="hub-stat-value">{shortBracketStatus(bracketStatus)}</span>
-                <span className="hub-stat-label">Bracket</span>
+                <span className="hub-stat-label">Bracket <HelpTip term="bracket" /></span>
               </div>
             )}
             <div className="hub-stat">
               <span className="hub-stat-value">{scouting.pointsAvailable}</span>
-              <span className="hub-stat-label">Recruit Hrs</span>
+              <span className="hub-stat-label">Recruit Hrs <HelpTip term="recruit-hours" /></span>
             </div>
           </div>
         </div>
-        {!seasonComplete && (
+        {offseason ? (
+          <div className="hub-sim-actions">
+            <p className="dim hub-offseason-note">
+              The season is over. Spend investment points, work the transfer portal and start the new season from the Offseason screen.
+            </p>
+            <button className="hub-sim-btn" onClick={onOpenOffseason}>
+              Open Offseason →
+            </button>
+          </div>
+        ) : !seasonComplete && (
           <div className="hub-sim-actions">
             {onCoachGame && (
               <button className="hub-sim-btn hub-coach-btn" onClick={onCoachGame}>
@@ -388,6 +427,33 @@ export function WeekHubScreen({
             </div>
           ))}
         </div>
+      )}
+
+      {guideCard}
+
+      {/* ── Action Items ──────────────────────────────── */}
+      {otherActions.length > 0 && (
+        <article className="card hub-actions-card" aria-label="Recommended actions">
+          <h3 className="hub-card-title">Recommended Actions</h3>
+          <ul className="hub-actions-list">
+            {shownActions.map((item) => (
+              <li key={item.id} className={`hub-action-row hub-action-${item.priority}`}>
+                <span className="hub-action-icon">{item.icon}</span>
+                <span className="hub-action-text">{item.text}</span>
+                {item.nav && (
+                  <button className="hub-action-nav" onClick={() => onNavigate(item.nav!)}>
+                    Go →
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {otherActions.length > 3 && (
+            <button type="button" className="ghost-btn hub-actions-more" onClick={() => setShowAllActions((v) => !v)}>
+              {showAllActions ? 'Show fewer' : `Show all ${otherActions.length}`}
+            </button>
+          )}
+        </article>
       )}
 
       {teamTalkCard}
@@ -439,20 +505,7 @@ export function WeekHubScreen({
                 {weeklyHub.opponentRecord.wins}–{weeklyHub.opponentRecord.losses}
               </div>
               <p className="hub-matchup-note">{weeklyHub.preview.matchupNote}</p>
-              <div className="hub-edges">
-                {[
-                  { label: 'OVR', val: weeklyHub.preview.ratingEdge },
-                  { label: 'OFF', val: weeklyHub.preview.offenseEdge },
-                  { label: 'DEF', val: weeklyHub.preview.defenseEdge },
-                  { label: 'GK', val: weeklyHub.preview.goalieEdge },
-                  { label: 'FO', val: weeklyHub.preview.faceoffEdge },
-                ].map(({ label, val }) => (
-                  <div key={label} className={`hub-edge ${val >= 0 ? 'edge-pos' : 'edge-neg'}`}>
-                    <span className="hub-edge-label">{label}</span>
-                    <span className="hub-edge-val">{val >= 0 ? '+' : ''}{val}</span>
-                  </div>
-                ))}
-              </div>
+              <EdgeChips preview={weeklyHub.preview} />
               {weeklyHub.keyPlayers.length > 0 && (
                 <div className="hub-key-players">
                   {weeklyHub.keyPlayers.map((kp) => (
@@ -608,23 +661,6 @@ export function WeekHubScreen({
         </article>
       </div>
 
-      {/* ── Action Items ──────────────────────────────── */}
-      <article className="card hub-actions-card">
-        <h3 className="hub-card-title">Recommended Actions</h3>
-        <ul className="hub-actions-list">
-          {actionItems.map((item) => (
-            <li key={item.id} className={`hub-action-row hub-action-${item.priority}`}>
-              <span className="hub-action-icon">{item.icon}</span>
-              <span className="hub-action-text">{item.text}</span>
-              {item.nav && (
-                <button className="hub-action-nav" onClick={() => onNavigate(item.nav!)}>
-                  Go →
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </article>
     </div>
   );
 }

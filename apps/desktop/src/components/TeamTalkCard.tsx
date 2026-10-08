@@ -17,10 +17,13 @@ export function TeamTalkCard({
   opponentName,
   talk,
   onTalk,
+  onDelegate,
 }: {
   opponentName: string;
   talk: PregameTalk | null;
   onTalk: (tone: TeamTalkTone) => void;
+  /** Hand the weekly talk and press conference to the staff. */
+  onDelegate?: (() => void) | undefined;
 }) {
   return (
     <article className="card team-talk-card" aria-label="Team talk">
@@ -45,8 +48,29 @@ export function TeamTalkCard({
               </button>
             ))}
           </div>
+          {onDelegate && (
+            <button type="button" className="link-btn delegate-link" onClick={onDelegate}>
+              Let the staff handle talks and press conferences
+            </button>
+          )}
         </>
       )}
+    </article>
+  );
+}
+
+/** Shown in place of the talk when the staff handles the room and the media. */
+export function StaffMediaCard({ onTakeBack }: { onTakeBack: () => void }) {
+  return (
+    <article className="card team-talk-card staff-media-card" aria-label="Team talk">
+      <p className="section-label">Team Talk &amp; Press</p>
+      <p className="dim">
+        Your staff gives a composed pregame talk and credits the players (or the opponent) after each game. Safe, never
+        a gamble.
+      </p>
+      <button type="button" className="ghost-btn" onClick={onTakeBack}>
+        Take them back
+      </button>
     </article>
   );
 }

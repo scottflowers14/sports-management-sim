@@ -1,7 +1,8 @@
 import { legacyScore, legacyTier } from './legacy';
 import { AchievementWatchCard } from './components/AchievementWatchCard';
 import { achievementWatch } from './achievements';
-import { DIFFICULTY_LABELS } from './difficulty';
+import { cpuRecruitingScale, DIFFICULTY_LABELS, userDecisionScale } from './difficulty';
+import { landChance, landChances } from './recruit-odds';
 import { seasonReport } from './season-report';
 import {
   calculateLacrosseTeamRating,
@@ -23,6 +24,7 @@ import {
   seasonAttendance,
 } from '@sports-management-sim/sport-lacrosse';
 import type { StandingsEntry } from '@sports-management-sim/engine-core';
+import type { LacrosseTeam, LacrosseTeamStats } from '@sports-management-sim/sport-lacrosse';
 import { classNeedsByPosition } from '@sports-management-sim/engine-core';
 
 import { getJobSecurityLabel, getJobSecurityColor } from './coach-profile';
@@ -46,21 +48,33 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { ACHIEVEMENTS, achievementPoints, profileLevel, profileTitle } from './achievements';
 import { AchievementToast } from './components/AchievementToast';
+import { CoachChecklistCard, WelcomeModal } from './components/CoachChecklist';
+import { GameRevealModal } from './components/GameRevealModal';
+import { buildGameReveal } from './game-reveal';
+import { offseasonTodos, spendableInvestmentPoints, startSeasonWarning } from './offseason-todo';
+import { ConfirmModal } from './components/ConfirmModal';
+import { TickerNumber, RankMove } from './ui/Ticker';
+import { coachGuideSteps, showCoachGuide } from './coach-guide';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SeasonPreviewCard } from './components/SeasonPreviewCard';
 import { HalftimeModal } from './components/HalftimeModal';
 import { recruitingPipelines } from './pipelines';
 import { playerGameLog } from './player-game-log';
-import { TeamTalkCard } from './components/TeamTalkCard';
+import { StaffMediaCard, TeamTalkCard } from './components/TeamTalkCard';
 import { allSeries, userSeasonGames } from './series-history';
 import { playerHonors } from './history';
-import { TOURNAMENT_ROUND_LABELS, projectNcaaField, projectionStatus } from './tournament';
+import { BRACKET_NEWS_FIRST_WEEK } from './week-sim';
+import { TOURNAMENT_ROUND_LABELS, opponentThisRound, projectNcaaField, projectionStatus, stillAlive } from './tournament';
+import type { OpponentScout } from './components/GamePlanPanel';
+import { PregameModal } from './components/PregameModal';
+import { OpenHelpContext } from './components/HelpTip';
+import { HelpScreen } from './screens/HelpScreen';
 import { PressConferenceCard } from './components/PressConferenceCard';
 import { WeekHubScreen } from './screens/WeekHubScreen';
 import { StartScreen } from './screens/StartScreen';
 import { ProgramsScreen } from './screens/ProgramsScreen';
 import { PlayersScreen } from './screens/PlayersScreen';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FormWatchCard } from './components/FormWatchCard';
 import { rosterForm } from './player-form';
 import { powerRankingBlurbs } from './power-rankings';
@@ -69,6 +83,9 @@ import { useDynastyController, type View } from './useDynastyController';
 import './App.css';
 
 const CLASS_NEED_POSITIONS = ['ATT', 'MID', 'DEF', 'LSM', 'FOGO', 'GK'] as const;
+
+/** localStorage key for the sidebar groups the coach has folded away. */
+const NAV_COLLAPSED_KEY = 'sms.navCollapsed';
 
 export function App() {
   const {
@@ -198,6 +215,7 @@ export function App() {
     answerPressConference,
     canCoachGame,
     coachGame,
+    simToOffseason,
     halftime,
     playSecondHalf,
     nil,
@@ -205,6 +223,8 @@ export function App() {
     rushInjuredPlayer,
     teamTalk,
     giveTeamTalk,
+    staffHandlesMedia,
+    setStaffHandlesMedia,
     signNilDeal,
     enterTournament,
     simTournamentSemis,
@@ -222,8 +242,43 @@ export function App() {
     handleImportTeams,
     handleClearCustomTeams,
     ncaaBracketOdds,
+    coachGuide,
+    markGuideVisited,
+    dismissCoachGuide,
+    acknowledgeWelcome,
+    pendingReveal,
+    dismissReveal,
   } = useDynastyController();
+
+  useEffect(() => {
+    if (screen === 'game') markGuideVisited(view);
+  }, [screen, view, markGuideVisited]);
   const [viewedProgramId, setViewedProgramId] = useState<string | null>(null);
+  /** Asking before a season starts with offseason decisions left undone. */
+  const [confirmStart, setConfirmStart] = useState(false);
+  /** Coach the Game opens on the pregame plan before the first half. */
+  const [pregameOpen, setPregameOpen] = useState(false);
+  /** Sidebar groups the coach has folded away, remembered on this device. */
+  const [collapsedNav, setCollapsedNav] = useState<string[]>(() => {
+    try {
+      const raw = window.localStorage.getItem(NAV_COLLAPSED_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
+  const toggleNavGroup = (id: string) => {
+    setCollapsedNav((prev) => {
+      const next = prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id];
+      try {
+        window.localStorage.setItem(NAV_COLLAPSED_KEY, JSON.stringify(next));
+      } catch {
+        // Private windows can refuse storage; the fold still works for this visit.
+      }
+      return next;
+    });
+  };
 
   if (screen === 'start') {
     return (
@@ -308,6 +363,49 @@ export function App() {
   ).length;
 
   const userRankEntry = rankings.find((r) => r.teamId === dynasty.userTeamId);
+  const guideActive = showCoachGuide(coachGuide, dynastyHistory.length);
+  const vacantStaffRoles = STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase());
+  const spendablePoints = spendableInvestmentPoints(investmentBudget, investmentPlan);
+  const todos =
+    offseasonSummary && !pendingJobOffers
+      ? offseasonTodos({
+          investmentBudget,
+          investmentPlan,
+          portalAvailable: dynasty.portalEntries.filter((e) => e.status === 'available').length,
+          portalOffers: dynasty.portalEntries.filter((e) => e.status === 'available' && e.offersByTeamId[dynasty.userTeamId] !== undefined).length,
+          scholarshipRoom: portalScholarshipRoom,
+          vacantStaffRoles,
+          realignmentPending: Boolean(offseasonSummary.realignmentInvite),
+        })
+      : null;
+  const startWarning = todos ? startSeasonWarning(todos, spendablePoints) : null;
+  const guardedStartSeason = () => (startWarning ? setConfirmStart(true) : startNewSeason());
+  const revealGame = pendingReveal ? dynasty.season.schedule.find((g) => g.id === pendingReveal.gameId) : undefined;
+  const revealData = (() => {
+    if (!pendingReveal || !revealGame?.result) return null;
+    const reveal = buildGameReveal(revealGame, gameLogs.get(revealGame.id), dynasty.userTeamId, {
+      userRank: pendingReveal.userRank,
+      opponentRank: pendingReveal.opponentRank,
+      trophy: rivalryForGame(dynastyRivalries(dynasty), revealGame)?.trophy ?? null,
+    });
+    if (!reveal) return null;
+    const { result } = revealGame;
+    const log = gameLogs.get(revealGame.id);
+    const boxScore = result.teamStats
+      ? {
+          title: `Week ${revealGame.week}`,
+          homeTeamName: teamMap.get(revealGame.homeTeamId) ?? revealGame.homeTeamId,
+          awayTeamName: teamMap.get(revealGame.awayTeamId) ?? revealGame.awayTeamId,
+          homeScore: result.homeScore,
+          awayScore: result.awayScore,
+          overtime: result.overtime,
+          homeStats: result.teamStats.home as LacrosseTeamStats,
+          awayStats: result.teamStats.away as LacrosseTeamStats,
+          ...(log ? { log } : {}),
+        }
+      : null;
+    return { reveal, boxScore };
+  })();
   // Badge the stories about our program from the latest simulated week.
   const latestNewsWeek = newsItems[0]?.week;
   const unreadNewsCount = newsItems.filter((n) => n.week === latestNewsWeek && n.featured).length;
@@ -355,23 +453,32 @@ export function App() {
     : undefined;
   const userForm = rosterForm(userTeam.roster, dynasty.season.schedule, gameLogs);
   const league = leagueTendencies(dynasty.season.schedule);
-  const opponentTendencies = nextOpponentTeam ? teamTendencies(dynasty.season.schedule, nextOpponentTeam.id) : null;
-  const nextOpponentScout = nextUserGame && nextOpponentTeam
-    ? {
-        tendencies: opponentTendencies,
-        keys: opponentTendencies && league ? scoutingKeys(opponentTendencies, league) : [],
-        week: nextUserGame.week,
-        name: formatTeamName(nextOpponentTeam.name),
-        isHome: nextUserGame.homeTeamId === dynasty.userTeamId,
-        plan: deriveCpuGamePlan(nextOpponentTeam),
-        rating: calculateLacrosseTeamRating(nextOpponentTeam).overall,
-        tape: taleOfTheTape(
-          teamStatRankings(dynasty.season.schedule, dynasty.season.teams.map((t) => t.id)),
-          dynasty.userTeamId,
-          nextOpponentTeam.id,
-        ),
-      }
-    : null;
+  const statRanks = teamStatRankings(dynasty.season.schedule, dynasty.season.teams.map((t) => t.id));
+  const scoutFor = (opponent: LacrosseTeam, isHome: boolean, week: number, label?: string): OpponentScout => {
+    const tendencies = teamTendencies(dynasty.season.schedule, opponent.id);
+    return {
+      tendencies,
+      keys: tendencies && league ? scoutingKeys(tendencies, league) : [],
+      week,
+      ...(label ? { label } : {}),
+      name: formatTeamName(opponent.name),
+      isHome,
+      plan: deriveCpuGamePlan(opponent),
+      rating: calculateLacrosseTeamRating(opponent).overall,
+      tape: taleOfTheTape(statRanks, dynasty.userTeamId, opponent.id),
+    };
+  };
+  const nextOpponentScout =
+    nextUserGame && nextOpponentTeam
+      ? scoutFor(nextOpponentTeam, nextUserGame.homeTeamId === dynasty.userTeamId, nextUserGame.week)
+      : null;
+  // In the postseason the scout covers this round's opponent.
+  const roundOpponent = tournament ? opponentThisRound(tournament, dynasty.userTeamId) : null;
+  const roundOpponentTeam = roundOpponent ? dynasty.season.teams.find((t) => t.id === roundOpponent.opponentId) : undefined;
+  const pregameScout =
+    tournament && roundOpponent && roundOpponentTeam
+      ? scoutFor(roundOpponentTeam, roundOpponent.isHome, dynasty.season.currentWeek, TOURNAMENT_ROUND_LABELS[tournament.phase])
+      : nextOpponentScout;
 
   const seriesByOpponent = allSeries(dynastyHistory, {
     year: dynasty.season.year,
@@ -393,21 +500,46 @@ export function App() {
     ? dynasty.season.teams.flatMap((t) => t.roster).find((p) => p.id === selectedPlayerId)
     : null;
   const selectedRecruit = selectedRecruitId ? dynasty.recruits.find((r) => r.id === selectedRecruitId) : null;
+  // Chance to land each open recruit; only worked out where it's shown.
+  const landContext = {
+    userTeam,
+    teams: dynasty.season.teams,
+    currentWeek: dynasty.season.currentWeek,
+    finalWeek: dynasty.season.schedule.reduce((max, g) => Math.max(max, g.week), 0) || 10,
+    decisionScale: userDecisionScale(dynasty.difficulty),
+    cpuInterestScale: cpuRecruitingScale(dynasty.difficulty),
+    teamName: (id: string) => formatTeamShort(teamMap.get(id) ?? id),
+  };
+  const recruitLandChances = view === 'recruiting' ? landChances(dynasty.recruits, landContext) : undefined;
+  const selectedRecruitChance = selectedRecruit ? landChance(selectedRecruit, landContext) : undefined;
 
+  const openHelp = () => setView('help');
+
+  // Once the user can't play again this postseason, the rest is one click.
+  const userOutOfPostseason =
+    !offseasonSummary && tournament !== null && tournament.phase !== 'complete' && !stillAlive(tournament, dynasty.userTeamId);
   const advance = (() => {
     if (offseasonSummary) {
       // A fired coach has to pick a new job first; that choice lives on the offseason screen.
       if (pendingJobOffers) {
         if (view === 'offseason') return null;
-        return { label: 'Offseason', title: 'Pick your next job to start the new season', run: () => setView('offseason') };
+        return { label: 'Pick a Job', title: 'Pick your next job to start the new season', run: () => setView('offseason') };
       }
       // The offseason already rolled the dynasty over to next year's season.
-      return { label: `Season ${dynasty.season.year}`, title: 'Start the new season', run: startNewSeason };
+      return { label: `Start Season ${dynasty.season.year}`, title: 'Start the new season', run: guardedStartSeason };
     }
     if (hasScheduledGames) {
-      return { label: `Week ${dynasty.season.currentWeek}`, title: `Sim week ${dynasty.season.currentWeek}`, run: simWeek };
+      const week = dynasty.season.currentWeek;
+      const game = dynasty.season.schedule.find(
+        (g) => g.week === week && g.status === 'scheduled' && (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
+      );
+      const opponentId = game ? (game.homeTeamId === dynasty.userTeamId ? game.awayTeamId : game.homeTeamId) : null;
+      const matchup = opponentId
+        ? ` ${game!.homeTeamId === dynasty.userTeamId ? 'vs' : 'at'} ${formatTeamShort(teamMap.get(opponentId) ?? opponentId)}`
+        : ' (bye)';
+      return { label: `Week ${week}${matchup}`, title: `Sim week ${week}: every game plays, recruiting moves, then the result`, run: simWeek };
     }
-    if (!tournament) return { label: 'Postseason', title: 'Start the conference tournaments', run: enterTournament };
+    if (!tournament) return { label: 'Start Postseason', title: 'Start the conference tournaments', run: enterTournament };
     const phaseActions = {
       conf_semis: { label: 'Conf Semis', title: 'Sim the conference semifinals', run: simTournamentSemis },
       conf_finals: { label: 'Conf Finals', title: 'Sim the conference finals, then the NCAA field is selected', run: simTournamentFinals },
@@ -415,7 +547,7 @@ export function App() {
       ncaa_quarterfinals: { label: 'NCAA Quarters', title: 'Sim the NCAA quarterfinals', run: simNcaaQuarterfinals },
       national_semis: { label: 'Final Four', title: 'Sim the national semifinals', run: simTournamentNationalSemis },
       national_final: { label: 'Title Game', title: 'Sim the national championship', run: simTournamentNational },
-      complete: { label: 'Offseason', title: 'Run the offseason: graduation, development and signing day', run: enterOffseason },
+      complete: { label: 'Run Offseason', title: 'Run the offseason: graduation, development and signing day', run: enterOffseason },
     } as const;
     return phaseActions[tournament.phase];
   })();
@@ -426,8 +558,9 @@ export function App() {
   };
 
   type NavItem = { view: View; label: string; badge?: number | string; alert?: boolean };
-  const navGroups: Array<{ title: string; items: NavItem[] }> = [
+  const navGroups: Array<{ id: string; title: string; items: NavItem[] }> = [
     {
+      id: 'office',
       title: 'Office',
       items: [
         ...(offseasonSummary ? [{ view: 'offseason' as const, label: 'Offseason' }] : []),
@@ -435,9 +568,11 @@ export function App() {
         { view: 'season', label: 'Season' },
         { view: 'news', label: 'News', ...(unreadNewsCount > 0 ? { badge: unreadNewsCount } : {}) },
         { view: 'profile', label: 'Profile', ...(achievementToasts.length > 0 ? { badge: achievementToasts.length } : {}) },
+        { view: 'help', label: 'Help' },
       ],
     },
     {
+      id: 'team',
       title: formatTeamName(userTeam.shortName || userTeam.name),
       items: [
         { view: 'team', label: 'Team' },
@@ -449,6 +584,7 @@ export function App() {
       ],
     },
     {
+      id: 'league',
       title: 'League',
       items: [
         { view: 'standings', label: 'Standings' },
@@ -464,7 +600,12 @@ export function App() {
     },
   ];
 
+  // A folded group still shows while you're on one of its screens.
+  const navFolded = (group: (typeof navGroups)[number]) =>
+    collapsedNav.includes(group.id) && !group.items.some((i) => i.view === view);
+
   return (
+    <OpenHelpContext.Provider value={openHelp}>
     <main className="app-shell">
       <header className="top-bar">
         <div className="brand">
@@ -477,12 +618,14 @@ export function App() {
         <section className="top-team" aria-label="User team summary">
           <strong className="top-team-name">{formatTeamName(userTeam.name)}</strong>
           <span className="top-record">
-            {offseasonSummary
-              ? `${offseasonSummary.userRecord.wins}–${offseasonSummary.userRecord.losses}`
-              : `${userTeam.record.wins}–${userTeam.record.losses}`}
+            <TickerNumber value={offseasonSummary ? offseasonSummary.userRecord.wins : userTeam.record.wins} />–
+            <TickerNumber value={offseasonSummary ? offseasonSummary.userRecord.losses : userTeam.record.losses} />
           </span>
           {userRankEntry && (
-            <span className="national-rank">#{userRankEntry.rank} Nationally</span>
+            <span className="national-rank">
+              #<TickerNumber value={userRankEntry.rank} /> Nationally
+              <RankMove rank={userRankEntry.rank} />
+            </span>
           )}
           <span className="top-phase">
             {offseasonSummary
@@ -502,14 +645,24 @@ export function App() {
         <div className="top-actions save-actions" aria-label="Save controls">
           {advance && (
             <button type="button" className="advance-btn" title={advance.title} onClick={advance.run}>
-              ▶ Advance: {advance.label}
+              ▶ Continue: {advance.label}
+            </button>
+          )}
+          {userOutOfPostseason && (
+            <button
+              type="button"
+              className="advance-skip"
+              title="You're out of the postseason: play the remaining rounds and go straight to the offseason"
+              onClick={simToOffseason}
+            >
+              ⏭ Sim to Offseason
             </button>
           )}
           <button type="button" onClick={() => persistDynasty()}>
             Save Now
           </button>
-          <button type="button" onClick={resetDynasty}>
-            New Dynasty
+          <button type="button" onClick={resetDynasty} title="Back to the main menu. This dynasty stays saved.">
+            Main Menu
           </button>
           <span className={saveError ? 'save-status save-status-failed' : 'save-status'} title={saveStatus}>
             {saveStatus}
@@ -524,6 +677,41 @@ export function App() {
             Manage saves
           </button>
         </div>
+      )}
+
+      {confirmStart && startWarning && (
+        <ConfirmModal
+          title={`Start the ${dynasty.season.year} season now?`}
+          message={startWarning}
+          confirmLabel="Start anyway"
+          cancelLabel="Not yet"
+          onConfirm={() => {
+            setConfirmStart(false);
+            startNewSeason();
+          }}
+          onCancel={() => {
+            setConfirmStart(false);
+            setView('offseason');
+          }}
+        />
+      )}
+
+      {revealData && (
+        <GameRevealModal
+          reveal={revealData.reveal}
+          userName={formatTeamName(userTeam.name)}
+          opponentName={formatTeamName(teamMap.get(revealData.reveal.opponentId) ?? revealData.reveal.opponentId)}
+          onBoxScore={revealData.boxScore ? () => setSelectedBoxScore(revealData.boxScore!) : undefined}
+          onClose={dismissReveal}
+        />
+      )}
+
+      {guideActive && !coachGuide.welcomed && (
+        <WelcomeModal
+          coachName={coachProfile?.name ?? 'Coach'}
+          teamName={formatTeamName(userTeam.name)}
+          onClose={acknowledgeWelcome}
+        />
       )}
 
       {achievementToasts.length > 0 && view !== 'profile' && (
@@ -542,9 +730,22 @@ export function App() {
         <aside className="side-nav">
           <nav aria-label="Main navigation">
             {navGroups.map((group) => (
-              <div key={group.title} className="nav-group">
-                <span className="nav-group-title">{group.title}</span>
-                {group.items.map((item) => (
+              <div key={group.id} className="nav-group">
+                <button
+                  type="button"
+                  className="nav-group-title nav-group-toggle"
+                  aria-expanded={!navFolded(group)}
+                  aria-label={navFolded(group) ? `Show ${group.title}` : `Fold ${group.title}`}
+                  title={navFolded(group) ? `Show ${group.title}` : `Fold ${group.title} away`}
+                  onClick={() => toggleNavGroup(group.id)}
+                >
+                  {group.title}
+                  <span className="nav-group-caret" aria-hidden="true">{navFolded(group) ? '▸' : '▾'}</span>
+                  {navFolded(group) && group.items.some((i) => i.badge !== undefined) && (
+                    <span className="tab-badge nav-folded-dot" aria-label="Updates inside">•</span>
+                  )}
+                </button>
+                {!navFolded(group) && group.items.map((item) => (
                   <button
                     key={item.view}
                     type="button"
@@ -621,9 +822,27 @@ export function App() {
         <section className="screen-area">
       {view === 'week-hub' && (
         <WeekHubScreen
-          onCoachGame={canCoachGame ? coachGame : undefined}
+          onCoachGame={canCoachGame ? () => setPregameOpen(true) : undefined}
           onRushInjury={rushInjuredPlayer}
-          bracketStatus={ncaaProjection ? projectionStatus(ncaaProjection, dynasty.userTeamId) : undefined}
+          bracketStatus={
+            ncaaProjection && dynasty.season.currentWeek > BRACKET_NEWS_FIRST_WEEK
+              ? projectionStatus(ncaaProjection, dynasty.userTeamId)
+              : undefined
+          }
+          guideCard={
+            guideActive ? (
+              <CoachChecklistCard
+                steps={coachGuideSteps({
+                  captainCount: teamCaptains(userTeam).length,
+                  offersOut: dynasty.recruits.filter((r) => r.scholarshipOffers.some((o) => o.teamId === dynasty.userTeamId)).length,
+                  gamesPlayed: userTeam.record.wins + userTeam.record.losses,
+                  visited: coachGuide.visited,
+                })}
+                onNavigate={(v) => setView(v as Parameters<typeof setView>[0])}
+                onDismiss={dismissCoachGuide}
+              />
+            ) : undefined
+          }
           achievementCard={
             <AchievementWatchCard
               items={achievementWatch(achievementSnapshot, achievements, { rivalryWeek: !seasonComplete && Boolean(rivalryWeek) })}
@@ -633,8 +852,11 @@ export function App() {
           formCard={<FormWatchCard roster={userTeam.roster} form={userForm} onSelectPlayer={setSelectedPlayerId} />}
           teamTalkCard={
             // Hidden at halftime: a talk given then would change a first half already shown.
-            weeklyHub && !seasonComplete && !tournament && !halftime ? (
+            weeklyHub && !seasonComplete && !tournament && !halftime && staffHandlesMedia ? (
+              <StaffMediaCard onTakeBack={() => setStaffHandlesMedia(false)} />
+            ) : weeklyHub && !seasonComplete && !tournament && !halftime ? (
               <TeamTalkCard
+                onDelegate={() => setStaffHandlesMedia(true)}
                 opponentName={formatTeamName(weeklyHub.opponentName)}
                 talk={teamTalk}
                 onTalk={(tone) =>
@@ -663,10 +885,12 @@ export function App() {
           rankOf={rankOf}
           gameLogs={gameLogs}
           onSimWeek={simWeek}
+          offseason={Boolean(offseasonSummary)}
+          onOpenOffseason={() => setView('offseason')}
           onBoxScore={setSelectedBoxScore}
           onNavigate={(v) => setView(v as Parameters<typeof setView>[0])}
           classNeeds={classNeedsByPosition(userTeam, dynasty.recruits, CLASS_NEED_POSITIONS)}
-          vacantStaffRoles={STAFF_ROLES.filter((role) => !staff[role]).map((role) => STAFF_ROLE_LABELS[role].title.toLowerCase())}
+          vacantStaffRoles={vacantStaffRoles}
           openPlanSlots={Math.max(0, MAX_DEVELOPMENT_PLANS - practicePlan.developmentPlans.length)}
           unhappyCount={unhappyCount}
           redshirtSuggestions={redshirtSuggestions}
@@ -690,7 +914,7 @@ export function App() {
 
       {view === 'season' && (
         <SeasonScreen
-          onCoachGame={canCoachGame ? coachGame : undefined}
+          onCoachGame={canCoachGame ? () => setPregameOpen(true) : undefined}
           currentWeek={dynasty.season.currentWeek}
           seasonComplete={seasonComplete}
           tournament={tournament}
@@ -797,6 +1021,7 @@ export function App() {
           onMakeOffers={offerScholarships}
           autoOffers={autoRecruitingOffers}
           onAutoOffersChange={setAutoRecruitingOffers}
+          landChances={recruitLandChances}
         />
       )}
 
@@ -820,7 +1045,7 @@ export function App() {
 
       {view === 'tournament' && (
         <TournamentScreen
-          onCoachGame={canCoachGame ? coachGame : undefined}
+          onCoachGame={canCoachGame ? () => setPregameOpen(true) : undefined}
           tournament={tournament}
           odds={ncaaBracketOdds}
           teamMap={teamMap}
@@ -896,6 +1121,8 @@ export function App() {
         />
       )}
 
+      {view === 'help' && <HelpScreen />}
+
       {view === 'records' && (
         <RecordsScreen
           archive={recordBook}
@@ -942,7 +1169,9 @@ export function App() {
           jobOffers={pendingJobOffers}
           coachName={coachProfile?.name ?? null}
           onAcceptJobOffer={acceptJobOffer}
-          onStartNewSeason={startNewSeason}
+          onStartNewSeason={guardedStartSeason}
+          todos={todos ?? undefined}
+          onOpenStaff={() => setView('staff')}
           onOfferPortalPlayer={offerPortalPlayer}
           portalTeams={dynasty.season.teams}
           portalScholarshipRoom={portalScholarshipRoom}
@@ -1009,8 +1238,25 @@ export function App() {
           scouting={scouting}
           userTeamId={dynasty.userTeamId}
           teamMap={teamMap}
+          chance={selectedRecruitChance}
           onScout={doScoutRecruit}
           onClose={() => setSelectedRecruitId(null)}
+        />
+      )}
+
+      {pregameOpen && canCoachGame && !halftime && (
+        <PregameModal
+          label={tournament ? TOURNAMENT_ROUND_LABELS[tournament.phase] : `Week ${dynasty.season.currentWeek}`}
+          scout={pregameScout}
+          gamePlan={gamePlan}
+          onGamePlanChange={setGamePlan}
+          autoGamePlan={autoGamePlan}
+          onUseStaffPlan={restoreStaffGamePlan}
+          onPlayFirstHalf={() => {
+            setPregameOpen(false);
+            coachGame();
+          }}
+          onCancel={() => setPregameOpen(false)}
         />
       )}
 
@@ -1034,6 +1280,7 @@ export function App() {
         />
       )}
     </main>
+    </OpenHelpContext.Provider>
   );
 }
 

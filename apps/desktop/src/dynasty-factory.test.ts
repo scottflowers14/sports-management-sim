@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createFreshLacrosseDynasty, loadCustomTeamsConfig } from './dynasty-factory';
+import {
+  createFreshLacrosseDynasty,
+  getLacrosseDynastyTeamChoices,
+  loadCustomTeamsConfig,
+  programTier,
+  recommendedStarterTeam,
+} from './dynasty-factory';
 
 describe('createFreshLacrosseDynasty', () => {
   afterEach(() => {
@@ -19,5 +25,31 @@ describe('createFreshLacrosseDynasty', () => {
     vi.stubGlobal('localStorage', {});
 
     expect(loadCustomTeamsConfig()).toBeNull();
+  });
+});
+
+describe('program tiers', () => {
+  it('names the job from prestige', () => {
+    expect(programTier(85)).toBe('Blue blood');
+    expect(programTier(70)).toBe('Contender');
+    expect(programTier(58)).toBe('Rising');
+    expect(programTier(47)).toBe('Rebuild');
+  });
+
+  it('suggests the strongest Contender to a new coach, with every program in a named conference', () => {
+    const choices = getLacrosseDynastyTeamChoices();
+    expect(choices.every((c) => c.conferenceName)).toBe(true);
+    const starter = recommendedStarterTeam(choices)!;
+    expect(programTier(starter.prestige)).toBe('Contender');
+    const contenders = choices.filter((c) => programTier(c.prestige) === 'Contender');
+    expect(starter.prestige).toBe(Math.max(...contenders.map((c) => c.prestige)));
+  });
+
+  it('falls back to the program closest to a Contender when there are none', () => {
+    const starter = recommendedStarterTeam([
+      { id: 'a', name: 'A', prestige: 90 },
+      { id: 'b', name: 'B', prestige: 60 },
+    ]);
+    expect(starter?.id).toBe('b');
   });
 });

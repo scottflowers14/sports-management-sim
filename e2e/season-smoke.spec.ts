@@ -19,6 +19,9 @@ test('plays a season through the title game and offseason into year two', async 
   await page.reload();
 
   await page.getByRole('button', { name: 'Start New Dynasty' }).click();
+  // A new coach is welcomed once, then the first-season checklist takes over.
+  await page.getByRole('button', { name: 'Got it' }).click();
+  await expect(page.getByLabel("Coach's checklist")).toContainText('0/5 done');
   const advance = page.locator('.advance-btn');
   await expect(advance).toContainText('Week 1');
 
@@ -39,6 +42,11 @@ test('plays a season through the title game and offseason into year two', async 
 
   // One week by hand, then the recruiting assistant.
   await advance.click();
+  // The result card ticks the score up, then stamps the result.
+  const reveal = page.getByRole('dialog', { name: 'Game result' });
+  await expect(reveal.locator('.reveal-stamp')).toHaveText(/WIN|LOSS|UPSET|TROPHY/, { timeout: 5000 });
+  await reveal.getByRole('button', { name: 'Continue' }).click();
+  await expect(reveal).toHaveCount(0);
   await expect(advance).toContainText('Week 2');
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Recruiting' }).click();
   await page.getByRole('button', { name: 'Run Assistant' }).click();
@@ -60,6 +68,7 @@ test('plays a season through the title game and offseason into year two', async 
 
   // One click runs the offseason; the transfer portal opens with it.
   await advance.click();
+  await expect(page.getByLabel('Offseason to-do')).toContainText('Spend investment points');
   await expect(page.locator('.season-recap-card')).toBeVisible();
   await expect(advance).toContainText(/Season \d{4}/);
   const nextYear = (await advance.innerText()).match(/Season (\d{4})/)![1]!;
@@ -78,8 +87,9 @@ test('plays a season through the title game and offseason into year two', async 
   await expect(portal.locator('.portal-stats')).toContainText('1 our offers');
 
   // Starting the season settles the portal: every entry has an outcome.
-  // One click from the portal starts the season.
+  // Advance from the portal asks first while investment points sit unspent.
   await advance.click();
+  await page.getByRole('dialog', { name: /Start the \d{4} season now/ }).getByRole('button', { name: 'Start anyway' }).click();
   await expect(advance).toContainText('Week 1');
   await expect(page.locator('.top-bar')).toContainText(`Season ${nextYear}`);
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Recruiting' }).click();

@@ -17,10 +17,23 @@ import { getDisplayOvr, getScoutTier, HOURS_COST } from '../scouting';
 import type { RecruitingActivity } from '../recruiting-activity';
 import type { AssistantReport as AssistantReportData } from '../recruiting-assistant';
 import { formatTeamName, formatTeamShort } from '../ui/format';
+import { attainableBoardScore, type LandChance } from '../recruit-odds';
+import { LandChip } from '../components/LandChip';
+import { HelpTip } from '../components/HelpTip';
 
 type LacrosseBoardEntry = RecruitBoardEntry<LacrossePosition, LacrossePlayerTraits>;
 
 export type RecruitBoardView = 'shortlist' | 'all';
+
+/** Chance to land each open recruit, keyed by id (see recruit-odds.ts). */
+const LandChanceContext = createContext<Map<string, LandChance> | undefined>(undefined);
+
+/** What the recruiting staff does on its own each week. */
+export type StaffMode = 'off' | 'pitch' | 'full';
+
+export function staffModeOf(autoAssistant: boolean, autoOffers: boolean): StaffMode {
+  return !autoAssistant ? 'off' : autoOffers ? 'full' : 'pitch';
+}
 type BoardSort = 'rank' | 'stars' | 'ovr' | 'interest';
 
 /** 4★+ recruits are nationally ranked — their star tier is public knowledge. */
@@ -285,6 +298,7 @@ export function RecruitingScreen({
   onAutoOffersChange,
   classNeeds,
   pipelines,
+  landChances,
 }: {
   recruitBoard: LacrosseBoardEntry[];
   portalEntries: LacrossePortalEntry[];
@@ -325,6 +339,7 @@ export function RecruitingScreen({
   onAutoOffersChange?: (on: boolean) => void;
   classNeeds?: PositionNeed[];
   pipelines?: PipelineRow[];
+  landChances?: Map<string, LandChance> | undefined;
 }) {
   const [boardSort, setBoardSort] = useState<BoardSort>('rank');
   const [hideCommitted, setHideCommitted] = useState(false);
@@ -341,6 +356,7 @@ export function RecruitingScreen({
 
   return (
     <PipelineContext.Provider value={pipelineMap}>
+    <LandChanceContext.Provider value={landChances}>
     <div className="recruit-layout">
       <div className="recruit-top-bar">
         <div className="recruit-tabs">
@@ -367,6 +383,7 @@ export function RecruitingScreen({
           <div className="scout-header-inline">
             <span className="scout-pts-num">{scouting.pointsAvailable}</span>
             <span className="scout-pts-label">Recruiting Hours</span>
+            <HelpTip term="recruit-hours" />
             <span className="scout-pts-hint">
               (+{scouting.pointsPerWeek}/wk · scout {HOURS_COST.scout}h · pitch {HOURS_COST.pitch}h · visit {HOURS_COST.visit}h)
             </span>
@@ -376,31 +393,30 @@ export function RecruitingScreen({
                   className="offer-btn assistant-btn"
                   onClick={onRunAssistant}
                   disabled={scouting.pointsAvailable < 1}
-                  title="Your recruiting coordinator pitches the recruits you've offered or pinned, then scouts the best fits. It never offers scholarships or books visits."
+                  title={`Spend this week's hours now: pitch the recruits you've offered or pinned, then scout the best fits. ${autoOffers ? 'On Full control it also makes the scholarship offers it suggests.' : 'It suggests scholarship offers for you to approve.'} It never books visits.`}
                 >
                   Run Assistant
                 </button>
-                <label className="assistant-auto">
-                  <input
-                    type="checkbox"
-                    checked={autoAssistant ?? false}
-                    onChange={(e) => onAutoAssistantChange?.(e.target.checked)}
-                  />
-                  Auto each week
-                </label>
-                {onAutoOffersChange && (
-                  <label
-                    className="assistant-auto"
-                    title="Let the assistant make its suggested scholarship offers instead of waiting for you"
+                <label
+                  className="assistant-auto"
+                  title="Off: nothing happens unless you click Run Assistant. Scout and pitch: each week the staff spends your hours pitching recruits you've offered or pinned and scouting good fits. Full control: the staff also offers scholarships, only to recruits you can realistically land."
+                >
+                  Staff each week
+                  <HelpTip term="staff-mode" />
+                  <select
+                    aria-label="Recruiting staff each week"
+                    value={staffModeOf(autoAssistant ?? false, autoOffers ?? false)}
+                    onChange={(e) => {
+                      const mode = e.target.value as StaffMode;
+                      onAutoAssistantChange?.(mode !== 'off');
+                      onAutoOffersChange?.(mode === 'full');
+                    }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={autoOffers ?? false}
-                      onChange={(e) => onAutoOffersChange(e.target.checked)}
-                    />
-                    Assistant makes offers
-                  </label>
-                )}
+                    <option value="off">Off: I recruit myself</option>
+                    <option value="pitch">Scout and pitch</option>
+                    {onAutoOffersChange && <option value="full">Full control (makes offers)</option>}
+                  </select>
+                </label>
               </div>
             )}
           </div>
@@ -440,6 +456,7 @@ export function RecruitingScreen({
               >
                 Scholarships {scholarshipBudget.used.toFixed(2)} / {scholarshipBudget.total.toFixed(2)}
               </span>
+              <HelpTip term="scholarships" />
             </div>
 
             {boardView === 'all' && (
@@ -451,7 +468,7 @@ export function RecruitingScreen({
                     value={boardSort}
                     onChange={(e) => setBoardSort(e.target.value as BoardSort)}
                   >
-                    <option value="rank">Best for Us</option>
+                    <option value="rank" title="Fit, need and talent, weighted by your chance to land him">Best for Us</option>
                     <option value="stars">Stars</option>
                     <option value="ovr">Scouted OVR</option>
                     <option value="interest">Interest</option>
@@ -548,6 +565,7 @@ export function RecruitingScreen({
         />
       )}
     </div>
+    </LandChanceContext.Provider>
     </PipelineContext.Provider>
   );
 }
@@ -699,6 +717,7 @@ function AllRecruitsList({
   onSelectRecruit: (recruitId: string) => void;
 }) {
   const [page, setPage] = useState(0);
+  const chances = useContext(LandChanceContext);
   const visible = hideCommitted
     ? entries.filter(
         (e) =>
@@ -721,12 +740,13 @@ function AllRecruitsList({
       case 'interest':
         return recruit.interestByTeamId[userTeamId] ?? 0;
       case 'rank':
-        return 0;
+        // Fit, need and talent, discounted by how likely he is to pick us.
+        return attainableBoardScore(entry.score, chances?.get(recruit.id));
     }
   };
 
   const sorted =
-    sort === 'rank'
+    sort === 'rank' && !chances
       ? visible
       : visible
           .map((entry, index) => ({ entry, index }))
@@ -754,6 +774,17 @@ function AllRecruitsList({
   return (
     <div className="recruit-list">
       {pager}
+      <div className="recruit-row recruit-list-head">
+        <span className="pin-btn-spacer" />
+        <span className="recruit-row-main">Recruit</span>
+        <span className="recruit-row-ovr">OVR</span>
+        <span className="recruit-row-status">
+          <span>
+            Chance to land <HelpTip term="chance-to-land" />
+          </span>
+        </span>
+        <span className="recruit-row-actions">Actions</span>
+      </div>
       {pageEntries.map((entry) => {
         const { recruit } = entry;
         const tier = getScoutTier(recruit.id, scouting);
@@ -766,6 +797,7 @@ function AllRecruitsList({
         const pinned = shortlistSet.has(recruit.id);
         const fullName = `${recruit.name.first} ${recruit.name.last}`;
         const showStars = tier !== 'none' || starsArePublic(entry);
+        const chance = chances?.get(recruit.id);
 
         return (
           <div
@@ -816,7 +848,7 @@ function AllRecruitsList({
                   {tier === 'partial' && <span className="fuzzy-tilde">~</span>}
                 </span>
               ) : (
-                <span className="board-score hidden-stat">??</span>
+                <span className="board-score hidden-stat" title="Scout him to see his rating">??</span>
               )}
             </div>
 
@@ -829,13 +861,20 @@ function AllRecruitsList({
                 <span className="badge badge-elsewhere">
                   → {formatTeamShort(teamMap.get(recruit.committedTeamId ?? recruit.signedTeamId ?? '') ?? 'Other')}
                 </span>
-              ) : hasOffer ? (
-                <span className="row-interest">
-                  Interest {userInterest}
-                  <TrendArrow delta={recruitTrends[recruit.id]} />
-                </span>
               ) : (
-                <span className="row-interest dim-interest">—</span>
+                <>
+                  {chance && (tier !== 'none' || starsArePublic(entry)) && <LandChip chance={chance} />}
+                  {hasOffer ? (
+                    <span className="row-interest">
+                      Interest {userInterest}
+                      <TrendArrow delta={recruitTrends[recruit.id]} />
+                    </span>
+                  ) : (
+                    !chance || (tier === 'none' && !starsArePublic(entry)) ? (
+                      <span className="row-interest dim-interest" title="Scout him to size up the race">Not scouted</span>
+                    ) : null
+                  )}
+                </>
               )}
             </div>
 
@@ -1058,6 +1097,7 @@ function RecruitCard({
   const tier = getScoutTier(recruit.id, scouting);
   const displayOvr = getDisplayOvr(recruit.id, recruit.ratings.overall, scouting);
   const userInterest = recruit.interestByTeamId[userTeamId] ?? 0;
+  const chance = useContext(LandChanceContext)?.get(recruit.id);
   const userOffer = recruit.scholarshipOffers.find((o) => o.teamId === userTeamId);
   const hasOffer = userOffer !== undefined;
   const isCommittedToUs =
@@ -1164,6 +1204,7 @@ function RecruitCard({
                 {ordinal(standing)} of {recruit.scholarshipOffers.length}
               </span>
             )}
+            {chance && <LandChip chance={chance} />}
           </div>
         </>
       )}

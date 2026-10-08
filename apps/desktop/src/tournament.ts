@@ -89,6 +89,63 @@ export function teamPlaysThisRound(state: TournamentState, teamId: string): bool
   }
 }
 
+/** The team's opponent in the round the tournament is on, if they play in it. */
+export function opponentThisRound(state: TournamentState, teamId: string): { opponentId: string; isHome: boolean } | null {
+  if (state.phase === 'conf_finals') {
+    for (const b of state.conferenceBrackets) {
+      if (b.final) continue;
+      const w1 = b.semifinal1.result?.winnerId;
+      const w2 = b.semifinal2.result?.winnerId;
+      // The top semifinal's winner hosts the final.
+      if (w1 === teamId && w2) return { opponentId: w2, isHome: true };
+      if (w2 === teamId && w1) return { opponentId: w1, isHome: false };
+    }
+    return null;
+  }
+  const game = currentRoundGames(state).find(
+    (g) => !g.result && (g.homeTeamId === teamId || g.awayTeamId === teamId),
+  );
+  if (!game) return null;
+  return game.homeTeamId === teamId
+    ? { opponentId: game.awayTeamId, isHome: true }
+    : { opponentId: game.homeTeamId, isHome: false };
+}
+
+function currentRoundGames(state: TournamentState): TournamentGame[] {
+  switch (state.phase) {
+    case 'conf_semis':
+      return state.conferenceBrackets.flatMap((b) => [b.semifinal1, b.semifinal2]);
+    case 'ncaa_first_round':
+      return state.ncaaFirstRound ?? [];
+    case 'ncaa_quarterfinals':
+      return state.ncaaQuarterfinals ?? [];
+    case 'national_semis':
+      return [state.nationalSemiFinal1, state.nationalSemiFinal2].filter((g): g is TournamentGame => g !== undefined);
+    case 'national_final':
+      return state.nationalGame ? [state.nationalGame] : [];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Whether the team can still play in this postseason. Until the NCAA field is
+ * picked a team outside its conference bracket can still get an at-large bid;
+ * after that, only teams in the field without a loss are alive.
+ */
+export function stillAlive(state: TournamentState, teamId: string): boolean {
+  if (state.phase === 'complete') return false;
+  if (!state.ncaaField) return true;
+  if (!state.ncaaField.some((e) => e.teamId === teamId)) return false;
+  return !tournamentGames(state).some(
+    (g) => g.result && g.result.winnerId !== teamId && (g.homeTeamId === teamId || g.awayTeamId === teamId) && isNcaaGame(state, g),
+  );
+}
+
+function isNcaaGame(state: TournamentState, game: TournamentGame): boolean {
+  return !state.conferenceBrackets.some((b) => b.semifinal1.id === game.id || b.semifinal2.id === game.id || b.final?.id === game.id);
+}
+
 /** Every game in the tournament so far, played or not. */
 export function tournamentGames(state: TournamentState): TournamentGame[] {
   return [

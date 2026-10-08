@@ -2731,14 +2731,17 @@ li span {
 
 .recruit-interest-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 4px 8px;
   margin-top: 2px;
 }
 
 .commit-pct {
   font-size: 0.75rem;
   font-weight: 700;
+  white-space: nowrap;
   color: #6b7a8f;
 }
 
@@ -3059,6 +3062,9 @@ li span {
 .start-hero h1 {
   font-size: clamp(2.4rem, 6vw, 5rem);
   margin-top: 10px;
+  /* Room below the baseline so the gradient clip keeps the g's descender. */
+  line-height: 1.15;
+  padding-bottom: 0.12em;
   background: linear-gradient(135deg, #e6edf3 30%, #72f2c6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -4107,6 +4113,39 @@ li span {
 
 .save-actions .advance-btn:hover {
   filter: brightness(1.1);
+}
+
+.save-actions .advance-btn {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-actions .advance-skip {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #9cc2ff;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  font-weight: 700;
+}
+
+.pregame-panel {
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.pregame-intro {
+  margin: 4px 0 12px;
+}
+
+.pregame-plan {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .shell-body {
@@ -7124,3 +7163,417 @@ li span {
 .postseason-stat-label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: #aab8ca; }
 .ncaa-finish { white-space: nowrap; }
 .ncaa-finish.deep { color: #f5c46b; font-weight: 700; }
+
+/* Coach's Checklist */
+.coach-checklist { border: 1px solid rgba(114, 242, 198, 0.35); }
+.coach-checklist-head { display: flex; align-items: center; gap: 16px; }
+.coach-checklist-head > div { flex: 1; }
+.coach-checklist-head .hub-card-title { margin: 2px 0 0; }
+.coach-checklist-count { font-weight: 700; color: #72f2c6; }
+.coach-checklist-track { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); margin: 10px 0 12px; overflow: hidden; }
+.coach-checklist-fill { height: 100%; background: linear-gradient(90deg, #45d6a8, #72f2c6); transition: width 0.4s ease; }
+.coach-checklist-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.coach-checklist-steps li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+.coach-checklist-steps li.step-next { background: rgba(114, 242, 198, 0.08); box-shadow: inset 3px 0 0 #72f2c6; }
+.coach-checklist-steps li.step-done { opacity: 0.6; }
+.coach-checklist-steps .step-text { flex: 1; }
+.coach-checklist-steps .step-mark { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25); display: grid; place-items: center; font-size: 0.8rem; color: #0b1626; }
+.coach-checklist-steps li.step-done .step-mark { background: #72f2c6; border-color: #72f2c6; }
+.welcome-panel { max-width: 520px; }
+.welcome-points { margin: 12px 0 18px; padding-left: 18px; display: grid; gap: 8px; line-height: 1.45; }
+.hub-actions-more { margin-top: 8px; }
+
+/* Game result reveal */
+.reveal-panel { max-width: 460px; text-align: center; transition: box-shadow 0.3s ease, border-color 0.3s ease; }
+.reveal-panel.reveal-win { border-color: rgba(114, 242, 198, 0.6); box-shadow: 0 0 40px rgba(114, 242, 198, 0.18); }
+.reveal-panel.reveal-loss { border-color: rgba(170, 184, 202, 0.3); }
+.reveal-board { margin: 10px 0 6px; display: grid; gap: 6px; }
+.reveal-team { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 1.15rem; font-weight: 700; }
+.reveal-name { text-align: left; }
+.reveal-rank { color: #f5c46b; font-size: 0.85rem; margin-right: 6px; }
+.reveal-score { font-size: 2.2rem; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; color: #aab8ca; }
+.reveal-score.lead { color: #72f2c6; }
+.reveal-periods { display: flex; gap: 10px; justify-content: center; font-size: 0.75rem; letter-spacing: 0.08em; color: rgba(170, 184, 202, 0.45); margin-top: 4px; }
+.reveal-periods .past { color: #aab8ca; }
+.reveal-periods .current { color: #72f2c6; font-weight: 800; }
+.reveal-stamp { margin: 14px 0 6px; font-size: 2.4rem; font-weight: 900; letter-spacing: 0.12em; animation: reveal-stamp 0.35s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.reveal-stamp.stamp-win { color: #72f2c6; }
+.reveal-stamp.stamp-big { color: #f5c46b; text-shadow: 0 0 18px rgba(245, 196, 107, 0.45); }
+.reveal-stamp.stamp-loss { color: #8d99ab; }
+.reveal-ot { font-size: 1rem; letter-spacing: 0.04em; }
+.reveal-actions { flex-wrap: wrap; justify-content: center; }
+.reveal-skip { flex-basis: 100%; font-size: 0.8rem; color: #8d99ab; margin-top: 4px; }
+.reveal-hint { font-size: 0.8rem; margin: 10px 0 0; }
+@keyframes reveal-stamp { from { transform: scale(2.2) rotate(-6deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+
+/* Tickers and rank moves */
+.rank-move { display: inline-block; margin-left: 6px; font-size: 0.8rem; font-weight: 800; animation: rank-move 4s ease forwards; }
+.rank-move.up { color: #72f2c6; }
+.rank-move.down { color: #ff8f8f; }
+@keyframes rank-move { 0% { opacity: 0; transform: translateY(6px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Achievement toast: slide in, medal shine, tier colors */
+.achievement-toast { animation: toast-in 0.45s cubic-bezier(0.2, 1.3, 0.4, 1); }
+.achievement-toast li .achievement-medal { color: var(--tier, #f5c84c); display: inline-block; animation: medal-shine 1.2s ease 0.3s; }
+.achievement-toast li { border-left: 3px solid var(--tier, #f5c84c); padding-left: 8px; }
+@keyframes toast-in { from { transform: translateX(120%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes medal-shine { 0% { transform: scale(1) rotate(0); filter: none; } 40% { transform: scale(1.5) rotate(20deg); filter: drop-shadow(0 0 6px var(--tier, #f5c84c)); } 100% { transform: scale(1) rotate(0); filter: none; } }
+
+/* Small touches: press feedback */
+button:active:not(:disabled) { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-stamp, .rank-move, .achievement-toast, .achievement-toast li .achievement-medal { animation: none; }
+  .rank-move { opacity: 1; }
+  button:active:not(:disabled) { transform: none; }
+}
+
+/* Offseason: to-do first, decisions, then the season in review */
+.offseason-page { display: flex; flex-direction: column; gap: 20px; }
+.offseason-decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; align-items: start; }
+.offseason-decisions:empty { display: none; }
+.offseason-section-title { margin: 8px 0 -4px; font-size: 1.1rem; letter-spacing: 0.06em; text-transform: uppercase; color: #aab8ca; }
+.offseason-todo-card { border: 1px solid rgba(242, 162, 51, 0.45); }
+.offseason-todo-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.offseason-todo-head h2 { margin: 2px 0 6px; }
+.offseason-todo-head .sim-btn { width: auto; background: linear-gradient(135deg, #f2a233 0%, #d4620e 100%); }
+.offseason-todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.offseason-todo-list li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+.offseason-todo-list li.todo-open { box-shadow: inset 3px 0 0 #f2a233; background: rgba(242, 162, 51, 0.07); }
+.offseason-todo-list li.todo-done { opacity: 0.6; }
+.offseason-todo-list .todo-text { flex: 1; }
+.offseason-todo-list .step-mark { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25); display: grid; place-items: center; font-size: 0.8rem; color: #0b1626; }
+.offseason-todo-list li.todo-done .step-mark { background: #72f2c6; border-color: #72f2c6; }
+.todo-tag { margin-left: 8px; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8d99ab; border: 1px solid rgba(141, 153, 171, 0.4); border-radius: 999px; padding: 1px 7px; }
+.hub-offseason-note { max-width: 520px; margin: 6px 0 0; }
+
+/* ── Recruiting: chance to land ─────────────────────────────────────────────── */
+.recruit-list-head {
+  background: transparent;
+  border-color: transparent;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7f8ea3;
+  font-weight: 700;
+}
+
+.recruit-list-head .pin-btn-spacer {
+  width: 26px;
+  flex: none;
+}
+
+.recruit-list-head .recruit-row-actions {
+  min-height: 0;
+}
+
+.recruit-row-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 130px;
+}
+
+.land-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  cursor: help;
+}
+
+.land-likely {
+  color: #7be0a6;
+  background: rgba(123, 224, 166, 0.12);
+  border-color: rgba(123, 224, 166, 0.35);
+}
+
+.land-tossup {
+  color: #f2c472;
+  background: rgba(242, 196, 114, 0.12);
+  border-color: rgba(242, 196, 114, 0.35);
+}
+
+.land-longshot {
+  color: #ff8f8f;
+  background: rgba(255, 143, 143, 0.1);
+  border-color: rgba(255, 143, 143, 0.3);
+}
+
+.land-hypothetical {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.recruit-land-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+}
+
+.recruit-land-detail {
+  flex-basis: 100%;
+  font-size: 0.74rem;
+}
+
+.assistant-auto select {
+  margin-left: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e6edf3;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
+.assistant-auto select option {
+  background: #0f1a2b;
+}
+
+@media (max-width: 760px) {
+  .recruit-list-head {
+    display: none;
+  }
+}
+
+/* Long Continue labels squeeze the team summary: let the phase text trail off. */
+.top-team .top-phase {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Help: "?" tips, Help page, edge chips ─────────────────────────────────── */
+.help-tip {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.help-tip-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(123, 168, 255, 0.5);
+  background: rgba(123, 168, 255, 0.12);
+  color: #9cc2ff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-tip-btn:hover,
+.help-tip-btn[aria-expanded='true'] {
+  background: rgba(123, 168, 255, 0.3);
+  color: #fff;
+}
+
+.help-tip-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #0f1a2b;
+  border: 1px solid rgba(123, 168, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  color: #d6e0ec;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  animation: modal-fade-in 0.12s ease-out;
+}
+
+.help-tip-pop strong {
+  color: #fff;
+  font-size: 0.84rem;
+}
+
+.help-tip-more {
+  align-self: flex-start;
+  font-size: 0.76rem;
+}
+
+.help-page {
+  display: grid;
+  gap: 16px;
+  max-width: 900px;
+}
+
+.help-steps {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: #d6e0ec;
+}
+
+.help-glossary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.help-search {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #e6edf3;
+  padding: 6px 10px;
+  min-width: 220px;
+}
+
+.help-category {
+  margin-top: 14px;
+}
+
+.help-terms {
+  margin: 6px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.help-term dt {
+  font-weight: 700;
+  color: #fff;
+}
+
+.help-term dd {
+  margin: 2px 0 0;
+  color: #aab8ca;
+  line-height: 1.45;
+}
+
+.edge-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edge-chips-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7f8ea3;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hub-edge.even {
+  color: #aab8ca;
+}
+
+/* Sidebar groups fold away; the title is the toggle. */
+.nav-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-group-toggle:hover {
+  color: #a6ffe0;
+}
+
+.nav-group-caret {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.nav-folded-dot {
+  margin-left: auto;
+  padding: 0 6px;
+}
+
+/* Wide tables (the depth chart) scroll inside their card instead of the page. */
+.depth-chart-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.team-pick-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
+.team-pick-note p {
+  margin: 0;
+}
+
+.tier-tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tier-blue-blood {
+  color: #9cc2ff;
+  border-color: rgba(156, 194, 255, 0.5);
+}
+
+.tier-contender {
+  color: #7be0a6;
+  border-color: rgba(123, 224, 166, 0.5);
+}
+
+.tier-rising {
+  color: #f2c472;
+  border-color: rgba(242, 196, 114, 0.5);
+}
+
+.tier-rebuild {
+  color: #ff8f8f;
+  border-color: rgba(255, 143, 143, 0.45);
+}
+
+.team-pick-suggest {
+  margin-top: 6px;
+}
+
+.delegate-link {
+  margin-top: 8px;
+  font-size: 0.8rem;
+}
+
+.staff-media-card .ghost-btn {
+  margin-top: 10px;
+}

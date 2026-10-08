@@ -1,3 +1,4 @@
+import { EdgeChips } from './EdgeChips';
 import type { WeeklyHubData } from '../weekly-hub';
 import { formatTeamName, formatTeamShort } from '../ui/format';
 import { formatSeries, formatStreak } from '../series-history';
@@ -74,12 +75,7 @@ export function WeeklyHub({
             </span>
           )}
         </div>
-        <div className="hub-edges">
-          <HubEdge label="O" edge={preview.offenseEdge} />
-          <HubEdge label="D" edge={preview.defenseEdge} />
-          <HubEdge label="GK" edge={preview.goalieEdge} />
-          <HubEdge label="FO" edge={preview.faceoffEdge} />
-        </div>
+        <EdgeChips preview={preview} />
       </div>
 
       {hub.keyPlayers.length > 0 && (
@@ -103,16 +99,5 @@ export function WeeklyHub({
         </div>
       )}
     </article>
-  );
-}
-
-function HubEdge({ label, edge }: { label: string; edge: number }) {
-  const signed = edge > 0 ? `+${edge}` : `${edge}`;
-  const className = edge > 0 ? 'positive' : edge < 0 ? 'negative' : 'even';
-  return (
-    <div className={`hub-edge ${className}`} title={`${label} edge`}>
-      <span>{label}</span>
-      <strong>{signed}</strong>
-    </div>
   );
 }

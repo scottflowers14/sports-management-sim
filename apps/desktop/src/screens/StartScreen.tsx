@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { DynastySaveMetadata } from '../persistence';
-import type { DynastyTeamChoice } from '../dynasty-factory';
+import { PROGRAM_TIER_NOTES, programTier, recommendedStarterTeam, type DynastyTeamChoice } from '../dynasty-factory';
 import { DIFFICULTIES, DIFFICULTY_DESCRIPTIONS, DIFFICULTY_LABELS, type Difficulty } from '../difficulty';
 
 export function StartScreen({
@@ -51,6 +51,14 @@ export function StartScreen({
   saveLegacies?: Readonly<Record<string, string>>;
 }) {
   const selectedTeam = teamChoices.find((team) => team.id === selectedTeamId) ?? teamChoices[0];
+  const starter = recommendedStarterTeam(teamChoices);
+  // Conferences in the order of their best program, teams strongest first.
+  const conferenceGroups = [...new Set(teamChoices.map((t) => t.conferenceName ?? 'Independent'))]
+    .map((name) => ({
+      name,
+      teams: teamChoices.filter((t) => (t.conferenceName ?? 'Independent') === name).sort((a, b) => b.prestige - a.prestige),
+    }))
+    .sort((a, b) => (b.teams[0]?.prestige ?? 0) - (a.teams[0]?.prestige ?? 0));
   const importInputRef = useRef<HTMLInputElement>(null);
   const teamsInputRef = useRef<HTMLInputElement>(null);
   const [confirmingNewDynasty, setConfirmingNewDynasty] = useState(false);
@@ -120,16 +128,35 @@ export function StartScreen({
             Team
           </label>
           <select id="team-select" value={selectedTeamId} onChange={(event) => onTeamChange(event.target.value)}>
-            {teamChoices.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name} · Prestige {team.prestige}
-              </option>
+            {conferenceGroups.map((group) => (
+              <optgroup key={group.name} label={group.name}>
+                {group.teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name} · {programTier(team.prestige)} · Prestige {team.prestige}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           {selectedTeam && (
-            <p className="dim">
-              Start as {selectedTeam.name}
-              {selectedTeam.conferenceId ? ` in ${selectedTeam.conferenceId.toUpperCase()}` : ''}.
+            <div className="team-pick-note" aria-label="Program outlook">
+              <span className={`tier-tag tier-${programTier(selectedTeam.prestige).replace(' ', '-').toLowerCase()}`}>
+                {programTier(selectedTeam.prestige)}
+              </span>
+              <p className="dim">
+                Start as {selectedTeam.name}
+                {selectedTeam.conferenceName ? ` in the ${selectedTeam.conferenceName}` : ''}.{' '}
+                {PROGRAM_TIER_NOTES[programTier(selectedTeam.prestige)]}
+              </p>
+            </div>
+          )}
+          {starter && starter.id !== selectedTeam?.id && (
+            <p className="dim team-pick-suggest">
+              New to the game?{' '}
+              <button type="button" className="link-btn" onClick={() => onTeamChange(starter.id)}>
+                Try {starter.name}
+              </button>
+              , a Contender with a roster that can win now.
             </p>
           )}
           {onDifficultyChange && (

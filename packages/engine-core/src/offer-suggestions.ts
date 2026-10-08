@@ -18,6 +18,8 @@ export interface SuggestOffersInput<Position extends string, SportTraits> {
   budgetRemaining: number;
   /** Whether the staff knows enough about a recruit to offer (scouted or nationally ranked). */
   isKnown: (recruitId: ID) => boolean;
+  /** Whether the race is worth entering (e.g. not a long shot behind rival offers); defaults to yes. */
+  isWinnable?: (recruitId: ID) => boolean;
   /** Cap on suggestions per call. */
   maxOffers?: number;
 }
@@ -47,7 +49,7 @@ export function suggestedScholarshipPercent(starRating: number): number {
 export function suggestScholarshipOffers<Position extends string, SportTraits>(
   input: SuggestOffersInput<Position, SportTraits>,
 ): OfferSuggestion[] {
-  const { team, board, isKnown, maxOffers = 8 } = input;
+  const { team, board, isKnown, isWinnable = () => true, maxOffers = 8 } = input;
   let budget = input.budgetRemaining;
 
   const openOffers = new Map<string, number>();
@@ -61,6 +63,7 @@ export function suggestScholarshipOffers<Position extends string, SportTraits>(
       recruit.status === 'open' &&
       !recruit.scholarshipOffers.some((o) => o.teamId === team.id) &&
       isKnown(recruit.id) &&
+      isWinnable(recruit.id) &&
       recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige) >= MIN_ATTAINABILITY,
   );
   // Every position with a hole gets its best fit first, so a class doesn't

@@ -70,6 +70,7 @@ import type { ProgramStaffState } from './program-staff';
 import type { GameLog, LacrosseDynastyState, LacrosseGamePlan, LacrossePosition, LacrosseTeam } from '@sports-management-sim/sport-lacrosse';
 import { userSeasonGames } from './series-history';
 import { challengeMet, challengesCompleted, weeklyChallenge, type ChallengeResult } from './challenges';
+import { NEW_COACH_GUIDE, VETERAN_COACH_GUIDE, markGuideVisit, type CoachGuideState } from './coach-guide';
 import { achievementXp, coachRivalryRecord, achievementPoints, newlyUnlocked, profileLevel, type AchievementGame, type AchievementUnlock, type UnlockedAchievements } from './achievements';
 import { careerFromHistory, loadProfile, saveProfile, type PlayerProfile } from './profile';
 import { careerMilestonesForWeek } from './career-milestones';
@@ -119,6 +120,7 @@ import {
 } from './tournament';
 import type { TournamentState } from './tournament';
 import { ncaaOdds } from './bracket-odds';
+import { revealsEnabled } from './ui/motion';
 import type { DynastySeasonRecord } from './history';
 import { CONFERENCE_POY_LABEL, deriveSeasonLeader, toAllAmericaRecords, toAllConferenceRecords, toSeasonAwardRecords } from './history';
 import {
@@ -181,7 +183,8 @@ export type View =
   | 'staff'
   | 'practice'
   | 'locker-room'
-  | 'profile';
+  | 'profile'
+  | 'help';
 
 /** The preseason poll as week-one news. */
 /** Saves from before the staff plan kept the neutral default unless the user picked their own. */
@@ -239,6 +242,7 @@ export function useDynastyController() {
   const [autoRecruitingOffers, setAutoRecruitingOffers] = useState<boolean>(
     () => loadedSave?.autoRecruitingOffers ?? false,
   );
+  const [staffHandlesMedia, setStaffHandlesMedia] = useState<boolean>(() => loadedSave?.staffHandlesMedia ?? false);
   const [staffState, setStaffState] = useState<ProgramStaffState>(() =>
     loadedSave?.staff
       ? { staff: loadedSave.staff, staffCandidates: loadedSave.staffCandidates ?? [] }
@@ -303,6 +307,9 @@ export function useDynastyController() {
   const [pendingJobOffers, setPendingJobOffers] = useState<JobOffer[] | null>(() => loadedSave?.pendingJobOffers ?? null);
   const [achievements, setAchievements] = useState<UnlockedAchievements>(() => loadedSave?.achievements ?? {});
   const [challengeLog, setChallengeLog] = useState<ChallengeResult[]>(() => loadedSave?.challengeLog ?? []);
+  /** The user's game just played, waiting for its result card. */
+  const [pendingReveal, setPendingReveal] = useState<{ gameId: string; userRank: number | null; opponentRank: number | null } | null>(null);
+  const [coachGuide, setCoachGuide] = useState<CoachGuideState>(() => (loadedSave ? loadedSave.coachGuide ?? VETERAN_COACH_GUIDE : NEW_COACH_GUIDE));
   const [profile, setProfile] = useState<PlayerProfile>(() => loadProfile());
   /** Achievement ids unlocked since the player last dismissed the toast. */
   const [achievementToasts, setAchievementToasts] = useState<string[]>([]);
@@ -351,11 +358,13 @@ export function useDynastyController() {
     recruitTrends,
     autoRecruitingAssistant,
     autoRecruitingOffers,
+    staffHandlesMedia,
     achievements,
+    coachGuide,
     challengeLog,
     staff: staffState.staff,
     staffCandidates: staffState.staffCandidates,
-  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, achievements, challengeLog]);
+  }), [staffState, dynasty, lastSimWeek, offseasonSummary, rankings, newsItems, tournament, dynastyHistory, injuries, scouting, seasonStats, careerStats, gameLogs, coachProfile, adConfidence, seasonGoals, bestNatRank, gamePlan, autoGamePlan, trainingFocus, practicePlan, practiceGains, lockerRoom, recordBook, rivalrySeries, weeklyHonors, investmentPlan, seasonPreview, hallOfFame, proDraftHistory, nilSaved, halftime, pressAnswers, teamTalk, pendingJobOffers, shortlistIds, recruitingActivity, recruitTrends, autoRecruitingAssistant, autoRecruitingOffers, staffHandlesMedia, achievements, challengeLog, coachGuide]);
 
   const refreshSaves = useCallback(() => setSaves(listDynastySaves()), []);
 
@@ -404,11 +413,14 @@ export function useDynastyController() {
     // coach who only sims games still signs a class. Either can be turned off.
     setAutoRecruitingAssistant(true);
     setAutoRecruitingOffers(true);
+    setStaffHandlesMedia(false);
     setAssistantReport(null);
     setAchievements({});
     setAchievementToasts([]);
     setLevelUp(null);
     setChallengeLog([]);
+    setCoachGuide(NEW_COACH_GUIDE);
+    setPendingReveal(null);
   }, []);
 
   const persistDynasty = useCallback((status = 'Saved locally') => {
@@ -491,8 +503,10 @@ export function useDynastyController() {
       recruitTrends: {},
       autoRecruitingAssistant: true,
       autoRecruitingOffers: true,
+      staffHandlesMedia: false,
       achievements: {},
       challengeLog: [],
+      coachGuide: NEW_COACH_GUIDE,
       ...newStaff,
     };
     const saved = writeSave(saveId, state);
@@ -528,6 +542,7 @@ export function useDynastyController() {
     setRecruitTrends(save.recruitTrends ?? {});
     setAutoRecruitingAssistant(save.autoRecruitingAssistant ?? false);
     setAutoRecruitingOffers(save.autoRecruitingOffers ?? false);
+    setStaffHandlesMedia(save.staffHandlesMedia ?? false);
     setAssistantReport(null);
     setSeasonStats(save.seasonStats);
     setCareerStats(save.careerStats ?? emptyCareerStats());
@@ -556,6 +571,8 @@ export function useDynastyController() {
     setAchievements(save.achievements ?? {});
     setAchievementToasts([]);
     setChallengeLog(save.challengeLog ?? []);
+    setCoachGuide(save.coachGuide ?? VETERAN_COACH_GUIDE);
+    setPendingReveal(null);
     setShortlistIds(save.shortlistIds ?? []);
     setRecruitBoardView((save.shortlistIds?.length ?? 0) > 0 ? 'shortlist' : 'all');
     setView(save.offseasonSummary ? 'offseason' : 'week-hub');
@@ -579,13 +596,15 @@ export function useDynastyController() {
   }, [activeSaveId, refreshSaves]);
 
   const resetDynasty = useCallback(() => {
+    // Main Menu keeps the career: save first so no pending change is lost.
+    persistDynasty();
     // Clear from localStorage too so the stale active key doesn't trigger autosave on revisit.
     window.localStorage.removeItem(ACTIVE_DYNASTY_SAVE_KEY);
     setActiveSaveId(null);
     setSaveStatus('Choose or create a dynasty');
     refreshSaves();
     setScreen('start');
-  }, [refreshSaves]);
+  }, [refreshSaves, persistDynasty]);
 
   // Don't autosave while on the start screen — prevents stale state from overwriting
   // an existing save before the user has actually started or loaded a dynasty.
@@ -768,8 +787,13 @@ export function useDynastyController() {
     practiceGains,
     rivalrySeries,
     weeklyHonors,
-    teamTalk,
-  }), [teamTalk, playingStaff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
+    // With the staff handling the room, they give a composed talk: a small
+    // defensive lift that never backfires. The coach can always do better.
+    teamTalk:
+      staffHandlesMedia && !isCurrentTalk(teamTalk, dynasty.season)
+        ? { year: dynasty.season.year, week: dynasty.season.currentWeek, tone: 'calm', result: teamTalkResult('calm', { winProbability: 50, rivalry: false }) }
+        : teamTalk,
+  }), [staffHandlesMedia, teamTalk, playingStaff, practicePlan, practiceGains, rivalrySeries, weeklyHonors, dynasty, rankings, injuries, newsItems, scouting, recruitingActivity, recruitTrends, seasonStats, gameLogs, bestNatRank, lastSimWeek]);
 
   const applyWeekSimResult = useCallback((simResult: WeekSimState) => {
     // Promises that came due are judged against the depth chart after the week.
@@ -911,16 +935,33 @@ export function useDynastyController() {
   }, [recordBook, careerStats, seasonStats, dynasty.season.teams, dynasty.season.schedule, lockerRoom.promises]);
 
   // Simming is locked while the offseason is pending; send the coach back there instead.
+  /** Stages this week's user game for the result card, with the poll it was played under. */
+  const stageReveal = useCallback(() => {
+    if (!revealsEnabled()) return;
+    const game = dynasty.season.schedule.find(
+      (g) =>
+        g.week === dynasty.season.currentWeek &&
+        g.status === 'scheduled' &&
+        (g.homeTeamId === dynasty.userTeamId || g.awayTeamId === dynasty.userTeamId),
+    );
+    if (!game) return;
+    const rankOf = (id: string) => rankings.find((r) => r.teamId === id)?.rank ?? null;
+    const opponentId = game.homeTeamId === dynasty.userTeamId ? game.awayTeamId : game.homeTeamId;
+    setPendingReveal({ gameId: game.id, userRank: rankOf(dynasty.userTeamId), opponentRank: rankOf(opponentId) });
+  }, [dynasty, rankings]);
+  const dismissReveal = useCallback(() => setPendingReveal(null), []);
+
   const simWeek = useCallback(() => {
     if (offseasonSummary) {
       setView('offseason');
       return;
     }
+    stageReveal();
     const start = autoRecruitingAssistant
       ? applyAssistantToWeekState(buildWeekSimState(), shortlistIds, Math.random, { autoOffer: autoRecruitingOffers }).state
       : buildWeekSimState();
     applyWeekSimResult(simulateOneWeek(start, effectiveGamePlan));
-  }, [applyWeekSimResult, buildWeekSimState, effectiveGamePlan, offseasonSummary, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
+  }, [applyWeekSimResult, buildWeekSimState, effectiveGamePlan, offseasonSummary, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds, stageReveal]);
 
   const simToEnd = useCallback(() => {
     if (offseasonSummary) {
@@ -1257,10 +1298,13 @@ export function useDynastyController() {
     const start = autoRecruitingAssistant
       ? applyAssistantToWeekState(buildWeekSimState(), shortlistIds, Math.random, { autoOffer: autoRecruitingOffers }).state
       : buildWeekSimState();
+    stageReveal();
     applyWeekSimResult(simulateOneWeek(start, effectiveGamePlan, Math.random, { seed: halftime.seed, secondHalfPlan }));
-  }, [halftime, tournament, playTournamentRound, dynasty.userTeamId, applyWeekSimResult, buildWeekSimState, effectiveGamePlan, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds]);
+  }, [halftime, tournament, playTournamentRound, dynasty.userTeamId, applyWeekSimResult, buildWeekSimState, effectiveGamePlan, autoRecruitingAssistant, autoRecruitingOffers, shortlistIds, stageReveal]);
 
-  const enterOffseason = useCallback(() => {
+  // Runs the offseason against a given final bracket, so Sim to Offseason can
+  // finish the postseason and roll straight into it.
+  const enterOffseasonWith = useCallback((tournament: TournamentState | null) => {
     const tournamentChampion = tournament?.nationalChampion;
     const userConfId = dynasty.season.teams.find((t) => t.id === dynasty.userTeamId)?.conferenceId;
     const userBracket = tournament?.conferenceBrackets.find(b => b.conferenceId === userConfId);
@@ -1559,7 +1603,18 @@ export function useDynastyController() {
     }
 
     setView('offseason');
-  }, [tournament, dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, seasonPreview, recordBook, hallOfFame, dynastyHistory, staffState.staff, playingStaff, coachAbilities]);
+  }, [dynasty, rankings, coachProfile, seasonGoals, bestNatRank, adConfidence, trainingFocus, seasonStats, careerStats, seasonPreview, recordBook, hallOfFame, dynastyHistory, staffState.staff, playingStaff, coachAbilities]);
+
+  const enterOffseason = useCallback(() => enterOffseasonWith(tournament), [enterOffseasonWith, tournament]);
+
+  // Out of the postseason: play every remaining round, then run the offseason.
+  const simToOffseason = useCallback(() => {
+    if (!tournament) return;
+    let final = tournament;
+    for (let round = 0; round < 8 && final.phase !== 'complete'; round += 1) final = playTournamentRound(final);
+    setTournament(final);
+    enterOffseasonWith(final);
+  }, [tournament, playTournamentRound, enterOffseasonWith]);
 
   const acceptJobOffer = useCallback((teamId: string) => {
     const newTeam = dynasty.season.teams.find((t) => t.id === teamId);
@@ -1707,6 +1762,14 @@ export function useDynastyController() {
     ]);
     setSaveStatus(`Press conference: ${answer.label.toLowerCase()}`);
   }, [pressConference, updateUserRoster, shortlistIds, coachProfile]);
+
+  // With the staff handling the media, they credit the players after a win and
+  // the opponent after a loss: small, safe morale, no gambles with the AD.
+  useEffect(() => {
+    if (!staffHandlesMedia || !pressConference) return;
+    const timer = window.setTimeout(() => answerPressConference('credit'), 0);
+    return () => window.clearTimeout(timer);
+  }, [staffHandlesMedia, pressConference, answerPressConference]);
 
   const setTeamCaptain = useCallback((playerId: string, captain: boolean) => {
     const player = userTeam?.roster.find((p) => p.id === playerId);
@@ -1958,8 +2021,18 @@ export function useDynastyController() {
   }, []);
 
 
+  const markGuideVisited = useCallback((view: string) => setCoachGuide((g) => markGuideVisit(g, view)), []);
+  const dismissCoachGuide = useCallback(() => setCoachGuide((g) => ({ ...g, welcomed: true, dismissed: true })), []);
+  const acknowledgeWelcome = useCallback(() => setCoachGuide((g) => ({ ...g, welcomed: true })), []);
+
   return {
     screen,
+    pendingReveal,
+    dismissReveal,
+    coachGuide,
+    markGuideVisited,
+    dismissCoachGuide,
+    acknowledgeWelcome,
     ncaaBracketOdds,
     setScreen,
     staff: staffState.staff,
@@ -1974,6 +2047,7 @@ export function useDynastyController() {
     answerPressConference,
     canCoachGame,
     coachGame,
+    simToOffseason,
     halftime,
     playSecondHalf,
     nil,
@@ -2092,6 +2166,8 @@ export function useDynastyController() {
     setAutoRecruitingAssistant,
     autoRecruitingOffers,
     setAutoRecruitingOffers,
+    staffHandlesMedia,
+    setStaffHandlesMedia,
     hasHomeGameThisWeek,
     offerPortalPlayer,
     withdrawPortalOffer,

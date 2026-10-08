@@ -29,6 +29,8 @@ import {
   tournamentGames,
   postseasonRecords,
   withTournamentCoaching,
+  opponentThisRound,
+  stillAlive,
 } from './tournament';
 import { deriveCpuGamePlan } from '@sports-management-sim/sport-lacrosse';
 
@@ -331,5 +333,48 @@ describe('selection committee resume', () => {
     const losers = teams.map((t) => ({ ...t, record: { ...t.record, wins: 1, losses: 5 } }));
     const { field } = selectNcaaField([a], losers, schedule);
     expect(field).toHaveLength(4);
+  });
+});
+
+describe('who is still playing', () => {
+  const season = finishedSeason();
+  const plan = (team: Parameters<typeof deriveCpuGamePlan>[0]) => deriveCpuGamePlan(team);
+  const play = (state: ReturnType<typeof initTournament>) =>
+    advanceTournamentPhase(state, season.teams, plan, season.schedule, () => ({ offense: 0, defense: 0 }));
+
+  it('names each round\'s opponent, including the conference final before it is scheduled', () => {
+    let state = initTournament(season.standings, season.conferences);
+    const semi = state.conferenceBrackets[0]!.semifinal1;
+    expect(opponentThisRound(state, semi.homeTeamId)).toEqual({ opponentId: semi.awayTeamId, isHome: true });
+    expect(opponentThisRound(state, semi.awayTeamId)).toEqual({ opponentId: semi.homeTeamId, isHome: false });
+
+    state = play(state);
+    const bracket = state.conferenceBrackets[0]!;
+    const top = bracket.semifinal1.result!.winnerId;
+    const bottom = bracket.semifinal2.result!.winnerId;
+    expect(opponentThisRound(state, top)).toEqual({ opponentId: bottom, isHome: true });
+    expect(opponentThisRound(state, bracket.semifinal1.result!.loserId)).toBeNull();
+  });
+
+  it('keeps everyone alive until the field is picked, then only unbeaten NCAA teams', () => {
+    let state = initTournament(season.standings, season.conferences);
+    const outsider = season.teams.find(
+      (t) => !state.conferenceBrackets.some((b) => [b.semifinal1, b.semifinal2].some((g) => g.homeTeamId === t.id || g.awayTeamId === t.id)),
+    )!;
+    // Not in a conference bracket, but an at-large bid is still possible.
+    expect(stillAlive(state, outsider.id)).toBe(true);
+
+    state = play(play(state));
+    const fieldIds = new Set(state.ncaaField!.map((e) => e.teamId));
+    const missed = season.teams.find((t) => !fieldIds.has(t.id))!;
+    expect(stillAlive(state, missed.id)).toBe(false);
+    expect([...fieldIds].every((id) => stillAlive(state, id))).toBe(true);
+
+    state = play(state);
+    const firstRoundLoser = state.ncaaFirstRound!.find((g) => g.result)!.result!.loserId;
+    expect(stillAlive(state, firstRoundLoser)).toBe(false);
+
+    while (state.phase !== 'complete') state = play(state);
+    expect(season.teams.some((t) => stillAlive(state, t.id))).toBe(false);
   });
 });

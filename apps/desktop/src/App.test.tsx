@@ -38,6 +38,9 @@ function installMockLocalStorage() {
 async function renderStartedApp() {
   render(<App />);
   await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+  // New coaches get a one-time welcome first.
+  const welcome = screen.queryByRole('button', { name: 'Got it' });
+  if (welcome) await userEvent.click(welcome);
 }
 
 beforeEach(() => {
@@ -154,7 +157,11 @@ describe('Desktop App', () => {
     expect(finished.games?.filter((g) => g.postseason).every((g) => g.round)).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: /^Offseason/ }));
 
+    // The offseason opens on its to-do list; starting with points unspent asks first.
+    expect(screen.getByRole('article', { name: 'Offseason to-do' })).toHaveTextContent(/Spend investment points/);
     await userEvent.click(screen.getByRole('button', { name: /Start 2029 Season/i }));
+    expect(screen.getByRole('dialog', { name: /Start the 2029 season now/ })).toHaveTextContent(/investment point/);
+    await userEvent.click(screen.getByRole('button', { name: 'Start anyway' }));
     expect(screen.getByText(/Men's College Lacrosse · Season 2029/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   }, 20000);
@@ -175,7 +182,7 @@ describe('Desktop App', () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
 
-    expect(screen.getByRole('heading', { name: /^Coaching$/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Coaching/i })).toBeInTheDocument();
     // New dynasties start on the staff's roster-built plan.
     expect(screen.getByLabelText(/Game plan source/i)).toHaveTextContent(/Staff plan/i);
 
@@ -245,6 +252,9 @@ describe('Desktop App', () => {
 
   it('saves the current dynasty to an active save slot', async () => {
     await renderStartedApp();
+    // Let the debounced autosave from starting the dynasty land first, so it
+    // can't overwrite the manual save's status on a slow machine.
+    await waitFor(() => expect(screen.getByLabelText(/Save controls/i)).toHaveTextContent(/Autosaved/i));
 
     await userEvent.click(screen.getByRole('button', { name: /Save Now/i }));
 
@@ -274,7 +284,7 @@ describe('Desktop App', () => {
     await renderStartedApp();
     const firstSave = loadActiveDynastySave();
 
-    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Main Menu$/i }));
 
     expect(screen.getByLabelText(/Dynasty start screen/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Load Maryland State 2028/i })).toBeInTheDocument();
@@ -285,12 +295,12 @@ describe('Desktop App', () => {
     expect(loadActiveDynastySave()?.dynasty.id).toBe(firstSave?.dynasty.id);
   });
 
-  it('starts a fresh generated dynasty when New Dynasty creates another career', async () => {
+  it('starts a fresh generated dynasty from the main menu', async () => {
     await renderStartedApp();
     const firstSave = loadActiveDynastySave();
     const firstRecruitId = firstSave?.dynasty.recruits[0]?.id;
 
-    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Main Menu$/i }));
     await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
     await userEvent.click(screen.getByRole('button', { name: /Yes, Start New/i }));
     const secondSave = loadActiveDynastySave();
@@ -306,13 +316,13 @@ describe('Desktop App', () => {
     await renderStartedApp();
     const firstSaveId = loadActiveDynastySave()?.saveId;
 
-    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Main Menu$/i }));
     await userEvent.selectOptions(screen.getByLabelText(/^Team$/i), 'virginia-lakes');
     await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
     await userEvent.click(screen.getByRole('button', { name: /Yes, Start New/i }));
     const secondSaveId = loadActiveDynastySave()?.saveId;
 
-    await userEvent.click(screen.getByRole('button', { name: /New Dynasty/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Main Menu$/i }));
 
     expect(listDynastySaves()).toHaveLength(2);
     await userEvent.click(screen.getByRole('button', { name: /Delete Maryland State 2028/i }));
@@ -358,11 +368,15 @@ describe('Desktop App', () => {
     await userEvent.click(within(pager).getByRole('button', { name: /Next/i }));
     expect(screen.getAllByRole('navigation', { name: /Recruit pages/i })[0]!).toHaveTextContent(/26–50 of/);
 
-    // New dynasties let the assistant make offers; turn that off to review them.
-    const autoOffers = screen.getByRole('checkbox', { name: /Assistant makes offers/i });
-    expect(autoOffers).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /Auto each week/i })).toBeChecked();
-    await userEvent.click(autoOffers);
+    // New dynasties hand the staff full control; step down to scout-and-pitch to review offers.
+    const staff = screen.getByRole('combobox', { name: /Recruiting staff each week/i });
+    expect(staff).toHaveValue('full');
+    await userEvent.selectOptions(staff, 'pitch');
+    expect(staff).toHaveValue('pitch');
+
+    // The list has column headers and says how likely each scouted recruit is to land.
+    expect(screen.getAllByText('Chance to land').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('.land-chip').length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: /^Run Assistant$/i }));
     const report = screen.getByLabelText(/Recruiting assistant report/i);
     expect(report).toHaveTextContent(/Scouting \(\d+\)/);
@@ -401,7 +415,7 @@ describe('Desktop App', () => {
     await renderStartedApp();
     // Advance until the first win lands; a recruiting unlock (a 5-star commit) can come first.
     for (let week = 1; week <= 6 && !loadActiveDynastySave()?.achievements?.['first-win']; week += 1) {
-      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Continue: Week ${week}`, 'i') }));
     }
     const toast = screen.getByRole('status', { name: /Achievement unlocked/i });
     // A big first win can unlock several at once; the toast lists three and counts the rest.
@@ -442,6 +456,9 @@ describe('Desktop App', () => {
     await userEvent.click(within(hub).getAllByTitle(/^View /i)[0]!);
     const panel = screen.getByLabelText(/Close player panel/i).closest('aside') as HTMLElement;
     expect(panel).toHaveTextContent(/Overall/i);
+    // Escape closes it, like every other overlay.
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByLabelText(/Close player panel/i)).not.toBeInTheDocument();
   });
 
   it('opens a reusable player card when a recruit name is clicked', async () => {
@@ -507,6 +524,18 @@ describe('Desktop App', () => {
     expect(screen.getByText(/Offered 50%/i)).toBeInTheDocument();
   });
 
+  it('explains jargon with "?" tips that lead to a searchable Help page', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: 'What is Win Prob?' }));
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/chance to win the next game/);
+    await userEvent.click(screen.getByRole('button', { name: /All terms/ }));
+    const glossary = screen.getByLabelText('Glossary');
+    expect(glossary).toHaveTextContent(/RPI/);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search terms' }), 'scholarship');
+    expect(glossary).toHaveTextContent(/3\.25 scholarship equivalents/);
+    expect(glossary).not.toHaveTextContent(/Rating Percentage Index/);
+  });
+
   it('switches to standings and shows national rankings and conference sections', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: /Standings/i }));
@@ -554,13 +583,13 @@ describe('Desktop App', () => {
 
   it('advances the week from the top bar', async () => {
     await renderStartedApp();
-    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
-    expect(screen.getByRole('button', { name: /Advance: Week 2/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Continue: Week 1/i }));
+    expect(screen.getByRole('button', { name: /Continue: Week 2/i })).toBeInTheDocument();
   });
 
   it('keeps a record book that counts the season as it is played', async () => {
     await renderStartedApp();
-    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Continue: Week 1/i }));
     await userEvent.click(screen.getByRole('button', { name: /^Records$/ }));
     const goals = screen.getByLabelText('Goals records');
     expect(within(goals).getAllByRole('row').length).toBeGreaterThan(0);
@@ -595,14 +624,20 @@ describe('Desktop App', () => {
     await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
 
-    // Simming is locked until the new season starts.
+    // The hub points to the offseason instead of a stale sim button.
     await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
-    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    expect(screen.queryByRole('button', { name: /Sim Week/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Open Offseason/i }));
     expect(screen.getByRole('button', { name: /Start 2029 Season/i })).toBeInTheDocument();
 
-    // From any other screen the top-bar Advance starts the season in one click.
+    // From any other screen the top-bar Advance starts the season, after a warning
+    // about unspent points; "Not yet" goes back to the offseason.
     await userEvent.click(screen.getByRole('button', { name: /^Recruiting/ }));
-    await userEvent.click(screen.getByRole('button', { name: /Advance: Season 2029/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Continue: Start Season 2029/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Not yet' }));
+    expect(screen.getByRole('article', { name: 'Offseason to-do' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Continue: Start Season 2029/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start anyway' }));
     expect(screen.getByLabelText(/User team summary/i)).toHaveTextContent(/Week 1/i);
   }, 20000);
 
@@ -664,9 +699,67 @@ describe('Desktop App', () => {
     expect(screen.getByText(/slate is locked/)).toBeInTheDocument();
   });
 
+  it('welcomes a new coach and walks the first week with a checklist', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Start New Dynasty/i }));
+    expect(screen.getByRole('dialog', { name: /You run/ })).toHaveTextContent(/Continue button/);
+    await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(loadActiveDynastySave()?.coachGuide?.welcomed).toBe(true));
+
+    const checklist = screen.getByRole('article', { name: "Coach's checklist" });
+    expect(checklist).toHaveTextContent('0/5 done');
+    // Recommended Actions sit right under the checklist, ahead of the rest of the hub.
+    const order = [...document.querySelectorAll('article')].map((a) => a.getAttribute('aria-label'));
+    expect(order.indexOf('Recommended actions')).toBe(order.indexOf("Coach's checklist") + 1);
+
+    // Visiting a screen ticks its step off.
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    await userEvent.click(within(nav).getByRole('button', { name: /^Team/ }));
+    await userEvent.click(within(nav).getByRole('button', { name: /^Week Hub/ }));
+    expect(screen.getByRole('article', { name: "Coach's checklist" })).toHaveTextContent('1/5 done');
+
+    // Closing it is for good, and survives a reload.
+    await userEvent.click(screen.getByRole('button', { name: 'Hide checklist' }));
+    expect(screen.queryByRole('article', { name: "Coach's checklist" })).not.toBeInTheDocument();
+    await waitFor(() => expect(loadActiveDynastySave()?.coachGuide?.dismissed).toBe(true));
+    cleanup();
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    expect(screen.queryByRole('article', { name: "Coach's checklist" })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('reveals the user result after a sim, and can be turned off', async () => {
+    // jsdom has no matchMedia; a browser with motion allowed gets the reveal.
+    window.matchMedia = ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      await renderStartedApp();
+      await userEvent.click(screen.getByRole('button', { name: /Sim Week 1/ }));
+      const card = screen.getByRole('dialog', { name: 'Game result' });
+      // Clicking skips the quarter-by-quarter tick straight to the final.
+      await userEvent.click(within(card).getByText('Click to skip'));
+      expect(within(card).getByText(/^(WIN|LOSS|UPSET!|TROPHY WIN)/)).toBeInTheDocument();
+      expect(card.querySelectorAll('.reveal-score')).toHaveLength(2);
+      await userEvent.click(within(card).getByRole('checkbox', { name: /Skip result reveals/ }));
+      await userEvent.click(within(card).getByRole('button', { name: 'Continue' }));
+      expect(screen.queryByRole('dialog', { name: 'Game result' })).not.toBeInTheDocument();
+      expect(localStorage.getItem('sms.skipReveals')).toBe('1');
+      // Off for good: the next week goes straight to the hub.
+      await userEvent.click(screen.getByRole('button', { name: /Sim Week 2/ }));
+      expect(screen.queryByRole('dialog', { name: 'Game result' })).not.toBeInTheDocument();
+    } finally {
+      delete (window as { matchMedia?: unknown }).matchMedia;
+    }
+  });
+
   it('coaches a game through halftime, and a reload returns to the locker room', async () => {
     await renderStartedApp();
     await userEvent.click(screen.getByRole('button', { name: 'Coach the Game' }));
+    // The pregame step comes first: scout report and the plan, then the first half.
+    const pregame = screen.getByRole('dialog', { name: /Game plan (vs|at) / });
+    expect(within(pregame).getByLabelText('Opponent scouting report')).toBeInTheDocument();
+    await userEvent.click(within(pregame).getByRole('button', { name: /Play First Half/ }));
     const dialog = screen.getByRole('dialog', { name: /Halftime|at/ });
     expect(within(dialog).getByText('Staff read')).toBeInTheDocument();
     await waitFor(() => expect(loadActiveDynastySave()?.halftime?.week).toBe(1));
@@ -704,6 +797,39 @@ describe('Desktop App', () => {
       expect(save.newsItems.some((n) => n.headline.includes('after the game'))).toBe(true);
     });
     expect(label.length).toBeGreaterThan(0);
+  });
+
+  it('lets the staff handle team talks and press conferences until taken back', async () => {
+    await renderStartedApp();
+    await userEvent.click(screen.getByRole('button', { name: /Let the staff handle talks/i }));
+    expect(screen.getByRole('button', { name: 'Take them back' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Sim Week/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^Week Hub/ }));
+    // The staff answered for us: no press card waits, and the answer is on record.
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Press conference')).not.toBeInTheDocument();
+      const save = loadActiveDynastySave()!;
+      expect(save.staffHandlesMedia).toBe(true);
+      expect(Object.values(save.pressAnswers ?? {})).toHaveLength(1);
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Take them back' }));
+    expect(screen.getByRole('button', { name: /Let the staff handle talks/i })).toBeInTheDocument();
+  });
+
+  it('folds sidebar groups away and remembers it', async () => {
+    await renderStartedApp();
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    const league = within(nav).getByRole('button', { name: 'Fold League' });
+    expect(league).toHaveAttribute('aria-expanded', 'true');
+    expect(within(nav).getByRole('button', { name: /^Standings/ })).toBeInTheDocument();
+    await userEvent.click(league);
+    expect(within(nav).getByRole('button', { name: 'Show League' })).toHaveAttribute('aria-expanded', 'false');
+    expect(within(nav).queryByRole('button', { name: /^Standings/ })).not.toBeInTheDocument();
+    cleanup();
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    const navAgain = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(within(navAgain).getByRole('button', { name: 'Show League' })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('sets practice intensity and development plans on the Practice screen', async () => {
@@ -750,6 +876,9 @@ describe('Desktop App', () => {
   it('suggests redshirts before the opener and redshirts a player from the Team screen', async () => {
     await renderStartedApp();
     const actions = screen.getByRole('heading', { name: /Recommended Actions/i }).closest('article')!;
+    // The card shows the top three; the rest are a click away.
+    const more = within(actions).queryByRole('button', { name: /Show all/ });
+    if (more) await userEvent.click(more);
     expect(actions).toHaveTextContent(/buried on the depth chart\. Redshirt them/);
     await userEvent.click(screen.getByRole('button', { name: /^Team/ }));
     const card = screen.getByLabelText('Redshirts');
@@ -801,7 +930,7 @@ describe('Desktop App', () => {
     const preview = screen.getByLabelText('Season preview');
     expect(preview).toHaveTextContent(/you're picked \d+(st|nd|rd|th)/);
     expect(within(preview).getAllByRole('listitem').length).toBeGreaterThan(10);
-    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Continue: Week 1/i }));
     await userEvent.click(screen.getByRole('button', { name: /Week Hub/i }));
     expect(screen.queryByLabelText('Season preview')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^News/ }));
@@ -811,7 +940,7 @@ describe('Desktop App', () => {
   it('tracks the awards race and weekly honors on the Stats screen', async () => {
     await renderStartedApp();
     for (let week = 1; week <= 2; week += 1) {
-      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Continue: Week ${week}`, 'i') }));
     }
     await userEvent.click(screen.getByRole('button', { name: /^Stats/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Awards Race' }));
@@ -825,7 +954,7 @@ describe('Desktop App', () => {
 
   it('ranks every team on the Team Stats tab and re-sorts by column', async () => {
     await renderStartedApp();
-    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Continue: Week 1/i }));
     await userEvent.click(screen.getByRole('button', { name: /^Stats/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Team Stats' }));
     const card = screen.getByLabelText('Team stats');
@@ -852,7 +981,7 @@ describe('Desktop App', () => {
     expect(within(screen.getByLabelText('Opponent scouting report')).queryByLabelText('Tale of the tape')).not.toBeInTheDocument();
     // The next opponent may have had a bye, so advance until both teams have a box score.
     for (let week = 1; week <= 4 && !screen.queryByLabelText('Tale of the tape'); week += 1) {
-      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Continue: Week ${week}`, 'i') }));
       await userEvent.click(screen.getByRole('button', { name: /^Season$/i }));
     }
     const tape = within(screen.getByLabelText('Opponent scouting report')).getByLabelText('Tale of the tape');
@@ -878,7 +1007,7 @@ describe('Desktop App', () => {
 
   it('filters stat leaders and team stats to the conference or the user team', async () => {
     await renderStartedApp();
-    await userEvent.click(screen.getByRole('button', { name: /Advance: Week 1/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Continue: Week 1/i }));
     await userEvent.click(screen.getByRole('button', { name: /^Stats/ }));
     const scopes = screen.getByRole('group', { name: 'Leaderboard scope' });
     const leaders = () => screen.getByRole('heading', { name: /^Scoring Leaders/ }).closest('article')!;
@@ -930,7 +1059,7 @@ describe('Desktop App', () => {
     await userEvent.click(within(concerns).getAllByRole('button', { name: 'Promise role' })[0]!);
     expect(concerns).toHaveTextContent(/Promised a starter role by week 3/);
     for (let week = 1; week <= 3; week += 1) {
-      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Advance: Week ${week}`, 'i') }));
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`Continue: Week ${week}`, 'i') }));
     }
     await userEvent.click(screen.getByRole('button', { name: /^News/ }));
     expect(screen.getByText(/feels betrayed after a broken promise of playing time/)).toBeInTheDocument();

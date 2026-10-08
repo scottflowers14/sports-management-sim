@@ -2,6 +2,7 @@ import type { TournamentState, TournamentGame, ConferenceBracket, NcaaEntry } fr
 import type { BoxScoreData } from '../ui/types';
 import { formatTeamName } from '../ui/format';
 import { formatOdds, type NcaaOdds } from '../bracket-odds';
+import { HelpTip } from '../components/HelpTip';
 
 export function TournamentScreen({
   tournament,
@@ -304,7 +305,7 @@ function NcaaSection({
         <div className="ncaa-field">
           <table className="data-grid">
             <thead>
-              <tr><th>Seed</th><th>Team</th><th>Bid</th><th>RPI</th><th title="Wins over top-quarter RPI teams">QW</th><th title="Losses to bottom-half RPI teams">BL</th></tr>
+              <tr><th>Seed</th><th>Team</th><th>Bid</th><th>RPI <HelpTip term="rpi" /></th><th title="Wins over top-quarter RPI teams">QW <HelpTip term="quality-wins" /></th><th title="Losses to bottom-half RPI teams">BL</th></tr>
             </thead>
             <tbody>
               {[...field].sort((a, b) => a.seed - b.seed).map((e) => (

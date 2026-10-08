@@ -317,6 +317,23 @@ export function healInjuriesOneWeek(currentInjuries: InjuredPlayer[]): InjuredPl
     .filter((inj): inj is InjuredPlayer => inj !== null);
 }
 
+/** The user's passive weekly interest gain on an offered recruit (pitches and visits come on top). */
+export function userWeeklyDrift(recruit: LacrosseRecruit, team: LacrosseTeam, scholarshipPercent: number): number {
+  const prestigeMult = recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige);
+  const scholarshipPull = (scholarshipPercent / 100) * (recruit.preferences.scholarshipImportance / 100) * 3;
+  return Math.round((3 + recruit.starRating * 0.5 + scholarshipPull) * prestigeMult);
+}
+
+/**
+ * A CPU program's weekly interest gain on a recruit it offered. CPU staffs work
+ * their boards off-screen, so their drift stays stronger. `roll` is in [0, 1).
+ */
+export function cpuWeeklyDrift(recruit: LacrosseRecruit, team: LacrosseTeam, cpuInterestScale: number, roll: number): number {
+  const prestigeMult = recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige);
+  const prestigeBonus = (team.reputation.nationalPrestige / 100) * 4;
+  return Math.round((5 + recruit.starRating * 0.5 + prestigeBonus + roll * 3) * prestigeMult * cpuInterestScale);
+}
+
 /** A recruit shuts down their recruitment early only when one school is a runaway leader. */
 const EARLY_COMMIT_INTEREST = 95;
 const EARLY_COMMIT_LEAD = 20;
@@ -367,17 +384,11 @@ export function autoCommitWeekly(
       const team = teams.find((t) => t.id === offer.teamId);
       if (!team) continue;
       const current = updatedInterest[team.id] ?? 0;
-      const prestigeMult = recruitPrestigeMultiplier(recruit.starRating, team.reputation.nationalPrestige);
-      if (team.id === userTeamId) {
-        const scholarshipPull = (offer.scholarshipPercent / 100) * (recruit.preferences.scholarshipImportance / 100) * 3;
-        const gain = Math.round((3 + recruit.starRating * 0.5 + scholarshipPull) * prestigeMult);
-        updatedInterest[team.id] = Math.min(100, current + gain);
-      } else {
-        // CPU staffs work their boards off-screen, so their drift stays stronger.
-        const prestigeBonus = (team.reputation.nationalPrestige / 100) * 4;
-        const gain = Math.round((5 + recruit.starRating * 0.5 + prestigeBonus + random() * 3) * prestigeMult * cpuInterestScale);
-        updatedInterest[team.id] = Math.min(100, current + gain);
-      }
+      const gain =
+        team.id === userTeamId
+          ? userWeeklyDrift(recruit, team, offer.scholarshipPercent)
+          : cpuWeeklyDrift(recruit, team, cpuInterestScale, random());
+      updatedInterest[team.id] = Math.min(100, current + gain);
     }
 
     const withInterest = { ...recruit, interestByTeamId: updatedInterest };
